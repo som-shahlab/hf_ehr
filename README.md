@@ -9,6 +9,10 @@ Side Goals:
 1. Develop personal ML skills (PyTorch Lightning, Hydra, multi-GPU training, Wandb, HuggingFace, etc.)
 2. Create Shah lab ML infrastructure akin to HazyResearch's `safari` repo
 
+Plan:
+1. Train several GPT-2 models at different scales, using the simplest possible patient timeline representation (the raw list of all codes in a patient's timeline)
+2. Test each model on EHRSHOT, compare to CLMBR / count-based baselines
+
 ## Setup
 
 ```bash
