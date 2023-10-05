@@ -1,0 +1,16 @@
+polars
+transformers
+pandas
+femr
+datasets
+pandas
+tensorboard
+torch
+transformers
+pytorch-lightning
+numpy
+pytorch-nlp
+wandb
+loguru
+hydra
+omegaconf
