@@ -7,7 +7,6 @@ import femr.datasets
 import os
 import numpy as np
 from jaxtyping import Float
-from hf_ehr.utils import DotDict
 from hf_ehr.config import PATH_TO_FEMR_EXTRACT, PATH_TO_TOKENIZER_DIR
 import json
 from omegaconf import DictConfig
@@ -162,22 +161,14 @@ def collate_femr_timelines(batch: List[List[int]],
 
 
 if __name__ == '__main__':
-    # Test out FEMRDataset
-    config = {}
-    config['path_to_femr_extract'] = PATH_TO_FEMR_EXTRACT
-    config['max_length'] = 1024
-    config['is_truncation_random'] = True
-    config['seed'] = 1
-    config = DotDict(config)
-    
     # Tokenizer
     atoi: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_DIR, 'code_2_int.json'), 'r'))
     tokenizer = FEMRTokenizer(atoi)
     
     # Dataset
-    train_dataset = FEMRDataset(config, split='train')
-    val_dataset = FEMRDataset(config, split='val')
-    test_dataset = FEMRDataset(config, split='test')
+    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT, split='train')
+    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT, split='val')
+    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT, split='test')
     
     # Stats
     print('train', len(train_dataset))
