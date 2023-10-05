@@ -98,7 +98,7 @@ class GPTLanguageModel(pl.LightningModule):
         # Metrics
         train_batch_examples: int = B
         train_batch_tokens_PAD: int = batch['attention_mask'].sum()
-        train_batch_tokens_nonPAD: int = (~batch['attention_mask']).sum()
+        train_batch_tokens_nonPAD: int = (1 - batch['attention_mask']).sum()
         self.train_cum_examples.update(train_batch_examples)
         self.train_cum_tokens_PAD.update(train_batch_tokens_PAD)
         self.train_cum_tokens_nonPAD.update(train_batch_tokens_nonPAD)
@@ -106,12 +106,14 @@ class GPTLanguageModel(pl.LightningModule):
         # Logging
         self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
-        self.log('train/batch/examples', B)
-        self.log('train/batch/tokens_PAD', train_batch_tokens_PAD)
-        self.log('train/batch/tokens_nonPAD', train_batch_tokens_nonPAD)
-        self.log('train/cum/examples', self.train_cum_examples.compute())
-        self.log('train/cum/tokens_PAD', self.train_cum_tokens_PAD.compute())
-        self.log('train/cum/tokens_nonPAD', self.train_cum_tokens_nonPAD.compute())
+        self.log('train/examples/batch', B)
+        self.log('train/examples/cum', self.train_cum_examples.compute())
+        self.log('train/tokens/batch_all', train_batch_tokens_PAD + train_batch_tokens_nonPAD)
+        self.log('train/tokens/batch_PAD', train_batch_tokens_PAD)
+        self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD)
+        self.log('train/tokens/cum_all', self.train_cum_tokens_PAD.compute() + self.train_cum_tokens_nonPAD.compute())
+        self.log('train/tokens/cum_PAD', self.train_cum_tokens_PAD.compute())
+        self.log('train/tokens/cum_nonPAD', self.train_cum_tokens_nonPAD.compute())
 
         return loss
 

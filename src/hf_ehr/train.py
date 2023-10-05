@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from pytorch_lightning.utilities import rank_zero_only
 
 from torch.utils.data import DataLoader
 from loguru import logger
@@ -29,8 +30,11 @@ class GradNormCallback(Callback):
         total_norm = total_norm ** (1. / 2)
         return total_norm
 
+    def on_after_backward(self, trainer, model):
+        model.log("optim/grad_norm_clipped", self.gradient_norm(model))
+    
     def on_before_optimizer_step(self, trainer, model, optimizer):
-        model.log("optim/grad_norm", self.gradient_norm(model))
+        model.log("optim/grad_norm_raw", self.gradient_norm(model))
         
 def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], tokenizer: FEMRTokenizer) -> Dict[str, DataLoader]:
     batch_size: int = config.data.dataloader.batch_size
@@ -114,14 +118,15 @@ def main(config: DictConfig) -> None:
     logger.info("Starting main")
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
     if is_wandb:
-        wandb.init(project='hf_ehr', config=OmegaConf.to_container(config), dir=path_to_log_dir)
         loggers += [ 
                     WandbLogger(project='hf_ehr',
                                 log_model=False,
                                 save_dir=path_to_log_dir)
         ]
-        wandb.define_metric('train/loss', summary='min')
-        wandb.define_metric('val/loss', summary='min')
+        if rank_zero_only.rank == 0:
+            wandb.config.update(OmegaConf.to_container(config, resolve=True))
+            wandb.define_metric('train/loss', summary='min')
+            wandb.define_metric('val/loss', summary='min')
 
     # Tokenizer
     logger.info(f"Loading tokenizer: `{path_to_tokenizer}`")
@@ -148,7 +153,7 @@ def main(config: DictConfig) -> None:
     )
     checkpoint_callback = ModelCheckpoint(
         dirpath=path_to_ckpt_dir,
-        filename='{epoch}-{val/loss:.2f}',
+        filename='{epoch}',
         save_top_k=config.callbacks.model_checkpointing.save_top_k,
         save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
         save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
@@ -173,7 +178,7 @@ def main(config: DictConfig) -> None:
         gradient_clip_val=gradient_clip_value,
         gradient_clip_algorithm=gradient_clip_algorithm,
     )
-
+    
     # Run
     trainer.fit(model, 
                 train_dataloaders=dataloaders['train'],
@@ -182,15 +187,16 @@ def main(config: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    # For Carina to work
-    # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+    # For Carina to work (otherwise get a ton of Disk space out of memory errors b/c will write to /home/mwornow/.local/ which is space limited)
     os.environ['HF_DATASETS_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
     os.environ['TRANSFORMERS_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
     os.environ['HUGGINGFACE_HUB_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
     os.environ['HF_HOME'] = "/share/pi/nigam/mwornow/hf_cache/"
     os.environ['WANDB_CACHE_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_CONFIG_DIR'] = "/share/pi/nigam/mwornow/wandb_config/"
-    os.environ['WANDB_DIR'] = "/share/pi/nigam/mwornow/wandb_dir/"
+    os.environ['WANDB_CONFIG_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
+    os.environ['WANDB_DATA_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
+    os.environ['WANDB_ARTIFACT_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
+    os.environ['WANDB_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
     os.environ['TRITON_CACHE_DIR'] = "/share/pi/nigam/mwornow/triton_cache/"
 
     # Run

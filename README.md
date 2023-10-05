@@ -26,7 +26,7 @@ pip3 install -e .
 
 Create Carina node:
 ```bash
-srun --partition=gpu --mem=200G --gres=gpu:4 --cpus-per-task=20 --time=5:00:00 --pty bash -i
+srun --partition=gpu --mem=200G --gres=gpu:4 --cpus-per-task=20 --time=24:00:00 --pty bash -i
 cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
 
 # Separately, in VSCode, run the command "Remote-Tunnels: Connect to Tunnel..." and select "slurm-gpu"
@@ -35,11 +35,11 @@ cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/p
 Launch training run:
 ```bash
 conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr
-python3 training.py \
+python3 train.py \
     data.dataloader.batch_size=4 \
     data.dataloader.n_workers=2 \
-    trainer.devices=[0,1] \
-    trainer.max_epochs=1
+    trainer.devices=[0,1,2,3] \
+    trainer.max_epochs=10
 ```
 
 ## Initial Setup

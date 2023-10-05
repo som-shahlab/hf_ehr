@@ -4,6 +4,10 @@ main:
   # Where outputs will be saved
   path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d-%H-%M-%S}/
 
+hydra:
+  run:
+    dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d-%H-%M-%S}/hydra/
+
 model:
   # Name of HF model to load
   name: gpt2
@@ -29,7 +33,7 @@ data:
     path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite
   dataloader:
     # Batch size to be used.
-    batch_size: 8
+    batch_size: 4
     # Number of data loader workers to use.
     n_workers: 4
     # Max number of codes to feed into model at once per patient.
