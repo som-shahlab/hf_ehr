@@ -1,0 +1,89 @@
+main:
+  # Training seed.
+  seed: 1
+  # Where outputs will be saved
+  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d-%H-%M-%S}/
+
+model:
+  # Name of HF model to load
+  name: gpt2
+  # Kwargs for ModelConfig
+  config_kwargs:
+    n_layer: 12
+    n_head: 12
+    n_embd: 768
+
+callbacks:
+  early_stopping:
+    # If we want to min/max the monitored quantity.
+    metric_mode: min
+    # Number of epochs with no improvement after which training will be stopped.
+    patience: 3
+  model_checkpointing:
+    # The best k models according to the quantity monitored will be saved. If -1, then save all models
+    save_top_k: -1
+
+data:
+  dataset:
+    # Path to FEMR extract
+    path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite
+  dataloader:
+    # Batch size to be used.
+    batch_size: 8
+    # Number of data loader workers to use.
+    n_workers: 4
+    # Max number of codes to feed into model at once per patient.
+    max_length: 1024
+    # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
+    is_truncation_random: True
+  tokenizer:
+    # Path to tokenizer
+    path_to_tokenizer: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer/code_2_int.json
+
+
+trainer:
+  # Accumulated gradients runs K small batches of size N before doing a backwards pass.
+  accumulate_grad_batches: 2
+  # Value for gradient clipping
+  gradient_clip_value: 3
+  # Whether to clip the gradients based on their 'norm' or 'value'
+  gradient_clip_algorithm: norm
+  # List of devices to run on
+  devices: 0, 1, 2, 3
+  # Supports three options dp, ddp, ddp2
+  distributed_backend: ddp
+  # If true uses 16 bit AMP precision
+  is_use_amp: True
+  # Limits training to a minimum number of epochs
+  min_epochs: 1
+  # Limits training to a max number number of epochs
+  max_epochs: 1
+  # Limits training to `N` batches if `int`, or `N%` of batches if `float`
+  limit_train_batches: 20
+  # Limits val to `N` batches if `int`, or `N%` of batches if `float`
+  limit_val_batches: 20
+  # OPTIMIZER
+  optimizer:
+    # Learning rate
+    lr: 3e-5
+  # SCHEDULER
+  scheduler:
+    # Max learning rate
+    max_lr: 3e-4
+    # Sets initial lr = max_lr / div_factor
+    div_factor: 10
+    # Sets plateau lr = max_lr / final_div_factor
+    final_div_factor: 100
+    # Percent of steps to use for increasing lr
+    pct_start: 0.01
+    # Total # of steps in cycle
+    total_steps: 1_000
+    # Annealing strat: `cos` or `linear`
+    anneal_strategy: cos
+
+logging:
+  wandb:
+    # If true, then turn ON wandb logging
+    is_wandb: True
+    # Run name
+    name: null
