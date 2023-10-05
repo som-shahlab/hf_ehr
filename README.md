@@ -1,4 +1,4 @@
-# HuggingFace for EHRs
+# Off-the-Shelf HuggingFace Models for EHRs
 
 Guiding Questions:
 1. Can we use off the shelf HuggingFace models on our structured EHR data?
