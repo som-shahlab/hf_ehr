@@ -1,12 +1,13 @@
 main:
   # Training seed.
   seed: 1
-  # Where outputs will be saved
-  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d-%H-%M-%S}/
+  # Where outputs will be saved; If folder exists, then run will be resumed from this directory's `../ckpts/last.ckpt` file
+  # path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/2023-10-05_22-39-21/
+  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
 
 hydra:
   run:
-    dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d-%H-%M-%S}/hydra/
+    dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/hydra/
 
 model:
   # Name of HF model to load
@@ -25,7 +26,9 @@ callbacks:
     patience: 3
   model_checkpointing:
     # The best k models according to the quantity monitored will be saved. If -1, then save all models
-    save_top_k: -1
+    save_top_k: 5
+    # Save model every N steps; if NULL, save after every epoch
+    every_n_train_steps: 10_000
 
 data:
   dataset:
@@ -46,8 +49,8 @@ data:
 
 
 trainer:
-  # Accumulated gradients runs K small batches of size N before doing a backwards pass.
-  accumulate_grad_batches: 2
+  # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
+  accumulate_grad_batches: 4
   # Value for gradient clipping
   gradient_clip_value: 3
   # Whether to clip the gradients based on their 'norm' or 'value'
@@ -61,11 +64,11 @@ trainer:
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
-  max_epochs: 1
+  max_epochs: 1000
   # Limits training to `N` batches if `int`, or `N%` of batches if `float`
-  limit_train_batches: 20
+  limit_train_batches: null
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`
-  limit_val_batches: 20
+  limit_val_batches: null
   # OPTIMIZER
   optimizer:
     # Learning rate
@@ -73,15 +76,15 @@ trainer:
   # SCHEDULER
   scheduler:
     # Max learning rate
-    max_lr: 3e-4
+    max_lr: 3e-3
     # Sets initial lr = max_lr / div_factor
     div_factor: 10
     # Sets plateau lr = max_lr / final_div_factor
     final_div_factor: 100
     # Percent of steps to use for increasing lr
-    pct_start: 0.01
+    pct_start: 0.3
     # Total # of steps in cycle
-    total_steps: 1_000
+    total_steps: 200_000
     # Annealing strat: `cos` or `linear`
     anneal_strategy: cos
 
@@ -91,3 +94,4 @@ logging:
     is_wandb: True
     # Run name
     name: null
+  is_log_grad_norm: False

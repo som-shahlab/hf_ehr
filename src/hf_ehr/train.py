@@ -9,7 +9,7 @@ from pytorch_lightning.utilities import rank_zero_only
 
 from torch.utils.data import DataLoader
 from loguru import logger
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
@@ -30,9 +30,6 @@ class GradNormCallback(Callback):
         total_norm = total_norm ** (1. / 2)
         return total_norm
 
-    def on_after_backward(self, trainer, model):
-        model.log("optim/grad_norm_clipped", self.gradient_norm(model))
-    
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
         
@@ -88,6 +85,7 @@ def main(config: DictConfig) -> None:
     print(config)
     path_to_output_dir: str = config.main.path_to_output_dir
     is_wandb: bool = config.logging.wandb.is_wandb
+    is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
     path_to_tokenizer: str = config.data.tokenizer.path_to_tokenizer
     devices: List[int] = config.trainer.devices
@@ -104,6 +102,10 @@ def main(config: DictConfig) -> None:
 
     # Random seed
     pl.seed_everything(seed)
+    
+    # Check if resuming from checkpoint
+    is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
+    path_to_resume_ckpt: Optional[str] = os.path.join(path_to_output_dir, 'ckpts/last.ckpt') if is_resume_from_ckpt else None
 
     # Paths
     path_to_log_dir: str = os.path.join(path_to_output_dir, 'logs/')
@@ -115,19 +117,40 @@ def main(config: DictConfig) -> None:
     
     # Logging
     logger.add(path_to_log_file)
-    logger.info("Starting main")
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
     if is_wandb:
-        loggers += [ 
-                    WandbLogger(project='hf_ehr',
-                                log_model=False,
-                                save_dir=path_to_log_dir)
-        ]
+        if is_resume_from_ckpt:
+            # Load wandb run ID
+            with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
+                wandb_run_id: str = f.read()
+            logger.info(f"Found existing wandb run: `{wandb_run_id}`")
+            loggers += [ 
+                        WandbLogger(project='hf_ehr',
+                                    log_model=False,
+                                    save_dir=path_to_log_dir,
+                                    resume='must',
+                                    id=wandb_run_id)
+            ]
+        else:
+            loggers += [ 
+                        WandbLogger(project='hf_ehr',
+                                    log_model=False,
+                                    save_dir=path_to_log_dir)
+            ]
+            if rank_zero_only.rank == 0:
+                # Save wandb run ID
+                wandb_run_id: str = wandb.run.id
+                with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'w') as f:
+                    f.write(wandb_run_id)
         if rank_zero_only.rank == 0:
-            wandb.config.update(OmegaConf.to_container(config, resolve=True))
+            if not is_resume_from_ckpt:
+                wandb.config.update(OmegaConf.to_container(config, resolve=True))
             wandb.define_metric('train/loss', summary='min')
             wandb.define_metric('val/loss', summary='min')
 
+    logger.info("========================== Starting main ==========================")
+    logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
+    
     # Tokenizer
     logger.info(f"Loading tokenizer: `{path_to_tokenizer}`")
     femr_vocab_atoi: Dict[str, int] = json.load(open(path_to_tokenizer, 'r'))
@@ -143,7 +166,8 @@ def main(config: DictConfig) -> None:
     # Dataloaders
     dataloaders: Dict[str, DataLoader] = load_dataloaders(config, datasets, tokenizer)
 
-    # Trainer
+    # Callbacks
+    callbacks: List = []
     early_stop_callback = EarlyStopping(
         monitor='val/loss',
         min_delta=0.0,
@@ -151,27 +175,34 @@ def main(config: DictConfig) -> None:
         verbose=True,
         mode=config.callbacks.early_stopping.metric_mode,
     )
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=path_to_ckpt_dir,
-        filename='{epoch}',
-        save_top_k=config.callbacks.model_checkpointing.save_top_k,
-        save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
-        save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
-        monitor='val/loss',
-        mode='min',
-        verbose=True,
-    )
-    grad_norm_callback = GradNormCallback()
+    callbacks += [ 
+        ModelCheckpoint(
+            dirpath=path_to_ckpt_dir,
+            filename='{epoch}',
+            save_top_k=config.callbacks.model_checkpointing.save_top_k,
+            every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
+            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
+            save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
+            monitor='val/loss',
+            mode='min',
+            verbose=True,
+        )
+    ]
+    if is_log_grad_norm:
+        callbacks += [ GradNormCallback() ]
+    
+    # Trainer
     trainer = Trainer(
         logger=loggers,
-        callbacks=[ checkpoint_callback, grad_norm_callback, ],
+        callbacks=callbacks,
         accelerator='gpu',
         devices=devices,
         strategy=distributed_backend,
         limit_train_batches=limit_train_batches,
         limit_val_batches=limit_val_batches,
         log_every_n_steps=1,
-        precision='16-mixed' if is_use_amp else '32-true',
+        precision=16 if is_use_amp else 32,
+        val_check_interval=0.1, # check val set every 10% of training batches (useful for large training datasets, rather than wait for full epoch to finish)
         max_epochs=max_epochs,
         min_epochs=min_epochs,
         accumulate_grad_batches=accumulate_grad_batches,
@@ -182,7 +213,8 @@ def main(config: DictConfig) -> None:
     # Run
     trainer.fit(model, 
                 train_dataloaders=dataloaders['train'],
-                val_dataloaders=dataloaders['val'])
+                val_dataloaders=dataloaders['val'],
+                ckpt_path=path_to_resume_ckpt)
     wandb.finish()
 
 

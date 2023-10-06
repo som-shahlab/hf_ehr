@@ -9,7 +9,6 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
 
-
 class GPTLanguageModel(pl.LightningModule):
     """
     Sample model to show how to train GPT2 with a Language Model head.
@@ -38,9 +37,9 @@ class GPTLanguageModel(pl.LightningModule):
         self.tokenizer = tokenizer
         
         # Metrics
-        self.train_cum_examples = SumMetric()
-        self.train_cum_tokens_PAD = SumMetric()
-        self.train_cum_tokens_nonPAD = SumMetric()
+        self.train_total_examples = SumMetric()
+        self.train_total_tokens_PAD = SumMetric()
+        self.train_total_tokens_nonPAD = SumMetric()
 
     def forward(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> Float[torch.Tensor, 'B L V']:
         B: int = tokens['input_ids'].shape[0]
@@ -90,6 +89,7 @@ class GPTLanguageModel(pl.LightningModule):
         # Forward pass
         pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(batch)
         loss: torch.Tensor = self.loss(pred_logits, batch['input_ids'])
+        ppl: torch.Tensor = torch.exp(loss)
         lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
 
         # Sanity checks
@@ -97,23 +97,24 @@ class GPTLanguageModel(pl.LightningModule):
         
         # Metrics
         train_batch_examples: int = B
-        train_batch_tokens_PAD: int = batch['attention_mask'].sum()
-        train_batch_tokens_nonPAD: int = (1 - batch['attention_mask']).sum()
-        self.train_cum_examples.update(train_batch_examples)
-        self.train_cum_tokens_PAD.update(train_batch_tokens_PAD)
-        self.train_cum_tokens_nonPAD.update(train_batch_tokens_nonPAD)
+        train_batch_tokens_PAD: torch.Tensor = batch['attention_mask'].sum()
+        train_batch_tokens_nonPAD: torch.Tensor = (1 - batch['attention_mask']).sum()
+        self.train_total_examples.update(train_batch_examples)
+        self.train_total_tokens_PAD.update(train_batch_tokens_PAD)
+        self.train_total_tokens_nonPAD.update(train_batch_tokens_nonPAD)
 
         # Logging
         self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
-        self.log('train/examples/batch', B)
-        self.log('train/examples/cum', self.train_cum_examples.compute())
-        self.log('train/tokens/batch_all', train_batch_tokens_PAD + train_batch_tokens_nonPAD)
-        self.log('train/tokens/batch_PAD', train_batch_tokens_PAD)
-        self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD)
-        self.log('train/tokens/cum_all', self.train_cum_tokens_PAD.compute() + self.train_cum_tokens_nonPAD.compute())
-        self.log('train/tokens/cum_PAD', self.train_cum_tokens_PAD.compute())
-        self.log('train/tokens/cum_nonPAD', self.train_cum_tokens_nonPAD.compute())
+        self.log('train/ppl', ppl)
+        self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
+        self.log('train/examples/total', self.train_total_examples.compute().to(torch.float32))
+        self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
+        self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
+        self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
+        self.log('train/tokens/total_all', (self.train_total_tokens_PAD.compute() + self.train_total_tokens_nonPAD.compute()).to(torch.float32))
+        self.log('train/tokens/total_PAD', self.train_total_tokens_PAD.compute().to(torch.float32))
+        self.log('train/tokens/total_nonPAD', self.train_total_tokens_nonPAD.compute().to(torch.float32))
 
         return loss
 
@@ -122,9 +123,11 @@ class GPTLanguageModel(pl.LightningModule):
                         batch_idx: int) -> torch.Tensor:
         pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(batch)
         loss: torch.Tensor = self.loss(pred_logits, batch['input_ids'])
+        ppl: torch.Tensor = torch.exp(loss)
 
         # Logging
-        self.log('val/loss', loss, prog_bar=True)
+        self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log('val/ppl', ppl, on_epoch=True, sync_dist=True)
 
         return loss
     

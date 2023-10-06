@@ -35,13 +35,15 @@ cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/p
 Launch training run:
 ```bash
 conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr
-python3 train.py \
-    data.dataloader.batch_size=4 \
-    data.dataloader.n_workers=2 \
-    trainer.devices=[0,1,2,3] \
-    trainer.max_epochs=10
+python3 train.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3]
 ```
 
+# Stats
+
+GPT-2-342M (12-layer, 12-head, 768 embed) w/ batch size = 4 on 4 v100 32GBs:
+* Memory = 25GB / GPU
+* Train time = 17 hrs / epoch
+Epoch 0:   2%|█                                                                  | 2723/164878 [17:46<17:38:36,  2.55it/s, v_num=cahv, train/loss=1.140, train/ppl=3.110]
 ## Initial Setup
 
 To create the simplest EHR tokenizer (every code is its own token):
