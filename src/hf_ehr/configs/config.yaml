@@ -2,8 +2,9 @@ main:
   # Training seed.
   seed: 1
   # Where outputs will be saved; If folder exists, then run will be resumed from this directory's `../ckpts/last.ckpt` file
-  # path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/2023-10-05_22-39-21/
-  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
+  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2/
+  # path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/test/
+  # path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
 
 hydra:
   run:
@@ -25,10 +26,12 @@ callbacks:
     # Number of epochs with no improvement after which training will be stopped.
     patience: 3
   model_checkpointing:
-    # The best k models according to the quantity monitored will be saved. If -1, then save all models
+    # Save the top K best models according to val/loss. If -1, then save all models
     save_top_k: 5
+    # Save the most recent K models. If -1, then save all models
+    save_most_recent_k: 1
     # Save model every N steps; if NULL, save after every epoch
-    every_n_train_steps: 10_000
+    every_n_train_steps: 5_000
 
 data:
   dataset:
@@ -38,7 +41,7 @@ data:
     # Batch size to be used.
     batch_size: 4
     # Number of data loader workers to use.
-    n_workers: 4
+    n_workers: 10
     # Max number of codes to feed into model at once per patient.
     max_length: 1024
     # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
@@ -59,8 +62,10 @@ trainer:
   devices: 0, 1, 2, 3
   # Supports three options dp, ddp, ddp2
   distributed_backend: ddp
-  # If true uses 16 bit AMP precision
-  is_use_amp: True
+  # If true uses bf16 mixed precision (A100 only)
+  is_use_bf16: False
+  # If true uses fp16 mixed precision
+  is_use_fp16: True
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
@@ -69,24 +74,20 @@ trainer:
   limit_train_batches: null
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`
   limit_val_batches: null
+  # How often we check the validation set within an epoch
+  val_check_interval: 0.25
   # OPTIMIZER
   optimizer:
     # Learning rate
-    lr: 3e-5
+    lr: 3e-3
   # SCHEDULER
   scheduler:
-    # Max learning rate
-    max_lr: 3e-3
-    # Sets initial lr = max_lr / div_factor
-    div_factor: 10
-    # Sets plateau lr = max_lr / final_div_factor
-    final_div_factor: 100
-    # Percent of steps to use for increasing lr
-    pct_start: 0.3
-    # Total # of steps in cycle
-    total_steps: 200_000
-    # Annealing strat: `cos` or `linear`
-    anneal_strategy: cos
+    # Number of steps from `initial_lr` -> `trainer.optimizer.lr`
+    num_warmup_steps: 10_000
+    # Number of steps from `trainer.optimizer.lr` -> `final_lr`
+    num_decay_steps: 2_000_000
+    initial_lr: 3e-6
+    final_lr: 3e-5
 
 logging:
   wandb:
@@ -94,4 +95,7 @@ logging:
     is_wandb: True
     # Run name
     name: null
+  # If TRUE, then calculate + log grad norm over all params (slows down training)
   is_log_grad_norm: False
+  # Log every N steps
+  log_every_n_steps: 1

@@ -96,7 +96,10 @@ class FEMRDataset(Dataset):
     '''Dataset that returns patients in a FEMR extract.
         Note: Takes 1.5 hrs to loop through all event.code of all 3769353 patients in STARR-OMOP-deid-lite.
     '''
-    def __init__(self, path_to_femr_extract: str, split: str = 'train'):
+    def __init__(self, 
+                 path_to_femr_extract: str, 
+                 split: str = 'train', 
+                 min_events: Optional[int] = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
@@ -109,6 +112,11 @@ class FEMRDataset(Dataset):
         self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
         self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
         self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
+        
+        # Filter out patients
+        # if min_events is not None:
+        #     # Filter out patients with timelines shorter than `min_events`
+            
 
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0

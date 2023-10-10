@@ -8,6 +8,7 @@ import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
+from hf_ehr.utils import lr_warmup_with_constant_plateau
 
 class GPTLanguageModel(pl.LightningModule):
     """
@@ -89,8 +90,12 @@ class GPTLanguageModel(pl.LightningModule):
         # Forward pass
         pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(batch)
         loss: torch.Tensor = self.loss(pred_logits, batch['input_ids'])
-        ppl: torch.Tensor = torch.exp(loss)
+        ppl: torch.Tensor = torch.exp(loss).detach()
+        
+        # Learning rate scheduler
         lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
+        sch = self.lr_schedulers()
+        sch.step()
 
         # Sanity checks
         assert pred_logits.shape == (B, L, V)
@@ -106,7 +111,7 @@ class GPTLanguageModel(pl.LightningModule):
         # Logging
         self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
-        self.log('train/ppl', ppl)
+        self.log('train/ppl', torch.tensor(min(ppl, 100), dtype=torch.float32)) # artificially cap to 100 so that charts look prettier
         self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
         self.log('train/examples/total', self.train_total_examples.compute().to(torch.float32))
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
@@ -127,7 +132,7 @@ class GPTLanguageModel(pl.LightningModule):
 
         # Logging
         self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
-        self.log('val/ppl', ppl, on_epoch=True, sync_dist=True)
+        self.log('val/ppl', torch.tensor(min(ppl, 100), dtype=torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
 
         return loss
     
@@ -143,19 +148,31 @@ class GPTLanguageModel(pl.LightningModule):
                 
         # Scheduler
         if self.config.trainer.scheduler:
-            max_lr: float = self.config.trainer.scheduler.max_lr
-            div_factor: float = self.config.trainer.scheduler.div_factor
-            final_div_factor: float = self.config.trainer.scheduler.final_div_factor
-            pct_start: float = self.config.trainer.scheduler.pct_start
-            total_steps: int = self.config.trainer.scheduler.total_steps
-            anneal_strategy: str = self.config.trainer.scheduler.anneal_strategy
-            scheduler = optim.lr_scheduler.OneCycleLR(optimizer, 
-                                                      max_lr=max_lr, 
-                                                        total_steps=total_steps,
-                                                        pct_start=pct_start,
-                                                        div_factor=div_factor,
-                                                        final_div_factor=final_div_factor,
-                                                        anneal_strategy=anneal_strategy)
+            scheduler = lr_warmup_with_constant_plateau(optimizer, 
+                                                        num_warmup_steps=self.config.trainer.scheduler.num_warmup_steps, 
+                                                        num_decay_steps=self.config.trainer.scheduler.num_decay_steps, 
+                                                        initial_lr=self.config.trainer.scheduler.initial_lr, 
+                                                        final_lr=self.config.trainer.scheduler.final_lr)
+
+
             return [ optimizer ], [ scheduler ]
 
         return [optimizer]
+    
+    def on_save_checkpoint(self, checkpoint):
+        # Save metric's state in the checkpoint
+        checkpoint['train_total_examples'] = self.train_total_examples.compute()
+        checkpoint['train_total_tokens_PAD'] = self.train_total_tokens_PAD.compute()
+        checkpoint['train_total_tokens_nonPAD'] = self.train_total_tokens_nonPAD.compute()
+
+    def on_load_checkpoint(self, checkpoint):
+        # Load metric's state from the checkpoint
+        if 'train_total_examples' in checkpoint:
+            self.train_total_examples = SumMetric()
+            self.train_total_examples.update(checkpoint['train_total_examples'])
+        if 'train_total_tokens_PAD' in checkpoint:
+            self.train_total_tokens_PAD = SumMetric()
+            self.train_total_tokens_PAD.update(checkpoint['train_total_tokens_PAD'])
+        if 'train_total_tokens_nonPAD' in checkpoint:
+            self.train_total_tokens_nonPAD = SumMetric()
+            self.train_total_tokens_nonPAD.update(checkpoint['train_total_tokens_nonPAD'])

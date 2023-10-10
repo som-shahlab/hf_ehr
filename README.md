@@ -26,24 +26,29 @@ pip3 install -e .
 
 Create Carina node:
 ```bash
-srun --partition=gpu --mem=200G --gres=gpu:4 --cpus-per-task=20 --time=24:00:00 --pty bash -i
+srun --partition=gpu --mem=200G --gres=gpu:4 --cpus-per-task=20 --time=48:00:00 --pty bash -i
 cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
 
 # Separately, in VSCode, run the command "Remote-Tunnels: Connect to Tunnel..." and select "slurm-gpu"
+
 ```
 
 Launch training run:
 ```bash
-conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr
-python3 train.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3]
+conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr/scripts
+export WANDB__SERVICE_WAIT=300
+python3 run.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3]
+
+# Profiling
+python3 run.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3] trainer.max_epochs=1 trainer.limit_train_batches=0.1 trainer.limit_val_batches=0.1
 ```
 
 # Stats
 
-GPT-2-342M (12-layer, 12-head, 768 embed) w/ batch size = 4 on 4 v100 32GBs:
-* Memory = 25GB / GPU
-* Train time = 17 hrs / epoch
-Epoch 0:   2%|█                                                                  | 2723/164878 [17:46<17:38:36,  2.55it/s, v_num=cahv, train/loss=1.140, train/ppl=3.110]
+GPT-2-342M (12-layer, 12-head, 768 embed) w/ batch size = 4 and 10 num_workers on 4 v100 32GBs:
+* Memory = 25GB / GPU | Model alone = 4 GB / GPU
+* Train time = 20 hrs / epoch
+
 ## Initial Setup
 
 To create the simplest EHR tokenizer (every code is its own token):

@@ -1,16 +1,15 @@
 import os
 import wandb
 import json
+import hydra
 import pytorch_lightning as pl
-from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from pytorch_lightning.utilities import rank_zero_only
 
-from torch.utils.data import DataLoader
 from loguru import logger
+from torch.utils.data import DataLoader
 from typing import Dict, List, Optional, Tuple
-import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, collate_femr_timelines
@@ -47,18 +46,21 @@ def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], token
         batch_size=batch_size,
         collate_fn=lambda x: collate_femr_timelines(x, tokenizer, max_length, is_truncation_random, seed),
         num_workers=n_workers,
+        pin_memory=True,
     )
     val_loader = DataLoader(
         dataset=datasets['val'],
         batch_size=batch_size,
         collate_fn=lambda x: collate_femr_timelines(x, tokenizer, max_length, is_truncation_random, seed),
         num_workers=n_workers,
+        pin_memory=True,
     )
     test_loader = DataLoader(
         dataset=datasets['test'],
         batch_size=batch_size,
         collate_fn=lambda x: collate_femr_timelines(x, tokenizer, max_length, is_truncation_random, seed),
         num_workers=n_workers,
+        pin_memory=True,
     )
     return {
         'train' : train_loader,
@@ -80,7 +82,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
             'test' : test_dataset,
     }
     
-@hydra.main(version_base=None, config_path="./configs/", config_name="config")
+@hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
     print(config)
     path_to_output_dir: str = config.main.path_to_output_dir
@@ -88,20 +90,10 @@ def main(config: DictConfig) -> None:
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
     path_to_tokenizer: str = config.data.tokenizer.path_to_tokenizer
-    devices: List[int] = config.trainer.devices
-    distributed_backend: str = config.trainer.distributed_backend
-    min_epochs: int = config.trainer.min_epochs
-    max_epochs: int = config.trainer.max_epochs
-    limit_train_batches: float = config.trainer.limit_train_batches
-    limit_val_batches: float = config.trainer.limit_val_batches
-    is_use_amp: bool = config.trainer.is_use_amp
-    accumulate_grad_batches: int = config.trainer.accumulate_grad_batches
-    gradient_clip_algorithm: str = config.trainer.gradient_clip_algorithm
-    gradient_clip_value: float = config.trainer.gradient_clip_value
     seed: int = config.main.seed
 
     # Random seed
-    pl.seed_everything(seed)
+    pl.seed_everything(seed, workers=True)
     
     # Check if resuming from checkpoint
     is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
@@ -116,7 +108,7 @@ def main(config: DictConfig) -> None:
     os.makedirs(path_to_ckpt_dir, exist_ok=True)
     
     # Logging
-    logger.add(path_to_log_file)
+    logger.add(path_to_log_file, enqueue=True, mode='a')
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
     if is_wandb:
         if is_resume_from_ckpt:
@@ -176,38 +168,55 @@ def main(config: DictConfig) -> None:
         mode=config.callbacks.early_stopping.metric_mode,
     )
     callbacks += [ 
+        # Save top-K checkpoints based on 'val/loss
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
-            filename='{epoch}',
+            filename='{epoch}-{step}-val_loss',
             save_top_k=config.callbacks.model_checkpointing.save_top_k,
             every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
-            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
             save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
             monitor='val/loss',
             mode='min',
+            verbose=True,
+        ),
+        ModelCheckpoint(
+            dirpath=path_to_ckpt_dir,
+            filename='{epoch}-{step}',
+            save_top_k=config.callbacks.model_checkpointing.save_most_recent_k,
+            every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
+            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
+            save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
+            monitor='step',
+            mode='max',
             verbose=True,
         )
     ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
     
+    # from pytorch_lightning.profilers import PyTorchProfiler
+    # profiler = PyTorchProfiler(
+    #         export_to_chrome=True,
+    # )
+
     # Trainer
-    trainer = Trainer(
+    trainer = pl.Trainer(
+        # profiler=profiler,
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',
-        devices=devices,
-        strategy=distributed_backend,
-        limit_train_batches=limit_train_batches,
-        limit_val_batches=limit_val_batches,
-        log_every_n_steps=1,
-        precision=16 if is_use_amp else 32,
-        val_check_interval=0.1, # check val set every 10% of training batches (useful for large training datasets, rather than wait for full epoch to finish)
-        max_epochs=max_epochs,
-        min_epochs=min_epochs,
-        accumulate_grad_batches=accumulate_grad_batches,
-        gradient_clip_val=gradient_clip_value,
-        gradient_clip_algorithm=gradient_clip_algorithm,
+        devices=config.trainer.devices,
+        strategy=config.trainer.distributed_backend,
+        limit_train_batches=config.trainer.limit_train_batches,
+        limit_val_batches=config.trainer.limit_val_batches,
+        log_every_n_steps=config.logging.log_every_n_steps,
+        precision="bf16" if config.trainer.is_use_bf16 else (16 if config.trainer.is_use_fp16 else 32),
+        val_check_interval=config.trainer.val_check_interval, # check val set every 10% of training batches (useful for large training datasets, rather than wait for full epoch to finish)
+        max_epochs=config.trainer.max_epochs,
+        min_epochs=config.trainer.min_epochs,
+        accumulate_grad_batches=config.trainer.accumulate_grad_batches,
+        gradient_clip_val=config.trainer.gradient_clip_value,
+        gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
     )
     
     # Run
@@ -230,6 +239,7 @@ if __name__ == "__main__":
     os.environ['WANDB_ARTIFACT_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
     os.environ['WANDB_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
     os.environ['TRITON_CACHE_DIR'] = "/share/pi/nigam/mwornow/triton_cache/"
+    os.environ['HF_CACHE_DIR'] = "/share/pi/nigam/mwornow/hf_cache/"
 
     # Run
     main()
