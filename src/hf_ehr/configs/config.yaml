@@ -2,22 +2,11 @@ main:
   # Training seed.
   seed: 1
   # Where outputs will be saved; If folder exists, then run will be resumed from this directory's `../ckpts/last.ckpt` file
-  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2/
-  # path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/test/
-  # path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
+  path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
 
 hydra:
   run:
-    dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/hydra/
-
-model:
-  # Name of HF model to load
-  name: gpt2
-  # Kwargs for ModelConfig
-  config_kwargs:
-    n_layer: 12
-    n_head: 12
-    n_embd: 768
+    dir: "${main.path_to_output_dir}"
 
 callbacks:
   early_stopping:
@@ -30,8 +19,8 @@ callbacks:
     save_top_k: 5
     # Save the most recent K models. If -1, then save all models
     save_most_recent_k: 1
-    # Save model every N steps; if NULL, save after every epoch
-    every_n_train_steps: 5_000
+    # Save model every N global steps; if NULL, save after every epoch
+    every_n_train_steps: 1_000
 
 data:
   dataset:
@@ -60,7 +49,7 @@ trainer:
   gradient_clip_algorithm: norm
   # List of devices to run on
   devices: 0, 1, 2, 3
-  # Supports three options dp, ddp, ddp2
+  # Supports: dp, ddp, ddp2, fsdp, deepspeed
   distributed_backend: ddp
   # If true uses bf16 mixed precision (A100 only)
   is_use_bf16: False
@@ -75,17 +64,17 @@ trainer:
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`
   limit_val_batches: null
   # How often we check the validation set within an epoch
-  val_check_interval: 0.25
+  val_check_interval: 0.1
   # OPTIMIZER
   optimizer:
     # Learning rate
-    lr: 3e-3
+    lr: 3e-4
   # SCHEDULER
   scheduler:
-    # Number of steps from `initial_lr` -> `trainer.optimizer.lr`
+    # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
     num_warmup_steps: 10_000
-    # Number of steps from `trainer.optimizer.lr` -> `final_lr`
-    num_decay_steps: 2_000_000
+    # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
+    num_decay_steps: 1_000_000
     initial_lr: 3e-6
     final_lr: 3e-5
 

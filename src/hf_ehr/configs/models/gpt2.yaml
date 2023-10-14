@@ -1,0 +1,15 @@
+# @package _global_
+
+model:
+  # Name of HF model to load
+  name: gpt2
+  # Kwargs for ModelConfig
+  config_kwargs:
+    n_layer: 12
+    n_head: 12
+    n_embd: 768
+
+data:
+  dataloader:
+    # Max number of codes to feed into model at once per patient.
+    max_length: 1024

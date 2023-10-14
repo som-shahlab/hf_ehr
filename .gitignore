@@ -5,6 +5,7 @@ slurm_logs/
 *.npy
 *.pkl
 *.csv
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,0 +1,21 @@
+# @package _global_
+
+model:
+  # Name of HF model to load
+  name: bert-base-uncased
+  # Kwargs for ModelConfig
+  config_kwargs:
+    num_hidden_layers: 12
+    num_attention_heads: 12
+    hidden_size: 768
+    # Max context window
+    max_position_embeddings: 1024
+
+trainer:
+  # For models that use MLM training, this is the percent of tokens to randomly mask
+  mlm_mask_pct: 0.15
+
+data:
+  dataloader:
+    # Max number of codes to feed into model at once per patient.
+    max_length: 1024

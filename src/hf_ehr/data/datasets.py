@@ -33,9 +33,30 @@ class FEMRTokenizer():
         self.bos_token_id = self.atoi['[BOS]']
         self.eos_token_id = self.atoi['[EOS]']
         self.unk_token_id = self.atoi['[UNK]']
+        self.special_tokens: List[str] = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]']
         
         # Set attributes
         self.vocab_size: int = len(self.atoi)
+    
+    def add_special_token(self, token_name: str, token: str):
+        max_curr_token: int = max([ int(x) for x in self.itoa.keys() ])
+        self.itoa[max_curr_token + 1] = token
+        self.atoi[token] = max_curr_token + 1
+        setattr(self, f'{token_name}_token_id', self.atoi[token])
+        self.special_tokens.append(token)
+        self.vocab_size = len(self.atoi)
+
+    def get_vocab(self, is_include_special_tokens: bool = True) -> List[str]:
+        if is_include_special_tokens:
+            return list(self.atoi.keys())
+        else:
+            return [ x for x in self.atoi.keys() if x not in self.special_tokens ]
+
+    def get_vocab_tokens(self, is_include_special_tokens: bool = True) -> torch.Tensor:
+        if is_include_special_tokens:
+            return torch.tensor(self.atoi.values(), dtype=torch.int64)
+        else:
+            return torch.tensor([ x for x in self.atoi.values() if x not in self.special_tokens ], dtype=torch.int64)
 
     def tokenize(self, 
                  batch: Union[List[str], List[List[str]]],

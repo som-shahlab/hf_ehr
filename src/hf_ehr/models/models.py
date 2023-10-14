@@ -12,7 +12,7 @@ from hf_ehr.utils import lr_warmup_with_constant_plateau
 
 class GPTLanguageModel(pl.LightningModule):
     """
-    Sample model to show how to train GPT2 with a Language Model head.
+    GPT2 with a Language Model head.
     """
 
     def __init__(self, config: DictConfig, tokenizer) -> None:
@@ -102,8 +102,8 @@ class GPTLanguageModel(pl.LightningModule):
         
         # Metrics
         train_batch_examples: int = B
-        train_batch_tokens_PAD: torch.Tensor = batch['attention_mask'].sum()
-        train_batch_tokens_nonPAD: torch.Tensor = (1 - batch['attention_mask']).sum()
+        train_batch_tokens_PAD: torch.Tensor = (1 - batch['attention_mask']).sum()
+        train_batch_tokens_nonPAD: torch.Tensor = batch['attention_mask'].sum()
         self.train_total_examples.update(train_batch_examples)
         self.train_total_tokens_PAD.update(train_batch_tokens_PAD)
         self.train_total_tokens_nonPAD.update(train_batch_tokens_nonPAD)
@@ -111,7 +111,7 @@ class GPTLanguageModel(pl.LightningModule):
         # Logging
         self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
-        self.log('train/ppl', torch.tensor(min(ppl, 100), dtype=torch.float32)) # artificially cap to 100 so that charts look prettier
+        self.log('train/ppl', torch.clamp(ppl, max=100).to(torch.float32)) # artificially cap to 100 so that charts look prettier
         self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
         self.log('train/examples/total', self.train_total_examples.compute().to(torch.float32))
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
@@ -128,11 +128,11 @@ class GPTLanguageModel(pl.LightningModule):
                         batch_idx: int) -> torch.Tensor:
         pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(batch)
         loss: torch.Tensor = self.loss(pred_logits, batch['input_ids'])
-        ppl: torch.Tensor = torch.exp(loss)
+        ppl: torch.Tensor = torch.exp(loss).detach()
 
         # Logging
         self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
-        self.log('val/ppl', torch.tensor(min(ppl, 100), dtype=torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
+        self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
 
         return loss
     

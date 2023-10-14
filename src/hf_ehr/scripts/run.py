@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, collate_femr_timelines
+from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.models import GPTLanguageModel
 
 class GradNormCallback(Callback):
@@ -109,10 +110,11 @@ def main(config: DictConfig) -> None:
     
     # Logging
     logger.add(path_to_log_file, enqueue=True, mode='a')
+    logger.info(config)
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
     if is_wandb:
         if is_resume_from_ckpt:
-            # Load wandb run ID
+            # Load existing wandb run ID
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
                 wandb_run_id: str = f.read()
             logger.info(f"Found existing wandb run: `{wandb_run_id}`")
@@ -127,7 +129,8 @@ def main(config: DictConfig) -> None:
             loggers += [ 
                         WandbLogger(project='hf_ehr',
                                     log_model=False,
-                                    save_dir=path_to_log_dir)
+                                    save_dir=path_to_log_dir,
+                                    name=config.logging.wandb.name)
             ]
             if rank_zero_only.rank == 0:
                 # Save wandb run ID
@@ -136,7 +139,9 @@ def main(config: DictConfig) -> None:
                     f.write(wandb_run_id)
         if rank_zero_only.rank == 0:
             if not is_resume_from_ckpt:
-                wandb.config.update(OmegaConf.to_container(config, resolve=True))
+                wandb_config = OmegaConf.to_container(config, resolve=True)
+                wandb_config.pop('config', None)
+                wandb.config.update(wandb_config)
             wandb.define_metric('train/loss', summary='min')
             wandb.define_metric('val/loss', summary='min')
 
@@ -150,8 +155,12 @@ def main(config: DictConfig) -> None:
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
-    model = GPTLanguageModel(config, tokenizer)
-    
+    if 'gpt2' in config.model.name:
+        model = GPTLanguageModel(config, tokenizer)
+    elif 'bert' in config.model.name:
+        model = BERTLanguageModel(config, tokenizer)
+    else:
+        raise ValueError(f"Model `{config.model.name}` not supported.")
     # Datasets
     datasets: Dict[str, FEMRDataset] = load_datasets(config)
     
@@ -206,7 +215,7 @@ def main(config: DictConfig) -> None:
         callbacks=callbacks,
         accelerator='gpu',
         devices=config.trainer.devices,
-        strategy=config.trainer.distributed_backend,
+        strategy='ddp' if config.trainer.distributed_backend == 'ddp' else config.trainer.distributed_backend,
         limit_train_batches=config.trainer.limit_train_batches,
         limit_val_batches=config.trainer.limit_val_batches,
         log_every_n_steps=config.logging.log_every_n_steps,
@@ -218,7 +227,7 @@ def main(config: DictConfig) -> None:
         gradient_clip_val=config.trainer.gradient_clip_value,
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
     )
-    
+
     # Run
     trainer.fit(model, 
                 train_dataloaders=dataloaders['train'],

@@ -27,7 +27,7 @@ pip3 install -e .
 Create Carina node:
 ```bash
 srun --partition=gpu --mem=200G --gres=gpu:4 --cpus-per-task=20 --time=48:00:00 --pty bash -i
-cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
+conda activate hf_env && cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
 
 # Separately, in VSCode, run the command "Remote-Tunnels: Connect to Tunnel..." and select "slurm-gpu"
 
