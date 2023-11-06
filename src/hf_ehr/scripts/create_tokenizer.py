@@ -2,11 +2,11 @@ import json
 from typing import Dict
 import os
 from tokenizers import Tokenizer, models, pre_tokenizers
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT, PATH_TO_TOKENIZER_DIR
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
 
 if __name__ == '__main__':
-    code_2_int: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_DIR, 'code_2_int.json'), 'r'))
-    code_2_count: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_DIR, 'code_2_count.json'), 'r'))
+    code_2_int: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_int.json'), 'r'))
+    code_2_count: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_count.json'), 'r'))
 
     # Define the tokenizer model with the custom vocab
     # # vocab must be a dict where: [key] = token, [value] = unique integer

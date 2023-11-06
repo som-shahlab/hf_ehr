@@ -1,15 +1,13 @@
 import random
-from typing import Dict, List, Optional, Union
-import pandas as pd
+from typing import Dict, List, Optional, Tuple, Union, Any
 import torch
 from torch.utils.data import Dataset
 import femr.datasets
 import os
 import numpy as np
 from jaxtyping import Float
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT, PATH_TO_TOKENIZER_DIR
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
 import json
-from omegaconf import DictConfig
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
@@ -154,7 +152,7 @@ class FEMRDataset(Dataset):
         else:
             raise ValueError(f"Invalid split: {self.split}")
     
-    def __getitem__(self, idx: int) -> List[int]:
+    def __getitem__(self, idx: int) -> Tuple[int, List[int]]:
         '''Return all event codes for this patient at `idx` in `self.split`'''
         if self.split == 'train':
             pid = self.train_pids[idx]
@@ -167,37 +165,40 @@ class FEMRDataset(Dataset):
         # For negative `idx`, we need to unwrap `pid`
         if len(pid.shape) > 0:
             pid = pid[0]
-        return [ e.code for e in self.femr_db[pid].events ]
+        return (pid, [ e.code for e in self.femr_db[pid].events ])
 
-def collate_femr_timelines(batch: List[List[int]], 
+def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
                              tokenizer: FEMRTokenizer, 
                              max_length: int,
                              is_truncation_random: bool = False,
-                             seed: int = 1):
+                             seed: int = 1) -> Dict[str, Any]:
     '''Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     '''
-    
+
     # Otherwise, truncate on right hand side of sequence
-    tokens: Float[torch.Tensor, 'B max_length'] = tokenizer.tokenize(batch, 
+    tokens: Float[torch.Tensor, 'B max_length'] = tokenizer.tokenize([ x[1] for x in batch ], 
                                                                         truncation=True, 
                                                                         padding=True, 
                                                                         max_length=max_length,
                                                                         is_truncation_random=is_truncation_random,
                                                                         seed=seed, 
                                                                         add_special_tokens=True)
-    return tokens
+    return {
+        'patient_ids' : [ x[0] for x in batch ],
+        'tokens' : tokens,
+    }
 
 
 if __name__ == '__main__':
     # Tokenizer
-    atoi: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_DIR, 'code_2_int.json'), 'r'))
+    atoi: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_int.json'), 'r'))
     tokenizer = FEMRTokenizer(atoi)
     
     # Dataset
-    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT, split='train')
-    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT, split='val')
-    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT, split='test')
+    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_v9, split='train')
+    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_v9, split='val')
+    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_v9, split='test')
     
     # Stats
     print('train', len(train_dataset))

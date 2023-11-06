@@ -14,7 +14,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, collate_femr_timelines
 from hf_ehr.models.bert import BERTLanguageModel
-from hf_ehr.models.models import GPTLanguageModel
+from hf_ehr.models.gpt import GPTLanguageModel
+from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 
 class GradNormCallback(Callback):
     """
@@ -32,56 +33,6 @@ class GradNormCallback(Callback):
 
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
-        
-def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], tokenizer: FEMRTokenizer) -> Dict[str, DataLoader]:
-    batch_size: int = config.data.dataloader.batch_size
-    max_length: int = config.data.dataloader.max_length
-    is_truncation_random: bool = config.data.dataloader.is_truncation_random
-    n_workers: int = config.data.dataloader.n_workers
-    seed: int = config.main.seed
-
-    logger.info(f"Loading FEMR dataloaders...")
-
-    train_loader = DataLoader(
-        dataset=datasets['train'],
-        batch_size=batch_size,
-        collate_fn=lambda x: collate_femr_timelines(x, tokenizer, max_length, is_truncation_random, seed),
-        num_workers=n_workers,
-        pin_memory=True,
-    )
-    val_loader = DataLoader(
-        dataset=datasets['val'],
-        batch_size=batch_size,
-        collate_fn=lambda x: collate_femr_timelines(x, tokenizer, max_length, is_truncation_random, seed),
-        num_workers=n_workers,
-        pin_memory=True,
-    )
-    test_loader = DataLoader(
-        dataset=datasets['test'],
-        batch_size=batch_size,
-        collate_fn=lambda x: collate_femr_timelines(x, tokenizer, max_length, is_truncation_random, seed),
-        num_workers=n_workers,
-        pin_memory=True,
-    )
-    return {
-        'train' : train_loader,
-        'val' : val_loader,
-        'test' : test_loader,
-    }
-
-def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
-    path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
-
-    logger.info(f"Loading FEMR datasets...")
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train')
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val')
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test')
-    
-    return { 
-            'train' : train_dataset, 
-            'val' : val_dataset, 
-            'test' : test_dataset,
-    }
     
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
@@ -161,10 +112,13 @@ def main(config: DictConfig) -> None:
         model = BERTLanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
+
     # Datasets
+    logger.info(f"Loading FEMR datasets...")
     datasets: Dict[str, FEMRDataset] = load_datasets(config)
     
     # Dataloaders
+    logger.info(f"Loading FEMR dataloaders...")
     dataloaders: Dict[str, DataLoader] = load_dataloaders(config, datasets, tokenizer)
 
     # Callbacks
@@ -177,24 +131,34 @@ def main(config: DictConfig) -> None:
         mode=config.callbacks.early_stopping.metric_mode,
     )
     callbacks += [ 
-        # Save top-K checkpoints based on 'val/loss
+        # Save top-K checkpoints based on `val/loss`; overwrites old models
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
             filename='{epoch}-{step}-val_loss',
             save_top_k=config.callbacks.model_checkpointing.save_top_k,
-            every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
-            save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
+            every_n_train_steps=config.callbacks.model_checkpointing.most_recent_every_n_train_steps,
+            save_weights_only=False, # If False, then save optimizer + scheduler states as well
             monitor='val/loss',
             mode='min',
             verbose=True,
         ),
+        # Save checkpoint every `every_n_train_steps` steps; persists all models
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
-            filename='{epoch}-{step}',
-            save_top_k=config.callbacks.model_checkpointing.save_most_recent_k,
+            filename='{epoch}-{step}-persist',
+            save_top_k=-1,
             every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
-            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
             save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
+            verbose=True,
+        ),
+        # Save most recent `n = save_most_recent_k` checkpoints; overwrites old models
+        ModelCheckpoint(
+            dirpath=path_to_ckpt_dir,
+            filename='{epoch}-{step}-recent',
+            save_top_k=config.callbacks.model_checkpointing.save_most_recent_k,
+            every_n_train_steps=config.callbacks.model_checkpointing.most_recent_every_n_train_steps,
+            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
+            save_weights_only=False, # If False, then save optimizer + scheduler states as well
             monitor='step',
             mode='max',
             verbose=True,
@@ -215,7 +179,7 @@ def main(config: DictConfig) -> None:
         callbacks=callbacks,
         accelerator='gpu',
         devices=config.trainer.devices,
-        strategy='ddp' if config.trainer.distributed_backend == 'ddp' else config.trainer.distributed_backend,
+        strategy=config.trainer.distributed_backend,
         limit_train_batches=config.trainer.limit_train_batches,
         limit_val_batches=config.trainer.limit_val_batches,
         log_every_n_steps=config.logging.log_every_n_steps,

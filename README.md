@@ -37,7 +37,19 @@ Launch training run:
 ```bash
 conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr/scripts
 export WANDB__SERVICE_WAIT=300
-python3 run.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3]
+python3 run.py \
+    +models=bert \
+    data.dataloader.batch_size=4 \
+    trainer.accumulate_grad_batches=4 \
+    data.dataloader.n_workers=10 \
+    trainer.devices=[0,1,2,3] \
+    model.config_kwargs.num_hidden_layers=2 \
+    model.config_kwargs.num_attention_heads=2 \
+    model.config_kwargs.hidden_size=256 \
+    callbacks.model_checkpointing.every_n_train_steps=100 \
+    trainer.val_check_interval=100 \
+    trainer.limit_val_batches=20 \
+    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-test/
 
 # Profiling
 python3 run.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3] trainer.max_epochs=1 trainer.limit_train_batches=0.1 trainer.limit_val_batches=0.1

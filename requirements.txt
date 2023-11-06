@@ -13,4 +13,5 @@ pytorch-nlp
 wandb
 loguru
 hydra
+deepspeed
 omegaconf

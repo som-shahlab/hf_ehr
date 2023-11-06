@@ -1,22 +1,21 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import optim
 from transformers import AutoModel, AutoConfig
 from jaxtyping import Float
 import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
+from hf_ehr.models.modules import BaseModel
 from torchmetrics.aggregation import SumMetric
-from hf_ehr.utils import lr_warmup_with_constant_plateau
 
-class GPTLanguageModel(pl.LightningModule):
+class GPTLanguageModel(BaseModel):
     """
     GPT2 with a Language Model head.
     """
 
     def __init__(self, config: DictConfig, tokenizer) -> None:
-        super(GPTLanguageModel, self).__init__()
+        super(GPTLanguageModel, self).__init__(config, tokenizer)
         self.save_hyperparameters()
         self.model_name: str = config.model.name
         self.config = config
@@ -38,11 +37,14 @@ class GPTLanguageModel(pl.LightningModule):
         self.tokenizer = tokenizer
         
         # Metrics
-        self.train_total_examples = SumMetric()
-        self.train_total_tokens_PAD = SumMetric()
-        self.train_total_tokens_nonPAD = SumMetric()
+        self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
+            'train_total_examples': SumMetric(),
+            'train_total_tokens_PAD': SumMetric(),
+            'train_total_tokens_MASK': SumMetric(),
+            'train_total_tokens_nonPAD': SumMetric(),
+        })
 
-    def forward(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> Float[torch.Tensor, 'B L V']:
+    def forward(self, tokens: Dict[str, Float[torch.Tensor, 'B L']], is_return_hidden_states: bool = True) -> Union[Tuple[Float[torch.Tensor, 'B L V'], Float[torch.Tensor, 'B L H']], Float[torch.Tensor, 'B L V']]:
         B: int = tokens['input_ids'].shape[0]
         L: int = tokens['input_ids'].shape[1]
         H: int = self.hidden_size
@@ -53,7 +55,10 @@ class GPTLanguageModel(pl.LightningModule):
         assert hidden_states.shape == (B, L, H)
         assert logits.shape == (B, L, V)
 
-        return logits
+        if is_return_hidden_states:
+            return logits, hidden_states
+        else:
+            return logits
 
     def loss(self, logits: Float[torch.Tensor, 'B L V'], targets: Float[torch.Tensor, 'B L']) -> torch.Tensor:
         B: int = logits.shape[0]
@@ -79,17 +84,24 @@ class GPTLanguageModel(pl.LightningModule):
         assert targets_shifted.shape == (B, L-1)
 
         return loss
+    
+    def run_eval(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> torch.Tensor:
+        B: int = tokens['input_ids'].shape[0]
+        L: int = tokens['input_ids'].shape[1]
+        V: int = self.tokenizer.vocab_size
+        pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(tokens, is_return_hidden_states=False)
+        loss: torch.Tensor = self.loss(pred_logits, tokens['input_ids'])
+        assert pred_logits.shape == (B, L, V)
+        return loss
 
     def training_step(self, 
-                      batch: Dict[str, Float[torch.Tensor, 'B L']],
+                      batch: Dict[str, Any],
                       batch_idx: int) -> torch.Tensor:
-        B: int = batch['input_ids'].shape[0]
-        L: int = batch['input_ids'].shape[1]
-        V: int = self.tokenizer.vocab_size
-        
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        B: int = tokens['input_ids'].shape[0]
+
         # Forward pass
-        pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(batch)
-        loss: torch.Tensor = self.loss(pred_logits, batch['input_ids'])
+        loss: torch.Tensor = self.run_eval(tokens)
         ppl: torch.Tensor = torch.exp(loss).detach()
         
         # Learning rate scheduler
@@ -97,37 +109,35 @@ class GPTLanguageModel(pl.LightningModule):
         sch = self.lr_schedulers()
         sch.step()
 
-        # Sanity checks
-        assert pred_logits.shape == (B, L, V)
-        
         # Metrics
         train_batch_examples: int = B
-        train_batch_tokens_PAD: torch.Tensor = (1 - batch['attention_mask']).sum()
-        train_batch_tokens_nonPAD: torch.Tensor = batch['attention_mask'].sum()
-        self.train_total_examples.update(train_batch_examples)
-        self.train_total_tokens_PAD.update(train_batch_tokens_PAD)
-        self.train_total_tokens_nonPAD.update(train_batch_tokens_nonPAD)
+        train_batch_tokens_PAD: torch.Tensor = (1 - tokens['attention_mask']).sum()
+        train_batch_tokens_nonPAD: torch.Tensor = tokens['attention_mask'].sum()
+        self.sum_metrics['train_total_examples'].update(train_batch_examples)
+        self.sum_metrics['train_total_tokens_PAD'].update(train_batch_tokens_PAD)
+        self.sum_metrics['train_total_tokens_nonPAD'].update(train_batch_tokens_nonPAD)
 
         # Logging
         self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
         self.log('train/ppl', torch.clamp(ppl, max=100).to(torch.float32)) # artificially cap to 100 so that charts look prettier
         self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
-        self.log('train/examples/total', self.train_total_examples.compute().to(torch.float32))
+        self.log('train/examples/total', self.sum_metrics['train_total_examples'].compute().to(torch.float32))
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
         self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
         self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
-        self.log('train/tokens/total_all', (self.train_total_tokens_PAD.compute() + self.train_total_tokens_nonPAD.compute()).to(torch.float32))
-        self.log('train/tokens/total_PAD', self.train_total_tokens_PAD.compute().to(torch.float32))
-        self.log('train/tokens/total_nonPAD', self.train_total_tokens_nonPAD.compute().to(torch.float32))
+        self.log('train/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32))
+        self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
+        self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
 
         return loss
 
-    def validation_step(self, 
-                        batch: Dict[str, Float[torch.Tensor, 'B L']], 
+    def validation_step(self,
+                        batch: Dict[str, Any],
                         batch_idx: int) -> torch.Tensor:
-        pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(batch)
-        loss: torch.Tensor = self.loss(pred_logits, batch['input_ids'])
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+
+        loss: torch.Tensor = self.run_eval(tokens)
         ppl: torch.Tensor = torch.exp(loss).detach()
 
         # Logging
@@ -135,44 +145,3 @@ class GPTLanguageModel(pl.LightningModule):
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
 
         return loss
-    
-    def parameters(self):
-        return list(self.model.parameters()) + list(self.lm_head.parameters())
-
-    def configure_optimizers(self):
-        """ Sets Learning rate for different parameter groups."""
-        lr: float = self.config.trainer.optimizer.lr
-
-        # Optimizer
-        optimizer = optim.Adam(self.parameters(), lr=lr)
-                
-        # Scheduler
-        if self.config.trainer.scheduler:
-            scheduler = lr_warmup_with_constant_plateau(optimizer, 
-                                                        num_warmup_steps=self.config.trainer.scheduler.num_warmup_steps, 
-                                                        num_decay_steps=self.config.trainer.scheduler.num_decay_steps, 
-                                                        initial_lr=self.config.trainer.scheduler.initial_lr, 
-                                                        final_lr=self.config.trainer.scheduler.final_lr)
-
-
-            return [ optimizer ], [ scheduler ]
-
-        return [optimizer]
-    
-    def on_save_checkpoint(self, checkpoint):
-        # Save metric's state in the checkpoint
-        checkpoint['train_total_examples'] = self.train_total_examples.compute()
-        checkpoint['train_total_tokens_PAD'] = self.train_total_tokens_PAD.compute()
-        checkpoint['train_total_tokens_nonPAD'] = self.train_total_tokens_nonPAD.compute()
-
-    def on_load_checkpoint(self, checkpoint):
-        # Load metric's state from the checkpoint
-        if 'train_total_examples' in checkpoint:
-            self.train_total_examples = SumMetric()
-            self.train_total_examples.update(checkpoint['train_total_examples'])
-        if 'train_total_tokens_PAD' in checkpoint:
-            self.train_total_tokens_PAD = SumMetric()
-            self.train_total_tokens_PAD.update(checkpoint['train_total_tokens_PAD'])
-        if 'train_total_tokens_nonPAD' in checkpoint:
-            self.train_total_tokens_nonPAD = SumMetric()
-            self.train_total_tokens_nonPAD.update(checkpoint['train_total_tokens_nonPAD'])

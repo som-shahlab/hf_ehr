@@ -13,3 +13,15 @@ data:
   dataloader:
     # Max number of codes to feed into model at once per patient.
     max_length: 1024
+
+optimizer:
+  # Learning rate
+  lr: 3e-4
+
+scheduler:
+  # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
+  num_warmup_steps: 40_000
+  # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
+  num_decay_steps: 4_000_000
+  initial_lr: 3e-6
+  final_lr: 3e-5
