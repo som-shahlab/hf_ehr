@@ -1,0 +1,30 @@
+# @package _global_
+
+model:
+  # Name of HF model to load
+  name: hyena
+  # Kwargs for ModelConfig
+  config_kwargs:
+    n_layer: 8
+    max_seq_len: 1024
+    d_model: 512
+    d_inner: ${d_model * 4}
+
+data:
+  dataloader:
+    # Max number of codes to feed into model at once per patient.
+    max_length: ${max_seq_len}
+
+trainer:
+  optimizer:
+    # Learning rate
+    lr: 3e-4
+    weight_decay: 0.1
+
+  scheduler:
+    # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
+    num_warmup_steps: 40_000
+    # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
+    num_decay_steps: 4_000_000
+    initial_lr: 3e-6
+    final_lr: 3e-5

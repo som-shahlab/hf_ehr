@@ -87,7 +87,8 @@ tensorboard --logdir="experiments/lightning_logs/"
 1. In `hf_ehr`, run the following to generate patient representations:
 
 ```bash
-$MODEL_NAME=bert-base
+conda activate hf_env
+export MODEL_NAME=bert-base-v8
 
 python3 ehrshot.py \
     --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
@@ -105,7 +106,8 @@ python3 ehrshot.py \
 3. Run `7_eval.sh`
 
 ```bash
-sbatch 7_eval.sh
+conda activate EHRSHOT_ENV
+bash 7_eval.sh
 ```
 
 4. Run `8_make_results_plots.sh`

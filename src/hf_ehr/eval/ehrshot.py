@@ -115,10 +115,10 @@ if __name__ == "__main__":
             timeline_starts_for_patient: List[datetime.datetime] = timeline_starts[patient_id]
             timeline_tokens_for_patient: List[int] = timeline_tokens[patient_id]
             
-            # Truncate timeline to only events < label.time
+            # Truncate timeline to only events <= label.time
             timeline: List[int] = []
             for token_idx, token in enumerate(timeline_tokens_for_patient):
-                if timeline_starts_for_patient[token_idx] < label_time:
+                if timeline_starts_for_patient[token_idx] <= label_time:
                     timeline.append(token)
                 else:
                     break
