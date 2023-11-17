@@ -18,7 +18,7 @@ class BERTLanguageModel(BaseModel):
     """
 
     def __init__(self, config: DictConfig, tokenizer) -> None:
-        super(BERTLanguageModel, self).__init__(config, tokenizer)
+        super(BERTLanguageModel, self).__init__(config)
 
         # Tokenizer
         self.tokenizer = tokenizer
@@ -40,14 +40,6 @@ class BERTLanguageModel(BaseModel):
         # Model
         self.model = AutoModel.from_config(model_config, add_pooling_layer=False) # no pooling on [CLS] b/c doing MLM on each token, and [CLS] will just get ignored
         self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
-
-        # Metrics
-        self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
-            'train_total_examples': SumMetric(),
-            'train_total_tokens_PAD': SumMetric(),
-            'train_total_tokens_MASK': SumMetric(),
-            'train_total_tokens_nonPAD': SumMetric(),
-        })
 
     def forward(self, tokens: Dict[str, Float[torch.Tensor, 'B L']], is_return_hidden_states: bool = True) -> Union[Tuple[Float[torch.Tensor, 'B L V'], Float[torch.Tensor, 'B L H']], Float[torch.Tensor, 'B L V']]:
         B: int = tokens['input_ids'].shape[0]
@@ -124,8 +116,12 @@ class BERTLanguageModel(BaseModel):
         B: int = tokens['input_ids'].shape[0]
 
         # Forward pass
-        loss, mask, __ = self.run_eval(tokens)
+        loss, mask, pred_targets = self.run_eval(tokens)
         ppl: torch.Tensor = torch.exp(loss).detach()
+
+        # None of the tokens were randomly chosen to be MASK'd, so loss will be `nan`, so skip
+        if pred_targets.sum() == 0:
+            return None
         
         # Throw out bad batches
         if ppl > 100 and self.trainer.global_step > self.config.trainer.scheduler.num_warmup_steps / len(self.config.trainer.devices):
