@@ -43,12 +43,13 @@ class GPTLanguageModel(BaseModel):
             'train_total_tokens_MASK': SumMetric(),
             'train_total_tokens_nonPAD': SumMetric(),
         })
-
+    
     def forward(self, tokens: Dict[str, Float[torch.Tensor, 'B L']], is_return_hidden_states: bool = True) -> Union[Tuple[Float[torch.Tensor, 'B L V'], Float[torch.Tensor, 'B L H']], Float[torch.Tensor, 'B L V']]:
         B: int = tokens['input_ids'].shape[0]
         L: int = tokens['input_ids'].shape[1]
         H: int = self.hidden_size
         V: int = self.tokenizer.vocab_size
+        
         
         hidden_states: Float[torch.Tensor, 'B L H'] = self.model(tokens['input_ids']).last_hidden_state
         logits: Float[torch.Tensor, 'B L V'] = self.lm_head(hidden_states)

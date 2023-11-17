@@ -14,6 +14,7 @@ import femr.datasets
 from femr.labelers import LabeledPatients, load_labeled_patients
 from hf_ehr.data.datasets import FEMRTokenizer
 from hf_ehr.models.gpt import GPTLanguageModel
+from hf_ehr.models.bert import BERTLanguageModel
 
 '''
 python3 ehrshot.py \
@@ -21,14 +22,14 @@ python3 ehrshot.py \
     --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/custom_benchmark \
     --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/custom_hf_features \
     --path_to_models_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models \
-    --model gpt2-base \
+    --model gpt2-base-v8 \
     --embed_strat last \
     --chunk_strat last \
     --is_force_refresh
 '''
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate CLMBR / MOTOR patient representations (for all tasks at once)")
+    parser = argparse.ArgumentParser(description="Generate patient representations (for all tasks at once)")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
@@ -49,9 +50,10 @@ if __name__ == "__main__":
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
-    PATH_TO_MODEL = os.path.join(args.path_to_models_dir, MODEL)
-    PATH_TO_TOKENIZER = os.path.join(args.path_to_models_dir, MODEL, 'code_2_int.json')
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_features.pkl')
+    PATH_TO_MODEL = os.path.join(args.path_to_models_dir, MODEL, 'last.ckpt')
+    PATH_TO_TOKENIZER_CODE_2_INT = os.path.join(args.path_to_models_dir, MODEL, 'code_2_int.json')
+    PATH_TO_TOKENIZER_CODE_2_COUNT = os.path.join(args.path_to_models_dir, MODEL, 'code_2_count.json')
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
     
     # Check that requested model exists
     assert os.path.exists(PATH_TO_MODEL), f"No model for `{MODEL}` exists @ `{PATH_TO_MODEL}`"
@@ -67,15 +69,25 @@ if __name__ == "__main__":
     # Run inference on every patient
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
 
+    # Device
+    device: str = 'cuda:0'
+    
     # Load model
-    checkpoint = torch.load('/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models/gpt2-base/epoch=11-step=479000-val_loss.ckpt')
-    model = GPTLanguageModel(**checkpoint['hyper_parameters'])
+    checkpoint = torch.load(PATH_TO_MODEL)
+    if 'bert' in MODEL:
+        model = BERTLanguageModel(**checkpoint['hyper_parameters'])
+    elif 'gpt2' in MODEL:
+        model = GPTLanguageModel(**checkpoint['hyper_parameters'])
+    else:
+        raise ValueError(f"Model `{MODEL}` not supported.")
     model.load_state_dict(checkpoint['state_dict'])
-    model.to('cuda:0')
+    model.to(device)
     
     # Load tokenizer
-    atoi: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER, 'r'))
-    tokenizer = FEMRTokenizer(atoi)
+    atoi: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER_CODE_2_INT, 'r'))
+    code_to_count: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER_CODE_2_COUNT, 'r'))
+    min_code_count: Optional[int] = 10 if 'v8' in MODEL else None
+    tokenizer = FEMRTokenizer(atoi, code_to_count, min_code_count=min_code_count)
 
     # Setup patient features
     timeline_starts: Dict[int, List[datetime.datetime]] = {}  # [key] = patient id, [value] = List of event.starts where [idx] is same as [idx] of corresponding code in `timeline_tokens`
@@ -84,8 +96,11 @@ if __name__ == "__main__":
         # NOTE: Takes ~2 mins to load all patients
         # Create timeline for each label, where we only consider events that occurred BEFORE label.time
         full_timeline: List[Tuple[datetime.datetime, str]] = [ (x.start, x.code) for x in database[patient_id].events ]
-        timeline_starts[patient_id] = [ x[0] for x in full_timeline ]
-        timeline_tokens[patient_id] = tokenizer.tokenize([ x[1] for x in full_timeline if x[1] in tokenizer.atoi ], add_special_tokens=True)['input_ids'].squeeze(0).tolist()
+        timeline_with_valid_tokens: List[Tuple[datetime.datetime, str]] = [ x for x in full_timeline if x[1] in tokenizer.atoi.keys() ]
+        timeline_starts[patient_id] = [ x[0] for x in timeline_with_valid_tokens ]
+        timeline_tokens[patient_id] = tokenizer.tokenize([ x[1] for x in timeline_with_valid_tokens ])['input_ids'].squeeze(0).tolist()
+        assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
+
         for label in labels:
             patient_ids.append(patient_id)
             label_values.append(label.value)
@@ -94,6 +109,7 @@ if __name__ == "__main__":
     # Generate patient representations
     max_length: int = model.config.data.dataloader.max_length
     with torch.no_grad():
+        # NOTE: Takes ~5 hrs
         for (patient_id, label_value, label_time) in tqdm(zip(patient_ids, label_values, label_times), desc='Generating patient representations', total=len(patient_ids)):
             # Get timeline
             timeline_starts_for_patient: List[datetime.datetime] = timeline_starts[patient_id]
@@ -116,18 +132,18 @@ if __name__ == "__main__":
             # Inference
             # logits.shape = (batch_size = 1, sequence_length, vocab_size = 167k)
             # hidden_states.shape = (batch_size = 1, sequence_length, hidden_size = 768)
-            logits, hidden_states = model({ 'input_ids': torch.tensor([ timeline ]).to('cuda:0') })
+            logits, hidden_states = model({ 'input_ids': torch.tensor([ timeline ]).to(device) })
 
             # Aggregate embeddings
             if EMBED_STRAT == 'last':
-                patient_rep = hidden_states[:,-1,:]
+                patient_rep = hidden_states[:,-1,:].detach().cpu().numpy()
             elif EMBED_STRAT == 'avg':
-                patient_rep = hidden_states.mean(dim=1)
+                patient_rep = hidden_states.mean(dim=1).detach().cpu().numpy()
             else:
                 raise ValueError(f"Embedding strategy `{EMBED_STRAT}` not supported.")
             feature_matrix.append(patient_rep)
     
-    feature_matrix = torch.cat(feature_matrix, dim=0).cpu().numpy()
+    feature_matrix = np.concatenate(feature_matrix)
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)
     label_times = np.array(label_times)
@@ -145,5 +161,6 @@ if __name__ == "__main__":
                 f"patient_ids={repr(patient_ids)}\n"
                 f"label_values={repr(label_values)}\n"
                 f"label_times={repr(label_times)}")
+    logger.info(f"Shapes: feature_matrix={feature_matrix.shape}, patient_ids={patient_ids.shape}, label_values={label_values.shape}, label_times={label_times.shape}")
 
     logger.success("Done!")

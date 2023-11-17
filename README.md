@@ -81,3 +81,31 @@ Launch tensorboard with:
 ```bash
 tensorboard --logdir="experiments/lightning_logs/"
 ```
+
+## Evaluation
+
+1. In `hf_ehr`, run the following to generate patient representations:
+
+```bash
+$MODEL_NAME=bert-base
+
+python3 ehrshot.py \
+    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/custom_benchmark \
+    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/custom_hf_features \
+    --path_to_models_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models \
+    --model $MODEL_NAME \
+    --embed_strat last \
+    --chunk_strat last \
+    --is_force_refresh
+```
+
+2. In `ehrshot-benchmark`, update `utils.py` so that your model is included in the global constants at the top of the file.
+
+3. Run `7_eval.sh`
+
+```bash
+sbatch 7_eval.sh
+```
+
+4. Run `8_make_results_plots.sh`

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from typing import Dict, List, Optional, Tuple
 from omegaconf import DictConfig, OmegaConf
 
-from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, collate_femr_timelines
+from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
@@ -41,7 +41,9 @@ def main(config: DictConfig) -> None:
     is_wandb: bool = config.logging.wandb.is_wandb
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
-    path_to_tokenizer: str = config.data.tokenizer.path_to_tokenizer
+    path_to_tokenizer_code_2_int: str = config.data.tokenizer.path_to_code_2_int
+    path_to_tokenizer_code_2_count: str = config.data.tokenizer.path_to_code_2_count
+    tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     seed: int = config.main.seed
 
     # Random seed
@@ -100,9 +102,11 @@ def main(config: DictConfig) -> None:
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
     
     # Tokenizer
-    logger.info(f"Loading tokenizer: `{path_to_tokenizer}`")
-    femr_vocab_atoi: Dict[str, int] = json.load(open(path_to_tokenizer, 'r'))
-    tokenizer = FEMRTokenizer(femr_vocab_atoi)
+    logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_int}`")
+    femr_vocab_atoi: Dict[str, int] = json.load(open(path_to_tokenizer_code_2_int, 'r'))
+    femr_vocab_count: Dict[str, int] = json.load(open(path_to_tokenizer_code_2_count, 'r'))
+    tokenizer = FEMRTokenizer(femr_vocab_atoi, femr_vocab_count, min_code_count=tokenizer_min_code_count)
+    logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
@@ -142,13 +146,20 @@ def main(config: DictConfig) -> None:
             mode='min',
             verbose=True,
         ),
+        # Save checkpoint at end of every epoch
+        ModelCheckpoint(
+            dirpath=path_to_ckpt_dir,
+            filename='{epoch}-{step}-epoch',
+            save_top_k=-1,
+            every_n_epochs=1,
+        ),
         # Save checkpoint every `every_n_train_steps` steps; persists all models
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
             filename='{epoch}-{step}-persist',
             save_top_k=-1,
             every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
-            save_weights_only=False, # If TRUE, then save optimizer + scheduler states as well
+            save_weights_only=False, # If False, then save optimizer + scheduler states as well
             verbose=True,
         ),
         # Save most recent `n = save_most_recent_k` checkpoints; overwrites old models

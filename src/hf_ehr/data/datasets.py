@@ -14,9 +14,9 @@ SPLIT_TRAIN_CUTOFF: float = 70
 SPLIT_VAL_CUTOFF: float = 85
 
 class FEMRTokenizer():
-    def __init__(self, atoi: Dict[str, int]) -> None:
+    def __init__(self, atoi: Dict[str, int], code_2_count: Dict[str, int], min_code_count: Optional[int] = None) -> None:
         self.atoi: Dict[str, int] = atoi # [key] = "ICD/10", [value] = 103
-        self.itoa: Dict[int, str] = { v: k for k, v in self.atoi.items()} # [key] = 103, [value] = "ICD/10"
+        self.code_2_count: Dict[str, int] = code_2_count # [key] = "ICD/10", [value] = 1
 
         # Special tokens
         if '[PAD]' not in self.atoi.keys():
@@ -27,12 +27,26 @@ class FEMRTokenizer():
             raise ValueError("Could not find [EOS] token in self.atoi")
         if '[UNK]' not in self.atoi.keys():
             raise ValueError("Could not find [UNK] token in self.atoi")
+        # if '[MASK]' not in self.atoi.keys():
+        #     raise ValueError("Could not find [MASK] token in self.atoi")
         self.pad_token_id = self.atoi['[PAD]']
         self.bos_token_id = self.atoi['[BOS]']
         self.eos_token_id = self.atoi['[EOS]']
         self.unk_token_id = self.atoi['[UNK]']
-        self.special_tokens: List[str] = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]']
-        
+        # self.mask_token_id = self.atoi['[MASK]']
+        self.special_tokens: List[str] = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]',]
+
+        # Only keep codes with >= `min_code_count` occurrences in our dataset
+        if min_code_count is not None:
+            self.atoi = { 
+                k: v 
+                for k,v in self.atoi.items() 
+                if (k in self.special_tokens or self.code_2_count[k] >= min_code_count) 
+            }
+            
+        # Set reverse mapping: [key] = int, [value] = code
+        self.itoa: Dict[int, str] = { v: k for k, v in self.atoi.items() } # [key] = 103, [value] = "ICD/10"
+
         # Set attributes
         self.vocab_size: int = len(self.atoi)
     
@@ -74,7 +88,7 @@ class FEMRTokenizer():
         # Tokenize
         tokenized_batch: List[List[int]] = []
         for timeline in batch:
-            tokenized_batch.append([ self.atoi[x] for x in timeline ])
+            tokenized_batch.append([ self.atoi[x] if x in self.atoi else self.unk_token_id for x in timeline ])
         
         # Special tokens
         if add_special_tokens:

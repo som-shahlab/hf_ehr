@@ -5,11 +5,16 @@ from typing import List, Dict
 import os
 from tqdm import tqdm
 
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR, PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_v8_DIR
+
+VERSION: int = 8
 
 if __name__ == '__main__':
-    os.makedirs(PATH_TO_TOKENIZER_v9_DIR, exist_ok=True)
-    femr_db = femr.datasets.PatientDatabase(PATH_TO_FEMR_EXTRACT_v9)
+    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v9_DIR if VERSION == 9 else PATH_TO_TOKENIZER_v8_DIR
+    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v9 if VERSION == 9 else PATH_TO_FEMR_EXTRACT_v8
+
+    os.makedirs(path_to_tokenizer_dir, exist_ok=True)
+    femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
 
     code_2_count = collections.defaultdict(int)
     for patient_id in tqdm(femr_db):
@@ -18,7 +23,7 @@ if __name__ == '__main__':
     
     # Map codes to count of occurrences
     code_2_count = dict(code_2_count)
-    json.dump(code_2_count, open(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_count.json'), 'w'))
+    json.dump(code_2_count, open(os.path.join(path_to_tokenizer_dir, 'code_2_count.json'), 'w'))
     print("# of unique codes: ", len(code_2_count))
     print("# of total codes: ", sum([ x for x in code_2_count.values() ]))
     
@@ -26,10 +31,10 @@ if __name__ == '__main__':
     unique_codes: List[str] = list(code_2_count.keys())
     unique_codes = sorted(unique_codes, key=lambda x: code_2_count[x], reverse=True)
     # Add special tokens
-    unique_codes = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]', ] + unique_codes
+    unique_codes = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]', '[MASK]', ] + unique_codes
 
     # Save vocab
     code_2_int: Dict[str, int] = { code: idx for idx, code in enumerate(unique_codes) }
-    json.dump(code_2_int, open(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_int.json'), 'w'))
+    json.dump(code_2_int, open(os.path.join(path_to_tokenizer_dir, 'code_2_int.json'), 'w'))
 
     print("DONE")

@@ -119,13 +119,17 @@ class BERTLanguageModel(BaseModel):
         
     def training_step(self, 
                       batch: Dict[str, Any],
-                      batch_idx: int) -> torch.Tensor:
+                      batch_idx: int) -> Optional[torch.Tensor]:
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
 
         # Forward pass
         loss, mask, __ = self.run_eval(tokens)
         ppl: torch.Tensor = torch.exp(loss).detach()
+        
+        # Throw out bad batches
+        if ppl > 100 and self.trainer.global_step > self.config.trainer.scheduler.num_warmup_steps / len(self.config.trainer.devices):
+            return None
 
         # Learning rate scheduler
         lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]

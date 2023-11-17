@@ -24,6 +24,9 @@ class BaseModel(pl.LightningModule):
     def parameters(self):
         return list(self.model.parameters()) + list(self.lm_head.parameters())
 
+    def get_param_count(self) -> int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
     def configure_optimizers(self):
         """ Sets Learning rate for different parameter groups."""
         lr: float = self.config.trainer.optimizer.lr

@@ -22,7 +22,7 @@ callbacks:
     # Save model every N global steps; if NULL, save after every epoch; overwrites previous model
     most_recent_every_n_train_steps: 1_000
     # Save model every N global steps; persists
-    every_n_train_steps: 50_000
+    every_n_train_steps: 10_000
 
 data:
   dataset:
@@ -39,8 +39,14 @@ data:
     is_truncation_random: True
   tokenizer:
     # Path to tokenizer
-    path_to_tokenizer: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json
-
+    # v9:
+    path_to_code_2_int: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json
+    path_to_code_2_count: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json
+    # v8:
+    # path_to_code_2_int: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_int.json
+    # path_to_code_2_count: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_count.json
+    # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines
+    # min_code_count: 10
 
 trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
@@ -70,13 +76,13 @@ trainer:
   # OPTIMIZER
   optimizer:
     # Learning rate
-    lr: 3e-4
+    lr: 8e-4
   # SCHEDULER
   scheduler:
     # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
-    num_warmup_steps: 10_000
+    num_warmup_steps: 20_000
     # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
-    num_decay_steps: 2_000_000
+    num_decay_steps: 10_000_000
     initial_lr: 3e-6
     final_lr: 3e-5
 
