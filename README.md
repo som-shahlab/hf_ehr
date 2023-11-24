@@ -16,10 +16,8 @@ Plan:
 ## Setup
 
 ```bash
-conda create -n hf_env python=3.10
+conda env create -f env.yaml
 conda activate hf_env
-pip3 install -r requirements.txt
-pip3 install -e .
 ```
 
 ## How to Run
