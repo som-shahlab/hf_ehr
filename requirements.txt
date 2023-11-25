@@ -12,6 +12,7 @@ numpy
 pytorch-nlp
 wandb
 loguru
-hydra
+hydra-core
 deepspeed
 omegaconf
+jaxtyping

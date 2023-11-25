@@ -1,5 +1,12 @@
 # Databricks notebook source
-import pandas as pd
+# MAGIC %%capture
+# MAGIC %pip install -r /Workspace/Repos/s0353982@stanfordhealthcare.org/hf_ehr/requirements.txt
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# MAGIC %cd /Workspace/Repos/s0353982@stanfordhealthcare.org/hf_ehr
+# MAGIC %pip install -e .
 
 # COMMAND ----------
 
