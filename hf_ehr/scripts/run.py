@@ -3,7 +3,7 @@ import wandb
 import json
 import hydra
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
+from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from pytorch_lightning.utilities import rank_zero_only
 
@@ -39,6 +39,7 @@ def main(config: DictConfig) -> None:
     print(config)
     path_to_output_dir: str = config.main.path_to_output_dir
     is_wandb: bool = config.logging.wandb.is_wandb
+    is_mlflow: bool = config.logging.mlflow.is_mlflow
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
     path_to_tokenizer_code_2_int: str = config.data.tokenizer.path_to_code_2_int
@@ -65,6 +66,41 @@ def main(config: DictConfig) -> None:
     logger.add(path_to_log_file, enqueue=True, mode='a')
     logger.info(config)
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
+    
+    ## MLFlow
+    if is_mlflow:
+        if is_resume_from_ckpt:
+            # Load existing mlflow run ID
+            with open(os.path.join(path_to_log_dir, 'mlflow_run_id.txt'), 'r') as f:
+                mlflow_run_id: str = f.read()
+            logger.info(f"Found existing mlflow run: `{mlflow_run_id}`")
+            loggers += [ 
+                    MLFlowLogger(experiment_name='hf_ehr',
+                                    run_id=mlflow_run_id,
+                                    log_checkpoint=True,
+                                    save_dir=f"{path_to_log_dir}",
+                                    tracking_uri=f"file:{path_to_log_dir}") 
+            ]
+        else:
+            loggers += [ 
+                    MLFlowLogger(experiment_name='hf_ehr',
+                                    run_name=config.logging.mlflow.name,
+                                    log_checkpoint=True,
+                                    save_dir=f"{path_to_log_dir}",
+                                    tracking_uri=f"file:{path_to_log_dir}") 
+            ]
+            if rank_zero_only.rank == 0:
+                # Save mlflow run ID
+                mlflow_run_id: str = loggers[-1].run_id
+                with open(os.path.join(path_to_log_dir, 'mlflow_run_id.txt'), 'w') as f:
+                    f.write(mlflow_run_id)
+        if rank_zero_only.rank == 0:
+            if not is_resume_from_ckpt:
+                mlflow_config = OmegaConf.to_container(config, resolve=True)
+                mlflow_config.pop('config', None)
+                loggers[-1].log_hyperparams(mlflow_config)
+
+    ## Wandb
     if is_wandb:
         if is_resume_from_ckpt:
             # Load existing wandb run ID
