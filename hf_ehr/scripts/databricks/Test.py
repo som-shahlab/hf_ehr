@@ -32,7 +32,7 @@ from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 
 # COMMAND ----------
 
-python3 ../run.py \
+!python3 hf_ehr/scripts/run.py \
     +models=bert \
     data.dataloader.batch_size=4 \
     trainer.accumulate_grad_batches=16 \
@@ -46,4 +46,20 @@ python3 ../run.py \
     data.tokenizer.path_to_code_2_int=/FileStore/michael-hf_ehr/cache/tokenizer_v8/code_2_int.json \
     data.tokenizer.path_to_code_2_count=/FileStore/michael-hf_ehr/cache/tokenizer_v8/code_2_count.json \
     +data.tokenizer.min_code_count=10 \
-    logging.wandb.name=bert-base-v8
+    logging.wandb.name=bert-base-v8-test
+
+# COMMAND ----------
+
+wandb.init()
+
+# COMMAND ----------
+
+wandb.run.id
+
+# COMMAND ----------
+
+os.environ['WANDB_API_KEY'] = ''
+
+# COMMAND ----------
+
+

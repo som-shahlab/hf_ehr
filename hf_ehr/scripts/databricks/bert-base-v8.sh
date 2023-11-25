@@ -1,7 +1,4 @@
 #!/bin/bash
-#SBATCH --job-name=bert-base-v8
-#SBATCH --output=/FileStore/michael-hf_ehr/slurm_logs/bert-base-v8_%A.out
-#SBATCH --error=/FileStore/michael-hf_ehr/slurm_logs/bert-base-v8_%A.err
 
 source base.sh
 
@@ -19,4 +16,4 @@ python3 ../run.py \
     data.tokenizer.path_to_code_2_int=/FileStore/michael-hf_ehr/cache/tokenizer_v8/code_2_int.json \
     data.tokenizer.path_to_code_2_count=/FileStore/michael-hf_ehr/cache/tokenizer_v8/code_2_count.json \
     +data.tokenizer.min_code_count=10 \
-    logging.wandb.name=bert-base-v8
+    logging.wandb.name=bert-base-v8 > /FileStore/michael-hf_ehr/slurm_logs/bert-base-v8.out 2> /FileStore/michael-hf_ehr/slurm_logs/bert-base-v8.err
