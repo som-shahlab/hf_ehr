@@ -244,22 +244,9 @@ def main(config: DictConfig) -> None:
                 train_dataloaders=dataloaders['train'],
                 val_dataloaders=dataloaders['val'],
                 ckpt_path=path_to_resume_ckpt)
-    wandb.finish()
+    if wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":
-    # For Carina to work (otherwise get a ton of Disk space out of memory errors b/c will write to /home/mwornow/.local/ which is space limited)
-    os.environ['HF_DATASETS_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['TRANSFORMERS_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['HUGGINGFACE_HUB_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['HF_HOME'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['WANDB_CACHE_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_CONFIG_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_DATA_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_ARTIFACT_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['TRITON_CACHE_DIR'] = "/share/pi/nigam/mwornow/triton_cache/"
-    os.environ['HF_CACHE_DIR'] = "/share/pi/nigam/mwornow/hf_cache/"
-
-    # Run
     main()
