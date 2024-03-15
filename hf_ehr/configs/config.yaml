@@ -46,7 +46,7 @@ data:
     # path_to_code_2_int: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_int.json
     # path_to_code_2_count: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_count.json
     # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines
-    # min_code_count: 10
+    min_code_count: 10
 
 trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
