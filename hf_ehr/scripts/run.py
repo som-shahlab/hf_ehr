@@ -77,7 +77,8 @@ def main(config: DictConfig) -> None:
             loggers += [ 
                     MLFlowLogger(experiment_name='hf_ehr',
                                     run_id=mlflow_run_id,
-                                    log_checkpoint=True,
+                                    #log_checkpoint=True,
+                                    log_model='all',
                                     save_dir=f"{path_to_log_dir}",
                                     tracking_uri=f"file:{path_to_log_dir}") 
             ]
@@ -85,7 +86,8 @@ def main(config: DictConfig) -> None:
             loggers += [ 
                     MLFlowLogger(experiment_name='hf_ehr',
                                     run_name=config.logging.mlflow.name,
-                                    log_checkpoint=True,
+                                    #log_checkpoint=True,
+                                    log_model='all',
                                     save_dir=f"{path_to_log_dir}",
                                     tracking_uri=f"file:{path_to_log_dir}") 
             ]
