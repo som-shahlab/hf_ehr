@@ -2,10 +2,12 @@ import os
 import wandb
 import json
 import hydra
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from pytorch_lightning.utilities import rank_zero_only
+from pytorch_lightning.profilers import PyTorchProfiler
 
 from loguru import logger
 from torch.utils.data import DataLoader
@@ -113,7 +115,7 @@ def main(config: DictConfig) -> None:
                         WandbLogger(project='hf_ehr',
                                     log_model=False,
                                     save_dir=path_to_log_dir,
-                                    resume='must',
+                                    resume='allow',
                                     id=wandb_run_id)
             ]
         else:
@@ -216,14 +218,26 @@ def main(config: DictConfig) -> None:
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
     
-    # from pytorch_lightning.profilers import PyTorchProfiler
-    # profiler = PyTorchProfiler(
-    #         export_to_chrome=True,
-    # )
+    profiler = PyTorchProfiler(
+        on_trace_ready = torch.profiler.tensorboard_trace_handler("tb_logs/profiler0"),
+        trace_memory=True,
+        schedule = torch.profiler.schedule(skip_first=10, wait=1, warmup=1, active=20)
+    )
+    """
+    profiler = PyTorchProfiler(
+        # You can specify various options here, such as:
+        profile_memory=True,  # Whether to report tensor memory allocation/deallocation.
+        with_stack=True,  # Whether to record source information.
+        record_shapes=True,  # Whether to record tensor shapes.
+        profile_mlops=True, # Whether to profile model operations.
+        export_to_chrome=True,
+        # There are other parameters available depending on your needs.
+    )
+    """
 
     # Trainer
     trainer = pl.Trainer(
-        # profiler=profiler,
+        profiler=profiler,
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',

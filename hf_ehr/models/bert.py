@@ -26,6 +26,10 @@ class BERTLanguageModel(BaseModel):
         if mask_token not in self.tokenizer.get_vocab():
             self.tokenizer.add_special_token('mask', mask_token)
             assert hasattr(self.tokenizer, 'mask_token_id'), f"Error - couldn't add [MASK] token to tokenizer"
+        """
+        OPTIMIZATION opportunity  - one idea could be to remove the assertion since we know the tokenizer works, so
+        something like - tokenizer.add_tokens([mask_token]), tokenizer.mask_token = mask_token
+        """
 
         # Model specs
         model_config = AutoConfig.from_pretrained(self.model_name)
@@ -71,9 +75,44 @@ class BERTLanguageModel(BaseModel):
         # Sanity checks
         assert logits.shape == (B, L, V)
         assert targets.shape == (B, L)
-
+        """
+        OPTIMIZATION opportunity  - remove the addition shape checks for logits and targets
+        """
         return loss
+    
+    def run_eval(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        B: int = tokens['input_ids'].shape[0]
+        L: int = tokens['input_ids'].shape[1]
+        V: int = self.tokenizer.vocab_size
 
+        # Save targets before modifying tokens with masking
+        pred_targets: Float[torch.Tensor, 'B L'] = tokens['input_ids'].clone()
+        device = tokens['input_ids'].device
+        # Dynamic mask generation for MLM using in-place operations where possible
+        mask: Float[torch.Tensor, 'B L'] = (torch.rand((B, L), device=device, dtype=torch.float32) < self.config.trainer.mlm_mask_pct)
+        mask = mask.to(torch.bool)  # Use torch.bool for masks to save memory and computation
+        # Efficiently compute indices for masking without moving tensors between devices
+        ones_indices = torch.nonzero(mask, as_tuple=True)
+        # Directly apply [MASK] and random tokens without shuffling to reduce operations
+        n_RANDOM = int(0.1 * mask.sum().item())
+        # Direct application of masks and random tokens without unnecessary tensor manipulation
+        tokens['input_ids'].masked_fill_(mask, self.tokenizer.mask_token_id)
+        # For random replacement, use a more direct method to avoid overhead
+        random_indices = torch.randperm(mask.sum().item(), device=device)[:n_RANDOM]
+        non_special_tokens = self.tokenizer.get_vocab_tokens(is_include_special_tokens=False).to(device)
+        random_tokens = non_special_tokens[torch.randint(0, len(non_special_tokens), (n_RANDOM,), device=device)]
+        tokens['input_ids'][ones_indices[0][random_indices], ones_indices[1][random_indices]] = random_tokens
+        #Forward pass
+        pred_logits = self.forward(tokens, is_return_hidden_states=False)
+        pred_targets[~mask] = self.tokenizer.pad_token_id
+        loss: torch.Tensor = self.loss(pred_logits, pred_targets)
+        # Sanity checks
+        assert pred_logits.shape == (B, L, V)
+        
+        return loss, mask, pred_targets
+        
+    
+    """
     def run_eval(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         B: int = tokens['input_ids'].shape[0]
         L: int = tokens['input_ids'].shape[1]
@@ -85,6 +124,7 @@ class BERTLanguageModel(BaseModel):
 
         # Dynamic mask generation for MLM
         mask: Float[torch.Tensor, 'B L'] = (torch.rand((B,L), dtype=torch.float32) < self.config.trainer.mlm_mask_pct).to(torch.int64)
+        
         ones_indices: Float[torch.Tensor, '0.15*B*L 2'] = torch.nonzero(mask == 1).to(device)
         ones_indices_shuffled: Float[torch.Tensor, 'n_MASK+n_RANDOM+n_ORIGINAL'] = torch.randperm(ones_indices.shape[0])
         ## Replace mask -> [MASK] (80%)
@@ -108,7 +148,7 @@ class BERTLanguageModel(BaseModel):
         assert pred_logits.shape == (B, L, V)
         
         return loss, mask, pred_targets
-        
+    """    
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
@@ -143,19 +183,19 @@ class BERTLanguageModel(BaseModel):
         self.sum_metrics['train_total_tokens_nonPAD'].update(train_batch_tokens_nonPAD)
 
         # Logging
-        self.log('optim/lr', lr)
+        #self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
         self.log('train/ppl', torch.clamp(ppl, max=100).to(torch.float32)) # artificially cap to 100 so that charts look prettier
         self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
         self.log('train/examples/total', self.sum_metrics['train_total_examples'].compute().to(torch.float32))
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
-        self.log('train/tokens/batch_MASK', train_batch_tokens_MASK.to(torch.float32))
-        self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
-        self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
+        #self.log('train/tokens/batch_MASK', train_batch_tokens_MASK.to(torch.float32))
+        #self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
+        #self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
         self.log('train/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32))
-        self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
+        #self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
         self.log('train/tokens/total_MASK', self.sum_metrics['train_total_tokens_MASK'].compute().to(torch.float32))
-        self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
+        #self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
 
         return loss
 
@@ -172,10 +212,12 @@ class BERTLanguageModel(BaseModel):
             return None
 
         # Logging
+        ## Try commenting out writing to a file since it might be inefficient esp in distributed settings
+        """
         with open('./vals.txt', 'a') as fd:
             fd.write(str(batch_idx) + ' , ' + str(loss) + ', ' + str(mask.sum()))
             fd.write('\n')
+        """
         self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
-
         return loss
