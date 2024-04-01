@@ -2,15 +2,14 @@ import time
 start = time.time()
 import os
 import wandb # 40s to load
-print('A', time.time() - start)
 import json
-import hydra # 5s to load
-print('B', time.time() - start)
-import lightning as pl # 150s to load
-from lightning.loggers import WandbLogger, TensorBoardLogger
-from lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
-from lightning.utilities import rank_zero_only
-print('C', time.time() - start)
+import hydra # 5s
+import torch
+import pytorch_lightning as pl # 150s
+from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from pytorch_lightning.utilities import rank_zero_only
+from pytorch_lightning.profilers import PyTorchProfiler
 
 from loguru import logger
 from torch.utils.data import DataLoader
@@ -92,6 +91,7 @@ def main(config: DictConfig) -> None:
     print(config)
     path_to_output_dir: str = config.main.path_to_output_dir
     is_wandb: bool = config.logging.wandb.is_wandb
+    is_mlflow: bool = config.logging.mlflow.is_mlflow
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
     path_to_tokenizer_code_2_int: str = config.data.tokenizer.path_to_code_2_int
@@ -118,8 +118,44 @@ def main(config: DictConfig) -> None:
     logger.add(path_to_log_file, enqueue=True, mode='a')
     logger.info(config)
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
+    
+    ## MLFlow
+    if is_mlflow:
+        if is_resume_from_ckpt:
+            # Load existing mlflow run ID
+            with open(os.path.join(path_to_log_dir, 'mlflow_run_id.txt'), 'r') as f:
+                mlflow_run_id: str = f.read()
+            logger.info(f"Found existing mlflow run: `{mlflow_run_id}`")
+            loggers += [ 
+                    MLFlowLogger(experiment_name='hf_ehr',
+                                    run_id=mlflow_run_id,
+                                    #log_checkpoint=True,
+                                    log_model='all',
+                                    save_dir=f"{path_to_log_dir}",
+                                    tracking_uri=f"file:{path_to_log_dir}") 
+            ]
+        else:
+            loggers += [ 
+                    MLFlowLogger(experiment_name='hf_ehr',
+                                    run_name=config.logging.mlflow.name,
+                                    #log_checkpoint=True,
+                                    log_model='all',
+                                    save_dir=f"{path_to_log_dir}",
+                                    tracking_uri=f"file:{path_to_log_dir}") 
+            ]
+            if rank_zero_only.rank == 0:
+                # Save mlflow run ID
+                mlflow_run_id: str = loggers[-1].run_id
+                with open(os.path.join(path_to_log_dir, 'mlflow_run_id.txt'), 'w') as f:
+                    f.write(mlflow_run_id)
+        if rank_zero_only.rank == 0:
+            if not is_resume_from_ckpt:
+                mlflow_config = OmegaConf.to_container(config, resolve=True)
+                mlflow_config.pop('config', None)
+                loggers[-1].log_hyperparams(mlflow_config)
+
+    ## Wandb
     if is_wandb:
-        import wandb
         if is_resume_from_ckpt:
             # Load existing wandb run ID
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
@@ -129,7 +165,7 @@ def main(config: DictConfig) -> None:
                         WandbLogger(project='hf_ehr',
                                     log_model=False,
                                     save_dir=path_to_log_dir,
-                                    resume='must',
+                                    resume='allow',
                                     id=wandb_run_id)
             ]
         else:
@@ -231,9 +267,27 @@ def main(config: DictConfig) -> None:
     ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
+    
+    profiler = PyTorchProfiler(
+        on_trace_ready = torch.profiler.tensorboard_trace_handler("tb_logs/profiler0"),
+        trace_memory=True,
+        schedule = torch.profiler.schedule(skip_first=10, wait=1, warmup=1, active=20)
+    )
+    """
+    profiler = PyTorchProfiler(
+        # You can specify various options here, such as:
+        profile_memory=True,  # Whether to report tensor memory allocation/deallocation.
+        with_stack=True,  # Whether to record source information.
+        record_shapes=True,  # Whether to record tensor shapes.
+        profile_mlops=True, # Whether to profile model operations.
+        export_to_chrome=True,
+        # There are other parameters available depending on your needs.
+    )
+    """
 
     # Trainer
     trainer = pl.Trainer(
+        profiler=profiler,
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',
@@ -261,18 +315,4 @@ def main(config: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    # For Carina to work (otherwise get a ton of Disk space out of memory errors b/c will write to /home/mwornow/.local/ which is space limited)
-    os.environ['HF_DATASETS_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['TRANSFORMERS_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['HUGGINGFACE_HUB_CACHE'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['HF_HOME'] = "/share/pi/nigam/mwornow/hf_cache/"
-    os.environ['WANDB_CACHE_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_CONFIG_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_DATA_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_ARTIFACT_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['WANDB_DIR'] = "/share/pi/nigam/mwornow/wandb_cache/"
-    os.environ['TRITON_CACHE_DIR'] = "/share/pi/nigam/mwornow/triton_cache/"
-    os.environ['HF_CACHE_DIR'] = "/share/pi/nigam/mwornow/hf_cache/"
-
-    # Run
     main()

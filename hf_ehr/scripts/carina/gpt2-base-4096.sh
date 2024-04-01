@@ -10,7 +10,7 @@
 
 source base.sh
 
-python3 run.py \
+python3 ../run.py \
     +models=gpt2 \
     data.dataloader.batch_size=1 \
     trainer.accumulate_grad_batches=16 \

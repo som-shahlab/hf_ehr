@@ -10,7 +10,7 @@
 
 source base.sh
 
-python3 run.py \
+python3 ../run.py \
     +models=bert \
     data.dataloader.batch_size=4 \
     trainer.accumulate_grad_batches=4 \

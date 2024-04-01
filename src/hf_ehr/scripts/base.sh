@@ -1,9 +1,0 @@
-export HF_DATASETS_CACHE="/share/pi/nigam/mwornow/hf_cache/"
-export TRANSFORMERS_CACHE="/share/pi/nigam/mwornow/hf_cache/"
-export HUGGINGFACE_HUB_CACHE="/share/pi/nigam/mwornow/hf_cache/"
-export HF_HOME="/share/pi/nigam/mwornow/hf_cache/"
-export WANDB_CACHE_DIR="/share/pi/nigam/mwornow/wandb_cache/"
-export WANDB_CONFIG_DIR="/share/pi/nigam/mwornow/wandb_config/"
-export WANDB_DIR="/share/pi/nigam/mwornow/wandb_dir/"
-export TRITON_CACHE_DIR="/share/pi/nigam/mwornow/triton_cache/"
-export WANDB__SERVICE_WAIT=300

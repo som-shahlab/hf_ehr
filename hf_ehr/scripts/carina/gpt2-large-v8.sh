@@ -10,7 +10,7 @@
 
 source base.sh
 
-python3 run.py \
+python3 ../run.py \
     +models=gpt2 \
     +data=v8 \
     data.dataloader.batch_size=1 \

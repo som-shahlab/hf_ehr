@@ -10,7 +10,7 @@
 
 source base.sh
 
-python3 run.py \
+python3 ../run.py \
     +models=bert \
     +data=v8 \
     data.dataloader.batch_size=2 \

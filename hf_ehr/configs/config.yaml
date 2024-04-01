@@ -92,6 +92,11 @@ logging:
     is_wandb: True
     # Run name
     name: null
+  mlflow:
+    # If true, then turn ON mlflow logging
+    is_mlflow: True
+    # Run name
+    name: null
   # If TRUE, then calculate + log grad norm over all params (slows down training)
   is_log_grad_norm: False
   # Log every N steps
