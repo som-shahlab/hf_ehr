@@ -1,11 +1,16 @@
+import time
+start = time.time()
 import os
-import wandb
+import wandb # 40s to load
+print('A', time.time() - start)
 import json
-import hydra
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
-from pytorch_lightning.utilities import rank_zero_only
+import hydra # 5s to load
+print('B', time.time() - start)
+import lightning as pl # 150s to load
+from lightning.loggers import WandbLogger, TensorBoardLogger
+from lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from lightning.utilities import rank_zero_only
+print('C', time.time() - start)
 
 from loguru import logger
 from torch.utils.data import DataLoader
@@ -15,7 +20,14 @@ from omegaconf import DictConfig, OmegaConf
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
+from hf_ehr.models.hyena import HyenaLanguageModel
+# from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
+
+V100_BASE_DIR: str = '/local-scratch-nvme/nigam/hf_ehr/'
+A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
+GPU_BASE_DIR: str = '/home/hf_ehr/'
+
 
 class GradNormCallback(Callback):
     """
@@ -33,9 +45,50 @@ class GradNormCallback(Callback):
 
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
-    
+
+def rewrite_paths_for_carina(config: DictConfig) -> DictConfig:
+    """Rewrite paths for Carina partitions to use local-scratch directories."""
+    if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
+        if not os.path.exists(V100_BASE_DIR):
+            os.makedirs(V100_BASE_DIR, exist_ok=True)
+            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite {V100_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {V100_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {V100_BASE_DIR}')
+        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', V100_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', V100_BASE_DIR)
+        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', V100_BASE_DIR)
+        print(f"Loading data from local-scratch: `{V100_BASE_DIR}`.")
+    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-a100':
+        if not os.path.exists(A100_BASE_DIR):
+            # Copy over the cache files
+            os.makedirs(A100_BASE_DIR, exist_ok=True)
+            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite {A100_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {A100_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {A100_BASE_DIR}')
+        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
+        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
+        print(f"Loading data from local-scratch: `{A100_BASE_DIR}`.")
+    elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
+        if not os.path.exists(GPU_BASE_DIR):
+            os.makedirs(GPU_BASE_DIR, exist_ok=True)
+            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite {GPU_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {GPU_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {GPU_BASE_DIR}')
+        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
+        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+        print(f"Loading data from local-scratch: `{GPU_BASE_DIR}`.")
+    else:
+        print("No local-scratch directory found. Using default `/share/pi/` paths.")
+    return config
+
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
+    # Rewrite paths for /local-scratch on certain partitions
+    config = rewrite_paths_for_carina(config)
+
+    # Load config
     print(config)
     path_to_output_dir: str = config.main.path_to_output_dir
     is_wandb: bool = config.logging.wandb.is_wandb
@@ -66,6 +119,7 @@ def main(config: DictConfig) -> None:
     logger.info(config)
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
     if is_wandb:
+        import wandb
         if is_resume_from_ckpt:
             # Load existing wandb run ID
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
@@ -110,13 +164,18 @@ def main(config: DictConfig) -> None:
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
-    if 'gpt2' in config.model.name:
+    if 'gpt2' in model_name:
         model = GPTLanguageModel(config, tokenizer)
-    elif 'bert' in config.model.name:
+    elif 'bert' in model_name:
         model = BERTLanguageModel(config, tokenizer)
+    elif 'hyena' in model_name:
+        model = HyenaLanguageModel(config, tokenizer)
+    elif 't5' in model_name:
+        model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
-
+    logger.info(f"Parameter count of model = {model.get_param_count()}")
+    
     # Datasets
     logger.info(f"Loading FEMR datasets...")
     datasets: Dict[str, FEMRDataset] = load_datasets(config)
@@ -127,13 +186,6 @@ def main(config: DictConfig) -> None:
 
     # Callbacks
     callbacks: List = []
-    early_stop_callback = EarlyStopping(
-        monitor='val/loss',
-        min_delta=0.0,
-        patience=config.callbacks.early_stopping.patience,
-        verbose=True,
-        mode=config.callbacks.early_stopping.metric_mode,
-    )
     callbacks += [ 
         # Save top-K checkpoints based on `val/loss`; overwrites old models
         ModelCheckpoint(
@@ -149,9 +201,11 @@ def main(config: DictConfig) -> None:
         # Save checkpoint at end of every epoch
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
-            filename='{epoch}-{step}-epoch',
+            filename='{epoch}-epoch',
             save_top_k=-1,
             every_n_epochs=1,
+            save_weights_only=False, # If False, then save optimizer + scheduler states as well
+            verbose=True,
         ),
         # Save checkpoint every `every_n_train_steps` steps; persists all models
         ModelCheckpoint(
@@ -177,15 +231,9 @@ def main(config: DictConfig) -> None:
     ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
-    
-    # from pytorch_lightning.profilers import PyTorchProfiler
-    # profiler = PyTorchProfiler(
-    #         export_to_chrome=True,
-    # )
 
     # Trainer
     trainer = pl.Trainer(
-        # profiler=profiler,
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',
@@ -208,7 +256,8 @@ def main(config: DictConfig) -> None:
                 train_dataloaders=dataloaders['train'],
                 val_dataloaders=dataloaders['val'],
                 ckpt_path=path_to_resume_ckpt)
-    wandb.finish()
+    if is_wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":

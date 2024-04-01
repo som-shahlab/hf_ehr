@@ -1,19 +1,21 @@
 # @package _global_
 
 model:
-  # Name of HF model to load
+  # Name of model to load
   name: hyena
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: LongSafari/hyenadna-large-1m-seqlen-hf
   # Kwargs for ModelConfig
   config_kwargs:
     n_layer: 8
     max_seq_len: 1024
     d_model: 512
-    d_inner: ${d_model * 4}
+    d_inner: ${eval:4 * ${.d_model}}
 
 data:
   dataloader:
     # Max number of codes to feed into model at once per patient.
-    max_length: ${max_seq_len}
+    max_length: ${model.config_kwargs.max_seq_len}
 
 trainer:
   optimizer:

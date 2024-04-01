@@ -28,11 +28,11 @@ class BERTLanguageModel(BaseModel):
             assert hasattr(self.tokenizer, 'mask_token_id'), f"Error - couldn't add [MASK] token to tokenizer"
 
         # Model specs
-        model_config = AutoConfig.from_pretrained(self.model_name)
+        model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'bert-base-uncased')
         model_config.vocab_size = tokenizer.vocab_size
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
-            assert hasattr(model_config, key), f"Config for HF model {self.model_name} does not have attribute {key}"
+            assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"
             setattr(model_config, key, val)
         self.model_config = model_config
         self.hidden_size = model_config.n_embd if hasattr(model_config, 'n_embd') else model_config.hidden_size

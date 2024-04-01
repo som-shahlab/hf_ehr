@@ -50,7 +50,7 @@ if __name__ == "__main__":
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
-    PATH_TO_MODEL = os.path.join(args.path_to_models_dir, MODEL, 'last.ckpt')
+    PATH_TO_MODEL = os.path.join(args.path_to_models_dir, MODEL, 'epoch=2-step=56000-val_loss.ckpt')
     PATH_TO_TOKENIZER_CODE_2_INT = os.path.join(args.path_to_models_dir, MODEL, 'code_2_int.json')
     PATH_TO_TOKENIZER_CODE_2_COUNT = os.path.join(args.path_to_models_dir, MODEL, 'code_2_count.json')
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')

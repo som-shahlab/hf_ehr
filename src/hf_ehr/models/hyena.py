@@ -18,7 +18,7 @@ class HyenaLanguageModel(CausalModel):
         self.tokenizer = tokenizer
 
         # Model specs
-        model_config = AutoConfig.from_pretrained(self.model_name)
+        model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
         model_config.vocab_size = tokenizer.vocab_size
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {self.model_name} does not have attribute {key}"
@@ -26,7 +26,7 @@ class HyenaLanguageModel(CausalModel):
         self.hidden_size = model_config.d_model
 
         # Model
-        self.model = AutoModel.from_config(model_config)
+        self.model = AutoModel.from_config(model_config, trust_remote_code=True)
         self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
 
     def configure_optimizers(self):

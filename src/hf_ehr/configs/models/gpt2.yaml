@@ -3,6 +3,8 @@
 model:
   # Name of HF model to load
   name: gpt2
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: gpt2
   # Kwargs for ModelConfig
   config_kwargs:
     n_layer: 12

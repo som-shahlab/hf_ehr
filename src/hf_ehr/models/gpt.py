@@ -12,15 +12,13 @@ class GPTLanguageModel(CausalModel):
     def __init__(self, config: DictConfig, tokenizer) -> None:
         super(GPTLanguageModel, self).__init__(config)
         self.save_hyperparameters()
-        self.model_name: str = config.model.name
-        self.config = config
 
         # Model specs
-        model_config = AutoConfig.from_pretrained(self.model_name)
+        model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'gpt2')
         model_config.vocab_size = tokenizer.vocab_size
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
-            assert hasattr(model_config, key), f"Config for HF model {self.model_name} does not have attribute {key}"
+            assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"
             setattr(model_config, key, val)
         self.hidden_size = model_config.n_embd
 

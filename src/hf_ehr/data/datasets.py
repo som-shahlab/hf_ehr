@@ -149,7 +149,6 @@ class FEMRDataset(Dataset):
         # Filter out patients
         # if min_events is not None:
         #     # Filter out patients with timelines shorter than `min_events`
-            
 
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
