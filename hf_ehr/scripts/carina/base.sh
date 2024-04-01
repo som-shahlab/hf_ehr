@@ -11,3 +11,7 @@ export WANDB_CONFIG_DIR="/share/pi/nigam/mwornow/wandb_cache/"
 export WANDB_DIR="/share/pi/nigam/mwornow/wandb_cache/"
 export TRITON_CACHE_DIR="/share/pi/nigam/mwornow/triton_cache/"
 export WANDB__SERVICE_WAIT=300
+
+# If GPU partition:
+conda activate /home/hf_ehr/hf_env
+python -m pip install -r requirements.txt # need this `-m` to write to correct /home/ env path and not the one on /share/pi

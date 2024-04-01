@@ -1,15 +1,15 @@
 import time
 start = time.time()
 import os
-import wandb # 40s to load
+import wandb
 import json
-import hydra # 5s
+import hydra
 import torch
-import pytorch_lightning as pl # 150s
-from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, Callback
-from pytorch_lightning.utilities import rank_zero_only
-from pytorch_lightning.profilers import PyTorchProfiler
+import lightning.pytorch as pl
+from lightning.pytorch.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from lightning.pytorch.utilities import rank_zero_only
+from lightning.pytorch.profilers import PyTorchProfiler
 
 from loguru import logger
 from torch.utils.data import DataLoader

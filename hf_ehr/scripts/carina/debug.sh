@@ -18,5 +18,4 @@ python3 run.py \
     trainer.devices=[0] \
     model.config_kwargs.n_layer=2 \
     model.config_kwargs.n_head=2 \
-    model.config_kwargs.n_embd=256 \
-    logging.wandb.is_wandb=False # importing `wandb` takes a long time
+    model.config_kwargs.n_embd=256
