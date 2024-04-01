@@ -6,6 +6,7 @@ slurm_logs/
 *.pkl
 *.csv
 .vscode/
+EHRSHOT_ASSETS/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

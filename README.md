@@ -16,7 +16,7 @@ Plan:
 ## Setup
 
 ```bash
-conda create -n hf_env python=3.10
+conda create -n hf_env python=3.10 -y
 conda activate hf_env
 pip3 install -r requirements.txt
 pip3 install -e .
@@ -24,19 +24,9 @@ pip3 install -e .
 
 ## How to Run
 
-Create Carina node:
-```bash
-srun --partition=gpu --mem=200G --gres=gpu:4 --cpus-per-task=20 --time=48:00:00 --pty bash -i
-conda activate hf_env && cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
-
-# Separately, in VSCode, run the command "Remote-Tunnels: Connect to Tunnel..." and select "slurm-gpu"
-
-```
-
 Launch training run:
 ```bash
-conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr/scripts
-export WANDB__SERVICE_WAIT=300
+conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr/scripts && source base.sh
 python3 run.py \
     +models=bert \
     data.dataloader.batch_size=4 \
@@ -50,10 +40,14 @@ python3 run.py \
     trainer.val_check_interval=100 \
     trainer.limit_val_batches=20 \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-test/
-
-# Profiling
-python3 run.py data.dataloader.batch_size=4 data.dataloader.n_workers=10 trainer.devices=[0,1,2,3] trainer.max_epochs=1 trainer.limit_train_batches=0.1 trainer.limit_val_batches=0.1
 ```
+
+With VSCode debugger:
+```bash
+srun --partition=nigam-v100 --mem=200G --gres=gpu:8 --cpus-per-task=20 --time=48:00:00 --pty bash -i
+conda activate hf_env && cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
+```
+
 
 # Stats
 
@@ -88,7 +82,7 @@ tensorboard --logdir="experiments/lightning_logs/"
 
 ```bash
 conda activate hf_env
-export MODEL_NAME=bert-base-v8
+export MODEL_NAME=gpt2-base-v8
 
 python3 ehrshot.py \
     --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
@@ -96,7 +90,7 @@ python3 ehrshot.py \
     --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/custom_hf_features \
     --path_to_models_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models \
     --model $MODEL_NAME \
-    --embed_strat last \
+    --embed_strat mean \
     --chunk_strat last \
     --is_force_refresh
 ```
