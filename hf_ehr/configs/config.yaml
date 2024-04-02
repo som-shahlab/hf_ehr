@@ -94,7 +94,7 @@ logging:
     name: null
   mlflow:
     # If true, then turn ON mlflow logging
-    is_mlflow: True
+    is_mlflow: False
     # Run name
     name: null
   # If TRUE, then calculate + log grad norm over all params (slows down training)

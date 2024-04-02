@@ -209,7 +209,8 @@ def main(config: DictConfig) -> None:
     elif 'hyena' in model_name:
         model = HyenaLanguageModel(config, tokenizer)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer)
+        raise NotImplementedError("T5 model not implemented.")
+        # model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
