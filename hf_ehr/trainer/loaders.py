@@ -45,14 +45,9 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     """
     path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
 
-    import time
-    start = time.time()
     train_dataset = FEMRDataset(path_to_femr_extract, split='train')
-    print("A", time.time() - start)
     val_dataset = FEMRDataset(path_to_femr_extract, split='val')
-    print("B", time.time() - start)
     test_dataset = FEMRDataset(path_to_femr_extract, split='test')
-    print("C", time.time() - start)
     
     return { 
             'train' : train_dataset, 

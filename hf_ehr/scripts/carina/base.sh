@@ -12,20 +12,31 @@ export WANDB_DIR="/share/pi/nigam/mwornow/wandb_cache/"
 export TRITON_CACHE_DIR="/share/pi/nigam/mwornow/triton_cache/"
 export WANDB__SERVICE_WAIT=300
 
-# If a100 partition:
-cp -r /share/pi/nigam/envs/hf_env /local-scratch/hf_ehr/ # one-time setup
-conda activate /local-scratch/hf_ehr/hf_env
-python -m pip install -r requirements.txt # need this `-m` to write to correct /local-scratch/ env path and not the one on /share/pi
-python -m pip install -e .
-
-# If v100 partition:
-cp -r /share/pi/nigam/envs/hf_env /local-scratch-nvme/hf_ehr/ # one-time setup
-conda activate /local-scratch-nvme/hf_ehr/hf_env
-python -m pip install -r requirements.txt # need this `-m` to write to correct /local-scratch-nvme/ env path and not the one on /share/pi
-python -m pip install -e .
-
-# If GPU partition:
-cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
-conda activate /home/hf_ehr/hf_env
-python -m pip install -r requirements.txt # need this `-m` to write to correct /home/ env path and not the one on /share/pi
-python -m pip install -e .
+if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
+    # If a100 partition:
+    if [[ ! -e "/local-scratch/nigam/hf_ehr/hf_env" ]]; then
+        cp -r /share/pi/nigam/envs/hf_env /local-scratch/nigam/hf_ehr/ # one-time setup
+    fi
+    conda activate /local-scratch/nigam/hf_ehr/hf_env
+    python -m pip install -r requirements.txt # need this `-m` to write to correct /local-scratch/ env path and not the one on /share/pi
+    python -m pip install -e .
+elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
+    # If v100 partition:
+    if [[ ! -e "/local-scratch-nvme/nigam/hf_ehr/hf_env" ]]; then
+        cp -r /share/pi/nigam/envs/hf_env /local-scratch-nvme/nigam/hf_ehr/ # one-time setup
+    fi
+    conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env
+    python -m pip install -r requirements.txt # need this `-m` to write to correct /local-scratch-nvme/ env path and not the one on /share/pi
+    python -m pip install -e .
+elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
+    # If GPU partition:
+    if [[ ! -e "/home/hf_ehr/hf_env" ]]; then
+        cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
+    fi
+    conda activate /home/hf_ehr/hf_env
+    python -m pip install -r requirements.txt # need this `-m` to write to correct /home/ env path and not the one on /share/pi
+    python -m pip install -e .
+else
+    echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
+    exit 1
+fi

@@ -153,6 +153,7 @@ def main(config: DictConfig) -> None:
             if not is_resume_from_ckpt:
                 mlflow_config = OmegaConf.to_container(config, resolve=True)
                 mlflow_config.pop('config', None)
+                mlflow_config.pop('tokenizer', None)
                 loggers[-1].log_hyperparams(mlflow_config)
 
     ## Wandb
@@ -272,9 +273,13 @@ def main(config: DictConfig) -> None:
         callbacks += [ GradNormCallback() ]
     
     profiler = PyTorchProfiler(
-        on_trace_ready = torch.profiler.tensorboard_trace_handler("tb_logs/profiler0"),
+        dirpath=os.path.join(path_to_output_dir),
+        filename='pytorch_profiler',
+        emit_nvtx=True,
+        # on_trace_ready = torch.profiler.tensorboard_trace_handler(os.path.join(path_to_output_dir, "profiler/tb_logs")),
         trace_memory=True,
-        schedule = torch.profiler.schedule(skip_first=10, wait=1, warmup=1, active=20)
+        export_to_chrome=True,
+        # schedule = torch.profiler.schedule(skip_first=10, wait=1, warmup=1, active=20)
     )
     """
     profiler = PyTorchProfiler(
@@ -289,9 +294,8 @@ def main(config: DictConfig) -> None:
     """
 
     # Trainer
-    breakpoint()
     trainer = pl.Trainer(
-        profiler=profiler,
+        profiler='simple',
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',
