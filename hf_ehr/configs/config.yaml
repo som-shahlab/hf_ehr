@@ -16,11 +16,11 @@ callbacks:
     patience: 3
   model_checkpointing:
     # Save the top K best models according to val/loss. If -1, then save all models
-    save_top_k: 5
+    save_top_k: 1
     # Save the most recent K models. If -1, then save all models
     save_most_recent_k: 1
     # Save model every N global steps; if NULL, save after every epoch; overwrites previous model
-    most_recent_every_n_train_steps: 1_000
+    most_recent_every_n_train_steps: 5_000
     # Save model every N global steps; persists
     every_n_train_steps: 10_000
 
