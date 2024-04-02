@@ -22,6 +22,7 @@ from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 # from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
+print("====> Done loading imports: ", time.time() - start, "s")
 
 V100_BASE_DIR: str = '/local-scratch-nvme/nigam/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
@@ -169,6 +170,7 @@ def main(config: DictConfig) -> None:
                                     id=wandb_run_id)
             ]
         else:
+            wandb.init()
             loggers += [ 
                         WandbLogger(project='hf_ehr',
                                     log_model=False,
@@ -286,6 +288,7 @@ def main(config: DictConfig) -> None:
     """
 
     # Trainer
+    breakpoint()
     trainer = pl.Trainer(
         profiler=profiler,
         logger=loggers,

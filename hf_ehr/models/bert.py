@@ -1,16 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import optim
 from transformers import AutoModel, AutoConfig
 from jaxtyping import Float
-import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
-from torchmetrics.aggregation import SumMetric
-from hf_ehr.utils import lr_warmup_with_constant_plateau
 from hf_ehr.models.modules import BaseModel
-import numpy as np
 
 class BERTLanguageModel(BaseModel):
     """

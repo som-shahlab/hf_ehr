@@ -39,11 +39,20 @@ def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], token
     }
 
 def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
+    """Load all FEMR datasets. 
+        - Takes ~8s for each dataset to load using /local-scratch/.
+        - Takes ~8s for each dataset to load using /share/pi/.
+    """
     path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
 
+    import time
+    start = time.time()
     train_dataset = FEMRDataset(path_to_femr_extract, split='train')
+    print("A", time.time() - start)
     val_dataset = FEMRDataset(path_to_femr_extract, split='val')
+    print("B", time.time() - start)
     test_dataset = FEMRDataset(path_to_femr_extract, split='test')
+    print("C", time.time() - start)
     
     return { 
             'train' : train_dataset, 

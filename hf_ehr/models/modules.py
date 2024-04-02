@@ -1,6 +1,6 @@
 import torch
 from torch import optim
-import pytorch_lightning as pl
+import lightning as L
 import torch.nn.functional as F
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
@@ -8,7 +8,7 @@ from hf_ehr.utils import lr_warmup_with_constant_plateau
 from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union, Tuple
 
-class BaseModel(pl.LightningModule):
+class BaseModel(L.LightningModule):
     """
     Base PyTorchLightning model with some common methods.
     """
@@ -21,7 +21,7 @@ class BaseModel(pl.LightningModule):
     config: DictConfig
 
     def __init__(self, config: DictConfig) -> None:
-        super(BaseModel, self).__init__()
+        super().__init__()
         self.save_hyperparameters()
         self.model_name: str = config.model.name
         self.config = config
