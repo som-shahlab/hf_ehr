@@ -1,7 +1,6 @@
 import time
 start = time.time()
 import os
-import wandb
 import json
 import hydra
 import torch
@@ -27,7 +26,6 @@ print("====> Done loading imports: ", time.time() - start, "s")
 V100_BASE_DIR: str = '/local-scratch-nvme/nigam/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
 GPU_BASE_DIR: str = '/home/hf_ehr/'
-
 
 class GradNormCallback(Callback):
     """
@@ -158,6 +156,7 @@ def main(config: DictConfig) -> None:
 
     ## Wandb
     if is_wandb:
+        import wandb
         if is_resume_from_ckpt:
             # Load existing wandb run ID
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
@@ -295,7 +294,7 @@ def main(config: DictConfig) -> None:
 
     # Trainer
     trainer = pl.Trainer(
-        profiler='simple',
+        # profiler='advanced',
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',

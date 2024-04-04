@@ -20,8 +20,9 @@ callbacks:
     # Save the most recent K models. If -1, then save all models
     save_most_recent_k: 1
     # Save model every N global steps; if NULL, save after every epoch; overwrites previous model
+    # useful for resuming training after a crash
     most_recent_every_n_train_steps: 5_000
-    # Save model every N global steps; persists
+    # Save model every N global steps; persists permanently
     every_n_train_steps: 10_000
 
 data:
@@ -66,13 +67,13 @@ trainer:
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
-  max_epochs: 1000
+  max_epochs: 1_000
   # Limits training to `N` batches if `int`, or `N%` of batches if `float`
   limit_train_batches: null
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`
   limit_val_batches: null
-  # How often we check the validation set within an epoch
-  val_check_interval: 0.1
+  # How often we check the validation set within an epoch - `int` is every N batches and `float` is a fraction of the training dataset
+  val_check_interval: 0.25
   # OPTIMIZER
   optimizer:
     # Learning rate
