@@ -19,6 +19,7 @@ from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
+from hf_ehr.models.mamba import MambaLanguageModel
 # from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 print("====> Done loading imports: ", time.time() - start, "s")
@@ -208,6 +209,8 @@ def main(config: DictConfig) -> None:
         model = BERTLanguageModel(config, tokenizer)
     elif 'hyena' in model_name:
         model = HyenaLanguageModel(config, tokenizer)
+    elif 'mamba' in model_name:
+        model = MambaLanguageModel(config, tokenizer)
     elif 't5' in model_name:
         raise NotImplementedError("T5 model not implemented.")
         # model = T5LanguageModel(config, tokenizer)
