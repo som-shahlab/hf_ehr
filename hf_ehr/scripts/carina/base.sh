@@ -20,6 +20,7 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     fi
 
     conda activate /local-scratch/nigam/hf_ehr/hf_env
+    # conda activate /local-scratch/nigam/hf_ehr/hf_env_miguel
     # conda activate /local-scratch/nigam/hf_ehr/hf_env_suhana
 
     python -m pip install -r ../../../requirements.txt # need this `-m` to write to correct /local-scratch/ env path and not the one on /share/pi
@@ -32,6 +33,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
     fi
 
     conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env
+    # conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env_miguel
     # conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env_suhana
 
     python -m pip install -r ../../../requirements.txt # need this `-m` to write to correct /local-scratch-nvme/ env path and not the one on /share/pi
@@ -44,6 +46,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     fi
 
     conda activate /home/hf_ehr/hf_env
+    # conda activate /home/hf_ehr/hf_env_miguel
     # conda activate /home/hf_ehr/hf_env_suhana
 
     python -m pip install -r ../../../requirements.txt # need this `-m` to write to correct /home/ env path and not the one on /share/pi
