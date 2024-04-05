@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
-from hf_ehr.models.bert import BERTLanguageModel
+from hf_ehr.models.bert2 import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel

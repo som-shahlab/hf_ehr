@@ -30,12 +30,16 @@ class BaseModel(L.LightningModule):
         self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
             'train_total_examples': SumMetric(),
             'train_total_tokens_PAD': SumMetric(),
-            'train_total_tokens_MASK': SumMetric(),
             'train_total_tokens_nonPAD': SumMetric(),
         })
 
-    def parameters(self):
-        return list(self.model.parameters()) + list(self.lm_head.parameters())
+    def parameters(self) -> List:
+        params = []
+        if hasattr(self, 'model'):
+            params += list(self.model.parameters())
+        if hasattr(self, 'lm_head'):
+            params += list(self.lm_head.parameters())
+        return params
 
     def get_param_count(self) -> int:
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

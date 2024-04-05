@@ -1,0 +1,511 @@
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+====> Done loading imports:  6.0507118701934814 s
+[rank: 0] Seed set to 1
+2024-04-04 10:39:56.247 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 10:39:57,600][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_103959-6kxiwp4i
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run summer-eon-119
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/6kxiwp4i
+2024-04-04 10:40:06.978 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 10:40:06.979 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 10:40:06.980 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 10:40:07.179 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 10:40:07.180 | INFO     | __main__:main:205 - Loading model: `bert`
+[2024-04-04 10:40:07,191][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmpeo7_fbzj
+[2024-04-04 10:40:07,191][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmpeo7_fbzj/_remote_module_non_scriptable.py
+2024-04-04 10:40:16.900 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 10:40:16.902 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 10:40:40.788 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/fabric/connector.py:563: `precision=16` is supported for historical reasons but its usage is discouraged. Please set your precision to 16-mixed instead!
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3 ../run.py +models=bert data.dataloader.batch_size=2 ...
+Using 16bit Automatic Mixed Precision (AMP)
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3 ../run.py +models=bert data.dataloader.batch_size=2 ...
+[rank: 0] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/4
+[W socket.cpp:426] [c10d] The server socket cannot be initialized on [::]:56533 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+====> Done loading imports:  4.491929769515991 s
+====> Done loading imports:  4.476882457733154 s
+====> Done loading imports:  4.485621213912964 s
+[rank: 1] Seed set to 1
+[rank: 3] Seed set to 1
+[rank: 2] Seed set to 1
+2024-04-04 10:40:46.113 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+2024-04-04 10:40:46.113 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+2024-04-04 10:40:46.117 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 10:40:46,630][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 10:40:46,685][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 8, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 10:40:46,721][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_104046-orpzzpxl
+wandb: Run `wandb offline` to turn off syncing.
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_104046-q28spsep
+wandb: Run `wandb offline` to turn off syncing.
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_104046-219bjf9d
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run logical-mountain-120
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/orpzzpxl
+wandb: Syncing run dauntless-blaze-121
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/q28spsep
+wandb: Syncing run glorious-pine-121
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/219bjf9d
+2024-04-04 10:40:53.627 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 10:40:53.628 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 10:40:53.628 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 10:40:53.630 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 10:40:53.630 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 10:40:53.631 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 10:40:53.631 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 10:40:53.632 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 10:40:53.632 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 10:40:53.847 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 10:40:53.848 | INFO     | __main__:main:205 - Loading model: `bert`
+2024-04-04 10:40:53.852 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 10:40:53.853 | INFO     | __main__:main:205 - Loading model: `bert`
+2024-04-04 10:40:53.853 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 10:40:53.854 | INFO     | __main__:main:205 - Loading model: `bert`
+[2024-04-04 10:40:53,859][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmp2pk8j80k
+[2024-04-04 10:40:53,860][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmp2pk8j80k/_remote_module_non_scriptable.py
+[2024-04-04 10:40:53,865][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmpiv6wuxg0
+[2024-04-04 10:40:53,866][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmpiv6wuxg0/_remote_module_non_scriptable.py
+[2024-04-04 10:40:53,866][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmpdshxhk8f
+[2024-04-04 10:40:53,867][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmpdshxhk8f/_remote_module_non_scriptable.py
+2024-04-04 10:41:02.749 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 10:41:02.752 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 10:41:03.017 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 10:41:03.019 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 10:41:03.492 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 10:41:03.494 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 10:41:27.140 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+2024-04-04 10:41:27.596 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+[rank: 2] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/4
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 10:41:27,708][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 2
+[rank: 1] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/4
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 10:41:28,129][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 1
+2024-04-04 10:41:28.362 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+[rank: 3] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/4
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:56533 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 10:41:28,894][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 3
+[2024-04-04 10:41:28,898][torch.distributed.distributed_c10d][INFO] - Rank 1: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+[2024-04-04 10:41:28,898][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 0
+[2024-04-04 10:41:28,899][torch.distributed.distributed_c10d][INFO] - Rank 0: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 4 processes
+----------------------------------------------------------------------------------------------------
+
+[2024-04-04 10:41:28,905][torch.distributed.distributed_c10d][INFO] - Rank 3: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+[2024-04-04 10:41:28,907][torch.distributed.distributed_c10d][INFO] - Rank 2: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/pytorch/loggers/wandb.py:391: There is a wandb run already in progress and newly created instances of `WandbLogger` will reuse this run. If this is not desired, call `wandb.finish()` before instantiating `WandbLogger`.
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 2 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 3 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+
+  | Name        | Type       | Params
+-------------------------------------------
+0 | sum_metrics | ModuleDict | 0     
+1 | model       | BertModel  | 424 M 
+2 | lm_head     | Linear     | 171 M 
+-------------------------------------------
+595 M     Trainable params
+0         Non-trainable params
+595 M     Total params
+2,382.045 Total estimated model params size (MB)
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Sanity Checking DataLoader 0:  50%|█████     | 1/2 [00:00<00:00,  1.14it/s]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Sanity Checking DataLoader 0: 100%|██████████| 2/2 [00:00<00:00,  2.04it/s]                                                                           Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/329756 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/329756 [00:00<?, ?it/s] /home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+/home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+/home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+/home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 1/329756 [00:00<34:57:00,  2.62it/s]Epoch 0:   0%|          | 1/329756 [00:00<35:02:59,  2.61it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 2/329756 [00:00<30:19:10,  3.02it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 2/329756 [00:00<30:23:03,  3.01it/s, v_num=wp4i, train/loss=12.30]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 3/329756 [00:00<27:58:21,  3.27it/s, v_num=wp4i, train/loss=12.30]Epoch 0:   0%|          | 3/329756 [00:00<28:00:38,  3.27it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 4/329756 [00:01<27:11:41,  3.37it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 4/329756 [00:01<27:13:43,  3.36it/s, v_num=wp4i, train/loss=12.50]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 5/329756 [00:01<27:00:16,  3.39it/s, v_num=wp4i, train/loss=12.50]Epoch 0:   0%|          | 5/329756 [00:01<28:19:45,  3.23it/s, v_num=wp4i, train/loss=12.30]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 6/329756 [00:01<27:09:20,  3.37it/s, v_num=wp4i, train/loss=12.30]Epoch 0:   0%|          | 6/329756 [00:01<28:15:05,  3.24it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 7/329756 [00:02<26:44:19,  3.43it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 7/329756 [00:02<26:45:40,  3.42it/s, v_num=wp4i, train/loss=12.20]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 8/329756 [00:02<28:21:46,  3.23it/s, v_num=wp4i, train/loss=12.20]Epoch 0:   0%|          | 8/329756 [00:02<28:55:53,  3.17it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:1')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+post-gather result [tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1'), tensor(False, device='cuda:1')]
+any_skipped False
+[2024-04-04 10:42:44,528][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:3')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+post-gather result [tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3'), tensor(False, device='cuda:3')]
+any_skipped False
+[2024-04-04 10:42:44,529][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+Flagging skip tensor(False, device='cuda:2')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+post-gather result [tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2'), tensor(False, device='cuda:2')]
+any_skipped False
+[2024-04-04 10:42:44,529][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+[2024-04-04 10:42:44,530][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 9/329756 [00:03<34:37:13,  2.65it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 9/329756 [00:03<35:12:45,  2.60it/s, v_num=wp4i, train/loss=12.00]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 10/329756 [00:03<33:29:24,  2.74it/s, v_num=wp4i, train/loss=12.00]Epoch 0:   0%|          | 10/329756 [00:03<33:30:11,  2.73it/s, v_num=wp4i, train/loss=12.00]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 11/329756 [00:03<32:36:45,  2.81it/s, v_num=wp4i, train/loss=12.00]Epoch 0:   0%|          | 11/329756 [00:03<33:12:53,  2.76it/s, v_num=wp4i, train/loss=12.20]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 12/329756 [00:04<31:54:12,  2.87it/s, v_num=wp4i, train/loss=12.20]Epoch 0:   0%|          | 12/329756 [00:04<32:16:15,  2.84it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 13/329756 [00:04<31:26:13,  2.91it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 13/329756 [00:04<31:26:42,  2.91it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 14/329756 [00:04<31:22:04,  2.92it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 14/329756 [00:04<31:51:02,  2.88it/s, v_num=wp4i, train/loss=12.20]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 15/329756 [00:05<31:13:33,  2.93it/s, v_num=wp4i, train/loss=12.20]Epoch 0:   0%|          | 15/329756 [00:05<31:40:33,  2.89it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 16/329756 [00:05<31:52:46,  2.87it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 16/329756 [00:05<32:11:31,  2.85it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 17/329756 [00:05<31:32:52,  2.90it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 17/329756 [00:05<31:33:20,  2.90it/s, v_num=wp4i, train/loss=12.20]/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/pytorch/loops/optimization/automatic.py:132: `training_step` returned `None`. If this was on purpose, ignore this warning...
+NONE detected from pred_targets.sum() == 0 in training_step()
+Flagging skip tensor(True, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(True, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped True
+Epoch 0:   0%|          | 18/329756 [00:06<30:55:31,  2.96it/s, v_num=wp4i, train/loss=12.20]Epoch 0:   0%|          | 18/329756 [00:06<30:55:40,  2.96it/s, v_num=wp4i, train/loss=12.20]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 19/329756 [00:06<31:48:38,  2.88it/s, v_num=wp4i, train/loss=12.20]Epoch 0:   0%|          | 19/329756 [00:06<32:07:01,  2.85it/s, v_num=wp4i, train/loss=12.00]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 20/329756 [00:07<32:42:05,  2.80it/s, v_num=wp4i, train/loss=12.00]Epoch 0:   0%|          | 20/329756 [00:07<32:42:28,  2.80it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 21/329756 [00:07<33:31:35,  2.73it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 21/329756 [00:07<33:50:06,  2.71it/s, v_num=wp4i, train/loss=12.00]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 22/329756 [00:08<34:13:45,  2.68it/s, v_num=wp4i, train/loss=12.00]Epoch 0:   0%|          | 22/329756 [00:08<34:30:31,  2.65it/s, v_num=wp4i, train/loss=12.10]Flagging skip tensor(False, device='cuda:0')
+world_size 4
+barrier passed
+result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+post-gather result [tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0'), tensor(False, device='cuda:0')]
+any_skipped False
+Epoch 0:   0%|          | 23/329756 [00:08<34:40:54,  2.64it/s, v_num=wp4i, train/loss=12.10]Epoch 0:   0%|          | 23/329756 [00:08<34:41:19,  2.64it/s, v_num=wp4i, train/loss=12.30]

@@ -8,122 +8,75 @@ import numpy as np
 from jaxtyping import Float
 from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
 import json
+from transformers import PreTrainedTokenizer
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
 SPLIT_VAL_CUTOFF: float = 85
 
-class FEMRTokenizer():
-    def __init__(self, atoi: Dict[str, int], code_2_count: Dict[str, int], min_code_count: Optional[int] = None) -> None:
-        self.atoi: Dict[str, int] = atoi # [key] = "ICD/10", [value] = 103
-        self.code_2_count: Dict[str, int] = code_2_count # [key] = "ICD/10", [value] = 1
-
-        # Special tokens
-        if '[PAD]' not in self.atoi.keys():
-            raise ValueError("Could not find [PAD] token in self.atoi")
-        if '[BOS]' not in self.atoi.keys():
-            raise ValueError("Could not find [BOS] token in self.atoi")
-        if '[EOS]' not in self.atoi.keys():
-            raise ValueError("Could not find [EOS] token in self.atoi")
-        if '[UNK]' not in self.atoi.keys():
-            raise ValueError("Could not find [UNK] token in self.atoi")
-        # if '[MASK]' not in self.atoi.keys():
-        #     raise ValueError("Could not find [MASK] token in self.atoi")
-        self.pad_token_id = self.atoi['[PAD]']
-        self.bos_token_id = self.atoi['[BOS]']
-        self.eos_token_id = self.atoi['[EOS]']
-        self.unk_token_id = self.atoi['[UNK]']
-        # self.mask_token_id = self.atoi['[MASK]']
-        self.special_tokens: List[str] = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]',]
-
+class FEMRTokenizer(PreTrainedTokenizer):
+    def __init__(self, code_2_count: Dict[str, int], min_code_count: Optional[int] = None) -> None:
         # Only keep codes with >= `min_code_count` occurrences in our dataset
+        codes: List[str] = list(code_2_count.keys())
         if min_code_count is not None:
-            self.atoi = { 
-                k: v 
-                for k,v in self.atoi.items() 
-                if (k in self.special_tokens or self.code_2_count[k] >= min_code_count) 
-            }
+            codes = [ x for x in codes if self.code_2_count[x] >= min_code_count ]
             
-        # Set reverse mapping: [key] = int, [value] = code
-        self.itoa: Dict[int, str] = { v: k for k, v in self.atoi.items() } # [key] = 103, [value] = "ICD/10"
+        # Create vocab
+        self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
+        self.non_special_tokens = codes
+        self.vocab = self.special_tokens + self.non_special_tokens
+        
+        # Map tokens -> idxs
+        self.token_2_idx = { x: idx for idx, x in enumerate(self.vocab) }
+        self.idx_2_token = { idx: x for idx, x in enumerate(self.vocab) }
 
-        # Set attributes
-        self.vocab_size: int = len(self.atoi)
-    
-    def add_special_token(self, token_name: str, token: str):
-        max_curr_token: int = max([ int(x) for x in self.itoa.keys() ])
-        self.itoa[max_curr_token + 1] = token
-        self.atoi[token] = max_curr_token + 1
-        setattr(self, f'{token_name}_token_id', self.atoi[token])
-        self.special_tokens.append(token)
-        self.vocab_size = len(self.atoi)
+        # Create tokenizer
+        super().__init__(
+            bos_token='[BOS]',
+            eos_token='[EOS]',
+            unk_token='[UNK]',
+            sep_token='[SEP]',
+            pad_token='[PAD]',
+            cls_token='[CLS]',
+            mask_token='[MASK]',
+        )
+        self.add_tokens(sorted(self.non_special_tokens))
 
-    def get_vocab(self, is_include_special_tokens: bool = True) -> List[str]:
-        if is_include_special_tokens:
-            return list(self.atoi.keys())
-        else:
-            return [ x for x in self.atoi.keys() if x not in self.special_tokens ]
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
 
-    def get_vocab_tokens(self, is_include_special_tokens: bool = True) -> torch.Tensor:
-        if is_include_special_tokens:
-            return torch.tensor(self.atoi.values(), dtype=torch.int64)
-        else:
-            return torch.tensor([ x for x in self.atoi.values() if x not in self.special_tokens ], dtype=torch.int64)
+    def get_vocab(self) -> Dict[str, int]:
+        return self.token_2_idx
 
     def tokenize(self, 
                  batch: Union[List[str], List[List[str]]],
-                 truncation: bool = False,
-                 padding: bool = False,
-                 max_length: Optional[int] = None,
                  is_truncation_random: bool = False,
-                 add_special_tokens: bool = False,
-                 seed: int = 1) -> Dict[str, torch.Tensor]:
-        '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.'''
-        assert truncation == False or (truncation == True and max_length is not None), "If truncation is True, max_length must be specified"
-        
-        if not isinstance(batch[0], list):
-            # Single timeline - batch to size 1
-            batch = [ batch ]
-        
-        # Tokenize
-        tokenized_batch: List[List[int]] = []
-        for timeline in batch:
-            tokenized_batch.append([ self.atoi[x] if x in self.atoi else self.unk_token_id for x in timeline ])
-        
-        # Special tokens
-        if add_special_tokens:
-            tokenized_batch = [ [self.bos_token_id] + timeline + [self.eos_token_id] for timeline in tokenized_batch ]
-        
-        # Truncate
-        if truncation:
-            if is_truncation_random:
-                random.seed(seed)
-                # Truncate at random positions
+                 seed: int = 1,
+                 **kwargs) -> Dict[str, torch.Tensor]:
+        '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
+            We add the ability to truncate seqs at random time points
+        '''
+        tokenized_batch: Dict[str, torch.Tensor] = self.tokenize(batch, **kwargs)
+
+        if is_truncation_random:
+            max_length: int = kwargs.get("max_length")
+            if not max_length:
+                raise ValueError(f"If you specify `is_truncation_random`, then you must also provide a non-None value for `max_length`")
+            random.seed(seed)
+            # Truncate at random positions
+            for key in tokenized_batch.keys():
                 truncated_batch: List[List[int]] = []
-                for timeline in tokenized_batch:
+                for timeline in tokenized_batch[key]:
                     if len(timeline) > max_length:
                         # Calculate a random start index
                         start_index: int = random.randint(0, len(timeline) - max_length)
                         truncated_batch.append(timeline[start_index:start_index + max_length])
                     else:
                         truncated_batch.append(timeline)
-                tokenized_batch = truncated_batch
-            else:
-                # Truncate on right hand side of sequence
-                tokenized_batch = [ timeline[:max_length] for timeline in tokenized_batch ]
+                tokenized_batch[key] = torch.tensor(truncated_batch)
 
-        # Pad
-        if padding:
-            max_batch_length: int = max([ len(timeline) for timeline in tokenized_batch ])
-            tokenized_batch = [ timeline + [self.pad_token_id] * (max_batch_length - len(timeline)) for timeline in tokenized_batch ]
-
-        # Input IDs
-        input_ids: Float[torch.Tensor, 'B max_length'] = torch.tensor(tokenized_batch)
-
-        # Attention masks
-        attention_mask: Float[torch.Tensor, 'B max_length'] = (input_ids != self.pad_token_id).int()
-        
-        return { "input_ids": input_ids, "attention_mask": attention_mask }
+        return tokenized_batch
 
 class FEMRDataset(Dataset):
     '''Dataset that returns patients in a FEMR extract.
@@ -180,10 +133,45 @@ class FEMRDataset(Dataset):
             pid = pid[0]
         return (pid, [ e.code for e in self.femr_db[pid].events ])
 
+def torch_mask_tokens(self, tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, special_tokens_mask: Optional[Any] = None) -> Tuple[Any, Any]:
+    """
+    Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original.
+    
+    Taken from: https://github.com/huggingface/transformers/blob/09f9f566de83eef1f13ee83b5a1bbeebde5c80c1/src/transformers/data/data_collator.py#L782
+    """
+    labels = inputs.clone()
+    # We sample a few tokens in each sequence for MLM training (with probability `mlm_prob`)
+    probability_matrix = torch.full(labels.shape, mlm_prob)
+    if special_tokens_mask is None:
+        special_tokens_mask = [
+            self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()
+        ]
+        special_tokens_mask = torch.tensor(special_tokens_mask, dtype=torch.bool)
+    else:
+        special_tokens_mask = special_tokens_mask.bool()
+
+    probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
+    masked_indices = torch.bernoulli(probability_matrix).bool()
+    labels[~masked_indices] = -100  # We only compute loss on masked tokens
+
+    # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+    indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+    inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+
+    # 10% of the time, we replace masked input tokens with random word
+    indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+    random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
+    inputs[indices_random] = random_words[indices_random]
+
+    # The rest of the time (10% of the time) we keep the masked input tokens unchanged
+    return inputs, labels
+
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
                              tokenizer: FEMRTokenizer, 
                              max_length: int,
                              is_truncation_random: bool = False,
+                             is_mlm: bool = False,
+                             mlm_probability: float = 0.15,
                              seed: int = 1) -> Dict[str, Any]:
     '''Collate function for FEMR timelines
         Truncate or pad to max length in batch.

@@ -1,0 +1,180 @@
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+====> Done loading imports:  6.082420825958252 s
+[rank: 0] Seed set to 1
+2024-04-04 09:34:53.081 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 09:34:54,475][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_093456-p7nxnrdy
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run swept-eon-107
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/p7nxnrdy
+2024-04-04 09:35:03.601 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 09:35:03.636 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 09:35:03.655 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 09:35:03.886 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 09:35:03.919 | INFO     | __main__:main:205 - Loading model: `bert`
+[2024-04-04 09:35:03,953][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmp3yioucd1
+[2024-04-04 09:35:03,994][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmp3yioucd1/_remote_module_non_scriptable.py
+2024-04-04 09:35:12.873 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 09:35:12.908 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 09:35:36.764 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/fabric/connector.py:563: `precision=16` is supported for historical reasons but its usage is discouraged. Please set your precision to 16-mixed instead!
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3 ../run.py +models=bert data.dataloader.batch_size=2 ...
+Using 16bit Automatic Mixed Precision (AMP)
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/fabric/plugins/environments/slurm.py:204: The `srun` command is available on your system but is not used. HINT: If your intention is to run Lightning on SLURM, prepend your python command with `srun` like so: srun python3 ../run.py +models=bert data.dataloader.batch_size=2 ...
+[rank: 0] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/4
+[W socket.cpp:426] [c10d] The server socket cannot be initialized on [::]:44775 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/utils/hub.py:124: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
+  warnings.warn(
+====> Done loading imports:  4.320644378662109 s
+====> Done loading imports:  4.332766532897949 s
+[rank: 2] Seed set to 1
+[rank: 1] Seed set to 1
+====> Done loading imports:  4.297604322433472 s
+2024-04-04 09:35:42.734 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+2024-04-04 09:35:42.736 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[rank: 3] Seed set to 1
+2024-04-04 09:35:42.747 | INFO     | __main__:main:119 - {'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 09:35:43,278][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 09:35:43,294][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+Loading data from local-scratch: `/home/hf_ehr/`.
+{'main': {'seed': 1, 'path_to_output_dir': '/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/'}, 'callbacks': {'early_stopping': {'metric_mode': 'min', 'patience': 3}, 'model_checkpointing': {'save_top_k': 1, 'save_most_recent_k': 1, 'most_recent_every_n_train_steps': 5000, 'every_n_train_steps': 10000}}, 'data': {'dataset': {'path_to_femr_extract': '/home/hf_ehr/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'}, 'dataloader': {'batch_size': 2, 'n_workers': 4, 'max_length': '${model.config_kwargs.max_position_embeddings}', 'is_truncation_random': True}, 'tokenizer': {'path_to_code_2_int': '/home/hf_ehr/code_2_int.json', 'path_to_code_2_count': '/home/hf_ehr/code_2_count.json', 'min_code_count': None}}, 'trainer': {'accumulate_grad_batches': 4, 'gradient_clip_value': 3, 'gradient_clip_algorithm': 'norm', 'devices': [0, 1, 2, 3], 'distributed_backend': 'ddp', 'is_use_bf16': False, 'is_use_fp16': True, 'min_epochs': 1, 'max_epochs': 1000, 'limit_train_batches': None, 'limit_val_batches': None, 'val_check_interval': 0.25, 'optimizer': {'lr': 0.0001}, 'scheduler': {'num_warmup_steps': 50000, 'num_decay_steps': 4000000, 'initial_lr': 3e-06, 'final_lr': 3e-05}, 'mlm_mask_pct': 0.15}, 'logging': {'wandb': {'is_wandb': True, 'name': 'bert-large'}, 'mlflow': {'is_mlflow': False, 'name': None}, 'is_log_grad_norm': False, 'log_every_n_steps': 1}, 'model': {'name': 'bert', 'hf_name': 'bert-base-uncased', 'config_kwargs': {'num_hidden_layers': 24, 'num_attention_heads': 16, 'hidden_size': 1024, 'max_position_embeddings': 1024}}}
+[2024-04-04 09:35:43,353][wandb.util][WARNING] - Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: WARNING Unable to read the token file at /var/run/secrets/kubernetes.io/serviceaccount/token due to permission error ([Errno 13] Permission denied: '/var/run/secrets/kubernetes.io/serviceaccount/token').The current user id is 1300068. Consider changing the securityContext to run the container as the current user.
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: Currently logged in as: miking98 (ehr-fm). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_093543-3gs55hj9
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run rural-feather-108
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/3gs55hj9
+2024-04-04 09:35:49.817 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 09:35:49.818 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 09:35:49.819 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_093543-qefjb9oc
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run bumbling-blaze-109
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/qefjb9oc
+2024-04-04 09:35:49.954 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 09:35:49.955 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 09:35:49.955 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 09:35:50.030 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 09:35:50.030 | INFO     | __main__:main:205 - Loading model: `bert`
+[2024-04-04 09:35:50,041][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmprj0tgj2_
+[2024-04-04 09:35:50,042][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmprj0tgj2_/_remote_module_non_scriptable.py
+2024-04-04 09:35:50.172 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 09:35:50.173 | INFO     | __main__:main:205 - Loading model: `bert`
+[2024-04-04 09:35:50,185][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmpuas5ncl5
+[2024-04-04 09:35:50,185][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmpuas5ncl5/_remote_module_non_scriptable.py
+wandb: wandb version 0.16.6 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.15.11
+wandb: Run data is saved locally in /share/pi/nigam/mwornow/wandb_cache/wandb/run-20240404_093543-7ght4tp5
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run wobbly-sun-109
+wandb: ⭐️ View project at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts
+wandb: 🚀 View run at https://wandb.ai/ehr-fm/hf_ehr-hf_ehr_scripts/runs/7ght4tp5
+2024-04-04 09:35:50.966 | INFO     | __main__:main:194 - ========================== Starting main ==========================
+2024-04-04 09:35:50.967 | INFO     | __main__:main:195 - >>>> Training from SCRATCH | Saving to: `/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-large/` <<<<
+2024-04-04 09:35:50.968 | INFO     | __main__:main:198 - Loading tokenizer: `/home/hf_ehr/code_2_int.json`
+2024-04-04 09:35:51.188 | INFO     | __main__:main:202 - Vocab size: `167238`
+2024-04-04 09:35:51.188 | INFO     | __main__:main:205 - Loading model: `bert`
+[2024-04-04 09:35:51,200][torch.distributed.nn.jit.instantiator][INFO] - Created a temporary directory at /tmp/tmpqs49fmhf
+[2024-04-04 09:35:51,201][torch.distributed.nn.jit.instantiator][INFO] - Writing /tmp/tmpqs49fmhf/_remote_module_non_scriptable.py
+2024-04-04 09:35:59.041 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 09:35:59.044 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 09:35:59.495 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 09:35:59.497 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 09:36:00.391 | INFO     | __main__:main:219 - Parameter count of model = 595511296
+2024-04-04 09:36:00.393 | INFO     | __main__:main:222 - Loading FEMR datasets...
+2024-04-04 09:36:22.953 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+[rank: 2] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/4
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 09:36:23,559][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 2
+2024-04-04 09:36:24.535 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+[rank: 1] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/4
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 09:36:25,122][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 1
+2024-04-04 09:36:25.572 | INFO     | __main__:main:226 - Loading FEMR dataloaders...
+[rank: 3] Seed set to 1
+Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/4
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 09:36:26,128][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 3
+[W socket.cpp:601] [c10d] The client socket cannot be initialized to connect to [localhost]:44775 (errno: 97 - Address family not supported by protocol).
+[2024-04-04 09:36:26,139][torch.distributed.distributed_c10d][INFO] - Rank 3: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+[2024-04-04 09:36:26,139][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 0
+[2024-04-04 09:36:26,142][torch.distributed.distributed_c10d][INFO] - Rank 0: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+[2024-04-04 09:36:26,142][torch.distributed.distributed_c10d][INFO] - Rank 2: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+[2024-04-04 09:36:26,142][torch.distributed.distributed_c10d][INFO] - Rank 1: Completed store-based barrier for key:store_based_barrier_key:1 with 4 nodes.
+----------------------------------------------------------------------------------------------------
+distributed_backend=nccl
+All distributed processes registered. Starting with 4 processes
+----------------------------------------------------------------------------------------------------
+
+/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/pytorch/loggers/wandb.py:391: There is a wandb run already in progress and newly created instances of `WandbLogger` will reuse this run. If this is not desired, call `wandb.finish()` before instantiating `WandbLogger`.
+LOCAL_RANK: 3 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 1 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+LOCAL_RANK: 2 - CUDA_VISIBLE_DEVICES: [0,1,2,3]
+
+  | Name        | Type       | Params
+-------------------------------------------
+0 | sum_metrics | ModuleDict | 0     
+1 | model       | BertModel  | 424 M 
+2 | lm_head     | Linear     | 171 M 
+-------------------------------------------
+595 M     Trainable params
+0         Non-trainable params
+595 M     Total params
+2,382.045 Total estimated model params size (MB)
+Sanity Checking: |          | 0/? [00:00<?, ?it/s]Sanity Checking:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:  50%|█████     | 1/2 [00:00<00:00,  1.45it/s]Sanity Checking DataLoader 0: 100%|██████████| 2/2 [00:00<00:00,  2.58it/s]                                                                           Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/329756 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/329756 [00:00<?, ?it/s] /home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+/home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+/home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+/home/mwornow/.local/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:139: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+  warnings.warn("Detected call of `lr_scheduler.step()` before `optimizer.step()`. "
+Epoch 0:   0%|          | 1/329756 [00:00<32:59:11,  2.78it/s]Epoch 0:   0%|          | 1/329756 [00:00<33:07:52,  2.76it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 2/329756 [00:00<28:00:24,  3.27it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 2/329756 [00:00<28:18:48,  3.24it/s, v_num=nrdy, train/loss=12.30]Epoch 0:   0%|          | 3/329756 [00:00<26:45:42,  3.42it/s, v_num=nrdy, train/loss=12.30]Epoch 0:   0%|          | 3/329756 [00:00<26:48:29,  3.42it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 4/329756 [00:01<30:27:50,  3.01it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 4/329756 [00:01<31:24:08,  2.92it/s, v_num=nrdy, train/loss=12.50][2024-04-04 09:37:41,597][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+[2024-04-04 09:37:41,599][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+[2024-04-04 09:37:41,603][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+[2024-04-04 09:37:41,603][torch.nn.parallel.distributed][INFO] - Reducer buckets have been rebuilt in this iteration.
+Epoch 0:   0%|          | 5/329756 [00:02<47:08:22,  1.94it/s, v_num=nrdy, train/loss=12.50]Epoch 0:   0%|          | 5/329756 [00:02<48:16:51,  1.90it/s, v_num=nrdy, train/loss=12.20]Epoch 0:   0%|          | 6/329756 [00:02<43:45:05,  2.09it/s, v_num=nrdy, train/loss=12.20]Epoch 0:   0%|          | 6/329756 [00:02<44:50:56,  2.04it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 7/329756 [00:03<41:02:45,  2.23it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 7/329756 [00:03<41:04:11,  2.23it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 8/329756 [00:03<40:42:58,  2.25it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 8/329756 [00:03<41:20:34,  2.22it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 9/329756 [00:03<39:05:42,  2.34it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 9/329756 [00:03<39:44:44,  2.30it/s, v_num=nrdy, train/loss=11.90]Epoch 0:   0%|          | 10/329756 [00:04<37:57:03,  2.41it/s, v_num=nrdy, train/loss=11.90]Epoch 0:   0%|          | 10/329756 [00:04<37:57:50,  2.41it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 11/329756 [00:04<36:37:53,  2.50it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 11/329756 [00:04<37:13:22,  2.46it/s, v_num=nrdy, train/loss=12.20]Epoch 0:   0%|          | 12/329756 [00:04<36:42:49,  2.49it/s, v_num=nrdy, train/loss=12.20]Epoch 0:   0%|          | 12/329756 [00:04<37:07:22,  2.47it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 13/329756 [00:05<35:44:58,  2.56it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 13/329756 [00:05<35:45:32,  2.56it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 14/329756 [00:05<35:15:02,  2.60it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 14/329756 [00:05<35:43:18,  2.56it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 15/329756 [00:05<34:46:32,  2.63it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 15/329756 [00:05<35:13:08,  2.60it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 16/329756 [00:06<35:07:56,  2.61it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 16/329756 [00:06<35:26:41,  2.58it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 17/329756 [00:06<34:32:07,  2.65it/s, v_num=nrdy, train/loss=12.00]Epoch 0:   0%|          | 17/329756 [00:06<34:32:21,  2.65it/s, v_num=nrdy, train/loss=12.10]/home/hf_ehr/hf_env/lib/python3.10/site-packages/lightning/pytorch/loops/optimization/automatic.py:132: `training_step` returned `None`. If this was on purpose, ignore this warning...
+Epoch 0:   0%|          | 18/329756 [00:06<33:04:40,  2.77it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 18/329756 [00:06<33:04:49,  2.77it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 19/329756 [00:06<32:26:10,  2.82it/s, v_num=nrdy, train/loss=12.10]Epoch 0:   0%|          | 19/329756 [00:06<32:47:03,  2.79it/s, v_num=nrdy, train/loss=11.90]

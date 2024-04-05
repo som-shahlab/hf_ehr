@@ -12,11 +12,13 @@ source base.sh
 
 if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     echo "Detected A100 Partition"
+    # TODO
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
     echo "Detected V100 Partition"
+    # TODO
 elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     echo "Detected GPU Partition"
-    # GPU Partition Settings (fills GPUs up to about 31950 / 32768 MB)
+    # GPU Partition Settings (batch_size=6 fills GPUs up to about 31950 / 32768 MB)
     python3 ../run.py \
         +models=bert \
         data.dataloader.batch_size=6 \

@@ -6,6 +6,7 @@ from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
 from hf_ehr.models.modules import BaseModel
+import torch.distributed as torch_dist
 
 class BERTLanguageModel(BaseModel):
     """
@@ -21,10 +22,6 @@ class BERTLanguageModel(BaseModel):
         if mask_token not in self.tokenizer.get_vocab():
             self.tokenizer.add_special_token('mask', mask_token)
             assert hasattr(self.tokenizer, 'mask_token_id'), f"Error - couldn't add [MASK] token to tokenizer"
-        """
-        OPTIMIZATION opportunity  - one idea could be to remove the assertion since we know the tokenizer works, so
-        something like - tokenizer.add_tokens([mask_token]), tokenizer.mask_token = mask_token
-        """
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'bert-base-uncased')
@@ -107,43 +104,36 @@ class BERTLanguageModel(BaseModel):
         return loss, mask, pred_targets
         
     
-    """
-    def run_eval(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        B: int = tokens['input_ids'].shape[0]
-        L: int = tokens['input_ids'].shape[1]
-        V: int = self.tokenizer.vocab_size
+    def return_safe_training_step_none_for_ddp(self, loss: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        """This allows us to return `None` in training_step() - useful to avoid nan losses"""
+        # See `https://github.com/a-r-j/ProteinWorkshop/pull/81/files` for code
+        # See discussion `https://github.com/Lightning-AI/pytorch-lightning/issues/5243` for why this is necessary for returning None with DDP
+        if loss is None:
+            flag_skip = torch.ones((), device=self.device, dtype=torch.bool)
+        else:
+            flag_skip = torch.zeros((), device=loss.device, dtype=torch.bool)
+        print("Flagging skip", flag_skip)
 
-        # Save targets before modifying tokens with masking
-        pred_targets: Float[torch.Tensor, 'B L'] = tokens['input_ids'].clone()
-        device = tokens['input_ids'].device
+        if torch_dist.is_initialized():
+            # if any rank skips a batch, then all other ranks need to skip
+            # their batches as well so DDP can properly keep all ranks synced
+            world_size = torch_dist.get_world_size()
+            print("world_size", world_size)
+            torch_dist.barrier()
+            print("barrier passed")
+            result = [torch.zeros_like(flag_skip) for _ in range(world_size)]
+            print("result", result)
+            torch_dist.all_gather(result, flag_skip)
+            print("post-gather result", result)
+            any_skipped = torch.sum(torch.stack(result)).bool().item()
+            print("any_skipped", any_skipped)
+            if any_skipped:
+                for p in self.trainer.model.parameters():
+                    if p.grad is not None:
+                        del p.grad
+                return None
+        return loss
 
-        # Dynamic mask generation for MLM
-        mask: Float[torch.Tensor, 'B L'] = (torch.rand((B,L), dtype=torch.float32) < self.config.trainer.mlm_mask_pct).to(torch.int64)
-        
-        ones_indices: Float[torch.Tensor, '0.15*B*L 2'] = torch.nonzero(mask == 1).to(device)
-        ones_indices_shuffled: Float[torch.Tensor, 'n_MASK+n_RANDOM+n_ORIGINAL'] = torch.randperm(ones_indices.shape[0])
-        ## Replace mask -> [MASK] (80%)
-        n_MASK: int = int(0.8 * len(ones_indices))
-        indices_MASK: Float[torch.Tensor, 'n_MASK'] = ones_indices_shuffled[:n_MASK].to(device)
-        ## Replace mask -> <random token> (10%)
-        n_RANDOM: int = int(0.1 * len(ones_indices))
-        indices_RANDOM: Float[torch.Tensor, 'n_RANDOM'] = ones_indices_shuffled[n_MASK:n_MASK + n_RANDOM].to(device)
-        # Apply masks to tokens
-        non_special_tokens: Float[torch.Tensor, 'V'] = self.tokenizer.get_vocab_tokens(is_include_special_tokens=False)
-        tokens['input_ids'][ones_indices[indices_MASK][:,0], ones_indices[indices_MASK][:,1]] = self.tokenizer.mask_token_id
-        tokens['input_ids'][ones_indices[indices_RANDOM][:,0], ones_indices[indices_RANDOM][:,1]] = non_special_tokens[torch.randint(0, len(non_special_tokens), (len(indices_RANDOM),)).squeeze()].to(device)
-
-        # Forward pass
-        pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(tokens, is_return_hidden_states=False)
-        ## Replace all tokens that weren't in the `mask` with [PAD] so that they are ignored by CrossEntropyLoss
-        pred_targets[~mask.bool()] = self.tokenizer.pad_token_id
-        loss: torch.Tensor = self.loss(pred_logits, pred_targets)
-
-        # Sanity checks
-        assert pred_logits.shape == (B, L, V)
-        
-        return loss, mask, pred_targets
-    """    
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
@@ -156,11 +146,13 @@ class BERTLanguageModel(BaseModel):
 
         # None of the tokens were randomly chosen to be MASK'd, so loss will be `nan`, so skip
         if pred_targets.sum() == 0:
-            return None
+            print("NONE detected from pred_targets.sum() == 0 in training_step()")
+            return self.return_safe_training_step_none_for_ddp(None)
         
         # Throw out bad batches
         if ppl > 100 and self.trainer.global_step > self.config.trainer.scheduler.num_warmup_steps / len(self.config.trainer.devices):
-            return None
+            print("NONE detected from ppl > 100 in training_step()")
+            return self.return_safe_training_step_none_for_ddp(None)
 
         # Learning rate scheduler
         lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
@@ -192,11 +184,11 @@ class BERTLanguageModel(BaseModel):
         self.log('train/tokens/total_MASK', self.sum_metrics['train_total_tokens_MASK'].compute().to(torch.float32))
         #self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
 
-        return loss
+        return self.return_safe_training_step_none_for_ddp(loss)
 
     def validation_step(self, 
                         batch: Dict[str, Any],
-                        batch_idx: int) -> torch.Tensor:
+                        batch_idx: int) -> Optional[torch.Tensor]:
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         
         # Forward pass
@@ -204,15 +196,9 @@ class BERTLanguageModel(BaseModel):
         ppl: torch.Tensor = torch.exp(loss).detach()
         if pred_targets.sum() == 0:
             # None of the tokens were randomly chosen to be MASK'd, so loss will be `nan`, so skip
-            return None
+            return self.return_safe_training_step_none_for_ddp(None)
 
         # Logging
-        ## Try commenting out writing to a file since it might be inefficient esp in distributed settings
-        """
-        with open('./vals.txt', 'a') as fd:
-            fd.write(str(batch_idx) + ' , ' + str(loss) + ', ' + str(mask.sum()))
-            fd.write('\n')
-        """
         self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
-        return loss
+        return self.return_safe_training_step_none_for_ddp(loss)
