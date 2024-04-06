@@ -196,9 +196,8 @@ def main(config: DictConfig) -> None:
     
     # Tokenizer
     logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_int}`")
-    femr_vocab_atoi: Dict[str, int] = json.load(open(path_to_tokenizer_code_2_int, 'r'))
     femr_vocab_count: Dict[str, int] = json.load(open(path_to_tokenizer_code_2_count, 'r'))
-    tokenizer = FEMRTokenizer(femr_vocab_atoi, femr_vocab_count, min_code_count=tokenizer_min_code_count)
+    tokenizer = FEMRTokenizer(femr_vocab_count, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model

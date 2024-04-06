@@ -198,13 +198,13 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
     '''
 
     # Otherwise, truncate on right hand side of sequence
-    tokens: Float[torch.Tensor, 'B max_length'] = tokenizer.tokenize([ x[1] for x in batch ], 
-                                                                        truncation=True, 
-                                                                        padding=True, 
-                                                                        max_length=max_length,
-                                                                        is_truncation_random=is_truncation_random,
-                                                                        seed=seed, 
-                                                                        add_special_tokens=True)
+    tokens: Float[torch.Tensor, 'B max_length'] = tokenizer([ ''.join(x[1]) for x in batch ], 
+                                                            truncation=True, 
+                                                            padding=True, 
+                                                            max_length=max_length,
+                                                            is_truncation_random=is_truncation_random,
+                                                            seed=seed, 
+                                                            add_special_tokens=True)
     return {
         'patient_ids' : [ x[0] for x in batch ],
         'tokens' : tokens,

@@ -98,7 +98,7 @@ if __name__ == "__main__":
     atoi: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER_CODE_2_INT, 'r'))
     code_to_count: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER_CODE_2_COUNT, 'r'))
     min_code_count: Optional[int] = 10 if 'v8' in MODEL else None # TODO -- replace with model.config setting
-    tokenizer = FEMRTokenizer(atoi, code_to_count, min_code_count=min_code_count)
+    tokenizer = FEMRTokenizer(code_to_count, min_code_count=min_code_count)
 
     # Setup patient features
     timeline_starts: Dict[int, List[datetime.datetime]] = {}  # [key] = patient id, [value] = List of event.starts where [idx] is same as [idx] of corresponding code in `timeline_tokens`
@@ -107,9 +107,9 @@ if __name__ == "__main__":
         # NOTE: Takes ~2 mins to load all patients
         # Create timeline for each label, where we only consider events that occurred BEFORE label.time
         full_timeline: List[Tuple[datetime.datetime, str]] = [ (x.start, x.code) for x in database[patient_id].events ]
-        timeline_with_valid_tokens: List[Tuple[datetime.datetime, str]] = [ x for x in full_timeline if x[1] in tokenizer.atoi.keys() ]
+        timeline_with_valid_tokens: List[Tuple[datetime.datetime, str]] = [ x for x in full_timeline if x[1] in tokenizer.vocab ]
         timeline_starts[patient_id] = [ x[0] for x in timeline_with_valid_tokens ]
-        timeline_tokens[patient_id] = tokenizer.tokenize([ x[1] for x in timeline_with_valid_tokens ])['input_ids'].squeeze(0).tolist()
+        timeline_tokens[patient_id] = tokenizer(''.join([ x[1] for x in timeline_with_valid_tokens ]))['input_ids'].squeeze(0).tolist()
         assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
 
         for label in labels:
