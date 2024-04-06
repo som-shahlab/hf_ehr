@@ -45,7 +45,7 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
-def rewrite_paths_for_carina(config: DictConfig) -> DictConfig:
+def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
     """Rewrite paths for Carina partitions to use local-scratch directories."""
     if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
         if not os.path.exists(V100_BASE_DIR):
@@ -85,7 +85,7 @@ def rewrite_paths_for_carina(config: DictConfig) -> DictConfig:
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
-    config = rewrite_paths_for_carina(config)
+    config = rewrite_paths_for_carina_from_config(config)
 
     # Load config
     print(config)

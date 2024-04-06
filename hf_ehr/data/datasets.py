@@ -6,8 +6,8 @@ import femr.datasets
 import os
 import numpy as np
 from jaxtyping import Float
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
 import json
+from hf_ehr.config import GPU_BASE_DIR
 from transformers import PreTrainedTokenizer
 
 SPLIT_SEED: int = 97
@@ -17,7 +17,7 @@ SPLIT_VAL_CUTOFF: float = 85
 class FEMRTokenizer(PreTrainedTokenizer):
     def __init__(self, code_2_count: Dict[str, int], min_code_count: Optional[int] = None) -> None:
         # Only keep codes with >= `min_code_count` occurrences in our dataset
-        codes: List[str] = list(code_2_count.keys())
+        codes: List[str] = sorted(list(code_2_count.keys()))
         if min_code_count is not None:
             codes = [ x for x in codes if self.code_2_count[x] >= min_code_count ]
             
@@ -40,7 +40,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
             cls_token='[CLS]',
             mask_token='[MASK]',
         )
-        self.add_tokens(sorted(self.non_special_tokens))
+        self.add_tokens(self.non_special_tokens)
 
     @property
     def vocab_size(self) -> int:
@@ -49,22 +49,37 @@ class FEMRTokenizer(PreTrainedTokenizer):
     def get_vocab(self) -> Dict[str, int]:
         return self.token_2_idx
 
-    def tokenize(self, 
+    def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
                  is_truncation_random: bool = False,
                  seed: int = 1,
                  **kwargs) -> Dict[str, torch.Tensor]:
         '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
-            We add the ability to truncate seqs at random time points
+            We add the ability to truncate seqs at random time points.
+            
+            Expects as input a list of codes in either the format of:
+                A list of codes (List[str])
+                A list of lists of codes (List[str])
+            Under the hood, it joins the inner List[str] into a concatenated string for the underlying HF tokenizer to work
         '''
-        tokenized_batch: Dict[str, torch.Tensor] = self.tokenize(batch, **kwargs)
+        if isinstance(batch[0], list):
+            # List[List[str]] => List[str]
+            batch = [ ''.join(x) for x in batch ]
+        elif isinstance(batch[0], str):
+            # List[str] => List[str]
+            batch = [ ''.join(batch) ]
 
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
             if not max_length:
                 raise ValueError(f"If you specify `is_truncation_random`, then you must also provide a non-None value for `max_length`")
-            random.seed(seed)
+
+            # Tokenize without truncation
+            kwargs.pop('max_length')
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs)
+            
             # Truncate at random positions
+            random.seed(seed)
             for key in tokenized_batch.keys():
                 truncated_batch: List[List[int]] = []
                 for timeline in tokenized_batch[key]:
@@ -74,7 +89,12 @@ class FEMRTokenizer(PreTrainedTokenizer):
                         truncated_batch.append(timeline[start_index:start_index + max_length])
                     else:
                         truncated_batch.append(timeline)
-                tokenized_batch[key] = torch.tensor(truncated_batch)
+                if kwargs.get('return_tensors') == 'pt':
+                    tokenized_batch[key] = torch.tensor(truncated_batch)
+                else:
+                    tokenized_batch[key] = truncated_batch
+        else:
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs)
 
         return tokenized_batch
 
@@ -192,14 +212,20 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 
 if __name__ == '__main__':
+
+    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'
+    path_to_femr_extract = path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+    path_to_code_2_count: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json'
+    path_to_code_2_count = path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
+    
     # Tokenizer
-    atoi: Dict[str, int] = json.load(open(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_int.json'), 'r'))
-    tokenizer = FEMRTokenizer(atoi)
+    code_2_count: Dict[str, int] = json.load(open(path_to_code_2_count, 'r'))
+    tokenizer = FEMRTokenizer(code_2_count)
     
     # Dataset
-    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_v9, split='train')
-    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_v9, split='val')
-    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_v9, split='test')
+    train_dataset = FEMRDataset(path_to_femr_extract, split='train')
+    val_dataset = FEMRDataset(path_to_femr_extract, split='val')
+    test_dataset = FEMRDataset(path_to_femr_extract, split='test')
     
     # Stats
     print('train', len(train_dataset))
@@ -209,5 +235,13 @@ if __name__ == '__main__':
     # Sanity checking
     print(train_dataset)
     print(train_dataset[-1])
-    print(tokenizer.tokenize(train_dataset[-1:])['input_ids'].tolist())
-    assert tokenizer.tokenize(train_dataset[-1:])['input_ids'].tolist() == [[246, 406, 1259, 395, 1195, 239, 911, 1588, 14, 56, 2335, 1292, 179]]
+    print(tokenizer(''.join(train_dataset[-1:][1]))['input_ids'])
+    print(tokenizer.batch_decode(tokenizer(''.join(train_dataset[-1:][1]))['input_ids']))
+    assert tokenizer(''.join(train_dataset[-1:][1]))['input_ids'] == [[109803, 8187, 8185, 93995, 91564, 95332, 154435, 155073, 91689, 8184, 155175, 49815, 167230]]
+    
+    long_seq = [x for i in range(10) for x in train_dataset[i][1] ]
+    assert len(long_seq) == 2846
+    print(tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=1)['input_ids'])
+    assert tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
+    assert tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
+    assert tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
