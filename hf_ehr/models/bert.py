@@ -32,13 +32,10 @@ class BERTLanguageModel(BaseModel):
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
-        print("TRAINING STEP")
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
-        print("RUN MODEL")
+
         outputs = self.model(**tokens)
-        print("Outputs:", outputs)
-        breakpoint()
         loss: torch.Tensor = outputs.loss
         ppl: torch.Tensor = torch.exp(loss).detach()
         
@@ -74,6 +71,7 @@ class BERTLanguageModel(BaseModel):
                         batch: Dict[str, Any],
                         batch_idx: int) -> Optional[torch.Tensor]:
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        B: int = tokens['input_ids'].shape[0]
         
         # Forward pass
         outputs = self.model(**tokens)
@@ -81,6 +79,6 @@ class BERTLanguageModel(BaseModel):
         ppl: torch.Tensor = torch.exp(loss).detach()
 
         # Logging
-        self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log('val/loss', loss.detach(), prog_bar=True, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
         return loss

@@ -42,13 +42,6 @@ class FEMRTokenizer(PreTrainedTokenizer):
         )
         self.add_tokens(self.non_special_tokens)
 
-    @property
-    def vocab_size(self) -> int:
-        return len(self.vocab)
-
-    def get_vocab(self) -> Dict[str, int]:
-        return self.token_2_idx
-
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
                  is_truncation_random: bool = False,
@@ -60,14 +53,11 @@ class FEMRTokenizer(PreTrainedTokenizer):
             Expects as input a list of codes in either the format of:
                 A list of codes (List[str])
                 A list of lists of codes (List[str])
-            Under the hood, it joins the inner List[str] into a concatenated string for the underlying HF tokenizer to work
+            NOTE: Must set `is_split_into_words=True` b/c we've already pre-tokenized our inputs (i.e. we're passing in a List of tokens, not a string)
         '''
-        if isinstance(batch[0], list):
-            # List[List[str]] => List[str]
-            batch = [ ''.join(x) for x in batch ]
-        elif isinstance(batch[0], str):
+        if isinstance(batch[0], str):
             # List[str] => List[str]
-            batch = [ ''.join(batch) ]
+            batch = [ batch ]
 
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
@@ -76,7 +66,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
 
             # Tokenize without truncation
             kwargs.pop('max_length')
-            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs)
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
             
             # Truncate at random positions
             random.seed(seed)
@@ -96,9 +86,27 @@ class FEMRTokenizer(PreTrainedTokenizer):
                 else:
                     tokenized_batch[key] = truncated_batch
         else:
-            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs)
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
 
         return tokenized_batch
+
+    """Mandatory overwrites of base class"""
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
+
+    def get_vocab(self) -> Dict[str, int]:
+        return self.token_2_idx
+
+    def _tokenize(self, text: str, **kwargs):
+        """Default to splitting by ' ' since the tokenizer will join together tokens using a space"""
+        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+
+    def _convert_token_to_id(self, token: str) -> int:
+        return self.token_2_idx[token]
+
+    def _convert_id_to_token(self, index: int) -> str:
+        raise self.idx_2_token[index]
 
 class FEMRDataset(Dataset):
     '''Dataset that returns patients in a FEMR extract.
@@ -155,7 +163,7 @@ class FEMRDataset(Dataset):
             pid = pid[0]
         return (pid, [ e.code for e in self.femr_db[pid].events ])
 
-def torch_mask_tokens(self, tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, special_tokens_mask: Optional[Any] = None) -> Tuple[Any, Any]:
+def torch_mask_tokens(tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, special_tokens_mask: Optional[Any] = None) -> Tuple[Any, Any]:
     """
     Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original.
     
@@ -166,7 +174,7 @@ def torch_mask_tokens(self, tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: flo
     probability_matrix = torch.full(labels.shape, mlm_prob)
     if special_tokens_mask is None:
         special_tokens_mask = [
-            self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()
+            tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()
         ]
         special_tokens_mask = torch.tensor(special_tokens_mask, dtype=torch.bool)
     else:
@@ -193,21 +201,23 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
                              max_length: int,
                              is_truncation_random: bool = False,
                              is_mlm: bool = False,
-                             mlm_probability: float = 0.15,
+                             mlm_prob: float = 0.15,
                              seed: int = 1) -> Dict[str, Any]:
     '''Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     '''
 
     # Otherwise, truncate on right hand side of sequence
-    tokens: Float[torch.Tensor, 'B max_length'] = tokenizer([ ''.join(x[1]) for x in batch ], 
-                                                            truncation=True, 
-                                                            padding=True, 
-                                                            max_length=max_length,
-                                                            is_truncation_random=is_truncation_random,
-                                                            seed=seed, 
-                                                            add_special_tokens=True,
-                                                            return_tensors='pt')
+    tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
+                                                                        truncation=True, 
+                                                                        padding=True, 
+                                                                        max_length=max_length,
+                                                                        is_truncation_random=is_truncation_random,
+                                                                        seed=seed, 
+                                                                        add_special_tokens=True,
+                                                                        return_tensors='pt')
+    if is_mlm:
+        tokens["input_ids"], tokens["labels"] = torch_mask_tokens(tokenizer, tokens["input_ids"], mlm_prob)
     return {
         'patient_ids' : [ x[0] for x in batch ],
         'tokens' : tokens,
@@ -238,13 +248,13 @@ if __name__ == '__main__':
     # Sanity checking
     print(train_dataset)
     print(train_dataset[-1])
-    print(tokenizer(''.join(train_dataset[-1:][1]))['input_ids'])
-    print(tokenizer.batch_decode(tokenizer(''.join(train_dataset[-1:][1]))['input_ids']))
-    assert tokenizer(''.join(train_dataset[-1:][1]))['input_ids'] == [[109803, 8187, 8185, 93995, 91564, 95332, 154435, 155073, 91689, 8184, 155175, 49815, 167230]]
+    print(tokenizer(train_dataset[-1:][1])['input_ids'])
+    print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
+    assert tokenizer(train_dataset[-1:][1])['input_ids'] == [[109803, 8187, 8185, 93995, 91564, 95332, 154435, 155073, 91689, 8184, 155175, 49815, 167230]]
     
     long_seq = [x for i in range(10) for x in train_dataset[i][1] ]
     assert len(long_seq) == 2846
-    print(tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=1)['input_ids'])
-    assert tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
-    assert tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
-    assert tokenizer(''.join(long_seq), is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
+    print(tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'])
+    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
+    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
+    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    

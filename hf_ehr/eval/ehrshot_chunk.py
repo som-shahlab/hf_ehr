@@ -109,7 +109,7 @@ if __name__ == "__main__":
         full_timeline: List[Tuple[datetime.datetime, str]] = [ (x.start, x.code) for x in database[patient_id].events ]
         timeline_with_valid_tokens: List[Tuple[datetime.datetime, str]] = [ x for x in full_timeline if x[1] in tokenizer.vocab ]
         timeline_starts[patient_id] = [ x[0] for x in timeline_with_valid_tokens ]
-        timeline_tokens[patient_id] = tokenizer(''.join([ x[1] for x in timeline_with_valid_tokens ]))['input_ids'].squeeze(0).tolist()
+        timeline_tokens[patient_id] = tokenizer([ x[1] for x in timeline_with_valid_tokens ])['input_ids'].squeeze(0).tolist()
         assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
 
         for label in labels:
