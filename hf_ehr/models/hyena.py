@@ -50,11 +50,10 @@ class HyenaLanguageModel(BaseModel):
             return [ optimizer ], [ scheduler ]
 
         return [optimizer]
-    """
+    
     def forward(
         self,
         input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
         output_hidden_states: Optional[bool] = None,
@@ -93,16 +92,20 @@ class HyenaLanguageModel(BaseModel):
             logits=logits,
             hidden_states=outputs.hidden_states,
         )
+    """
 
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
         # TODO (@Suhana) -- adapt for Hyena
-        tokens = {key: value for key, value in batch['tokens'].items() if key != 'attention_mask'}
-        #tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        #tokens = {key: value for key, value in batch['tokens'].items() if key != 'attention_mask'}
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens'].copy()
         B: int = tokens['input_ids'].shape[0]
-
-        outputs = self.model(input_ids=tokens['input_ids'], labels=batch.get('labels', None))
+        
+        tokens.pop("attention_mask", None)
+        tokens.pop("token_type_ids", None)
+        
+        outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
         
         # Learning rate scheduler
@@ -114,6 +117,20 @@ class HyenaLanguageModel(BaseModel):
         self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
+    
+    def log_training_step(self, loss, B, tokens, lr):
+    # Check if 'attention_mask' is available
+        if 'attention_mask' in tokens:
+            train_batch_tokens_PAD = (1 - tokens['attention_mask']).sum()
+            # Proceed with your logging using train_batch_tokens_PAD
+        else:
+            # Handle the case where 'attention_mask' is not available
+            # Maybe log a warning or use a default value
+            print("Warning: 'attention_mask' not available for logging.")
+        
+        # Continue with other logging as needed
+        # Example logging statement
+        # self.logger.log({"loss": loss, "batch_size": B, "learning_rate": lr})
 
     def validation_step(self, batch: Dict[str, Any], batch_idx: int) -> Optional[torch.Tensor]:
         """
@@ -126,22 +143,17 @@ class HyenaLanguageModel(BaseModel):
         Returns:
             Optional[torch.Tensor]: The validation loss of the current batch.
         """
-        # Prepare inputs
-        input_ids = batch["tokens"]["input_ids"]
-        labels = batch.get('labels', None)  # Assuming 'labels' is directly in 'batch'
-        attention_mask = batch["tokens"].get("attention_mask", None)
-
-        # Pass only the necessary arguments to the model
-        model_inputs = {'input_ids': input_ids}
-        if attention_mask is not None:
-            model_inputs['attention_mask'] = attention_mask
-
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        B: int = tokens['input_ids'].shape[0]
+        
+        tokens.pop("attention_mask", None)
+        tokens.pop("token_type_ids", None)
+        
         # Forward pass
-        with torch.no_grad():  # No gradients needed for validation
-            outputs = self.model(**model_inputs, labels=labels)
-            loss = outputs.loss
+        outputs = self.model(**tokens)
+        loss: torch.Tensor = outputs.loss
 
-        # Optionally, add logging or metric tracking here.
-        # Example: self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # Logging
+        self.log_validation_step(loss.detach())
 
         return loss
