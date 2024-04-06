@@ -48,6 +48,6 @@ trainer:
     warmup_ratio: 0.1
 
   # Training epochs
-  epochs: 100
+  epochs: 10
   # Device configuration (cuda or cpu)
   device: cuda
