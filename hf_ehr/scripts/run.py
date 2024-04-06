@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
-from hf_ehr.models.bert2 import BERTLanguageModel
+from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
@@ -118,6 +118,10 @@ def main(config: DictConfig) -> None:
     logger.add(path_to_log_file, enqueue=True, mode='a')
     logger.info(config)
     loggers: List = [ TensorBoardLogger(save_dir=path_to_log_dir) ]
+
+    # IMPORTANT! Keep this key (i.e. a pointer to the `tokenizer` object) out of the config, otherwise stuff is slow / logging breaks
+    if hasattr(config, 'tokenizer'):
+        config.__delattr__('tokenizer')
     
     ## MLFlow
     if is_mlflow:
@@ -152,7 +156,6 @@ def main(config: DictConfig) -> None:
             if not is_resume_from_ckpt:
                 mlflow_config = OmegaConf.to_container(config, resolve=True)
                 mlflow_config.pop('config', None)
-                mlflow_config.pop('tokenizer', None)
                 loggers[-1].log_hyperparams(mlflow_config)
 
     ## Wandb

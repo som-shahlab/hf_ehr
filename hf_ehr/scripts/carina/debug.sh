@@ -45,3 +45,15 @@ python3 ../run.py \
     model.config_kwargs.num_attention_heads=2 \
     model.config_kwargs.hidden_size=256 \
     trainer.max_epochs=1 > test.txt 2>&1
+
+python3 run.py \
+    +models=bert \
+    data.dataloader.batch_size=4 \
+    trainer.accumulate_grad_batches=4 \
+    data.dataloader.n_workers=1 \
+    trainer.devices=[0] \
+    model.config_kwargs.num_hidden_layers=2 \
+    model.config_kwargs.num_attention_heads=2 \
+    model.config_kwargs.hidden_size=256 \
+    trainer.limit_train_batches=50 \
+    trainer.max_epochs=1 > test.txt 2>&1

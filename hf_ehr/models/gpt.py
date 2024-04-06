@@ -10,8 +10,7 @@ class GPTLanguageModel(CausalModel):
     """
 
     def __init__(self, config: DictConfig, tokenizer) -> None:
-        super(GPTLanguageModel, self).__init__(config)
-        self.save_hyperparameters()
+        super(GPTLanguageModel, self).__init__(config, tokenizer)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'gpt2')
@@ -25,6 +24,3 @@ class GPTLanguageModel(CausalModel):
         # Model
         self.model = AutoModel.from_config(model_config)
         self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
-
-        # Tokenizer
-        self.tokenizer = tokenizer

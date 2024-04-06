@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
 from hf_ehr.utils import lr_warmup_with_constant_plateau
+from hf_ehr.data.datasets import FEMRTokenizer
 from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union, Tuple
 
@@ -13,18 +14,20 @@ class BaseModel(L.LightningModule):
     Base PyTorchLightning model with some common methods.
     """
     
-    tokenizer: Any
     model: Any
-    lm_head: Any
     hidden_size: int
     model_name: str
     config: DictConfig
+    vocab_size: int
+    pad_token_id: int
 
-    def __init__(self, config: DictConfig) -> None:
+    def __init__(self, config: DictConfig, tokenizer: FEMRTokenizer) -> None:
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters('config') #NOTE: Need to exclude `tokenizer` otherwise internal PTL .hparam call later will hang
         self.model_name: str = config.model.name
         self.config = config
+        self.vocab_size = tokenizer.vocab_size
+        self.pad_token_id = tokenizer.pad_token_id
         
         # Metrics
         self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
@@ -85,13 +88,12 @@ class BaseModel(L.LightningModule):
 class CausalModel(BaseModel):
     def __init__(self, config: DictConfig) -> None:
         super(CausalModel, self).__init__(config)
-        self.save_hyperparameters()
 
     def forward(self, tokens: Dict[str, Float[torch.Tensor, 'B L']], is_return_hidden_states: bool = True) -> Union[Tuple[Float[torch.Tensor, 'B L V'], Float[torch.Tensor, 'B L H']], Float[torch.Tensor, 'B L V']]:
         B: int = tokens['input_ids'].shape[0]
         L: int = tokens['input_ids'].shape[1]
         H: int = self.hidden_size
-        V: int = self.tokenizer.vocab_size
+        V: int = self.vocab_size
         
         hidden_states: Float[torch.Tensor, 'B L H'] = self.model(tokens['input_ids']).last_hidden_state
         logits: Float[torch.Tensor, 'B L V'] = self.lm_head(hidden_states)
@@ -117,7 +119,7 @@ class CausalModel(BaseModel):
         # Calculate loss
         loss = F.cross_entropy(logits_shifted.view(-1, logits_shifted.shape[-1]), 
                                targets_shifted.view(-1), 
-                               ignore_index=self.tokenizer.pad_token_id, 
+                               ignore_index=self.pad_token_id, 
                                reduction='mean')
     
         # Sanity checks
@@ -131,7 +133,7 @@ class CausalModel(BaseModel):
     def run_eval(self, tokens: Dict[str, Float[torch.Tensor, 'B L']]) -> torch.Tensor:
         B: int = tokens['input_ids'].shape[0]
         L: int = tokens['input_ids'].shape[1]
-        V: int = self.tokenizer.vocab_size
+        V: int = self.vocab_size
         pred_logits: Float[torch.Tensor, 'B L V'] = self.forward(tokens, is_return_hidden_states=False)
         loss: torch.Tensor = self.loss(pred_logits, tokens['input_ids'])
         assert pred_logits.shape == (B, L, V)

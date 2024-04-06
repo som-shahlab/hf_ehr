@@ -10,8 +10,7 @@ class MambaLanguageModel(CausalModel):
     """
 
     def __init__(self, config: DictConfig, tokenizer) -> None:
-        super(MambaLanguageModel, self).__init__(config)
-        self.save_hyperparameters()
+        super(MambaLanguageModel, self).__init__(config, tokenizer)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
@@ -25,6 +24,3 @@ class MambaLanguageModel(CausalModel):
         # Model
         self.model = AutoModel.from_config(model_config, trust_remote_code=True)
         self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
-
-        # Tokenizer
-        self.tokenizer = tokenizer

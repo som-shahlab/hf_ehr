@@ -11,11 +11,7 @@ class HyenaLanguageModel(CausalModel):
     """
 
     def __init__(self, config: DictConfig, tokenizer) -> None:
-        super(HyenaLanguageModel, self).__init__(config)
-        self.save_hyperparameters()
-
-        # Tokenizer
-        self.tokenizer = tokenizer
+        super(HyenaLanguageModel, self).__init__(config, tokenizer)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)

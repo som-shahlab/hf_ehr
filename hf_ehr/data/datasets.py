@@ -86,11 +86,13 @@ class FEMRTokenizer(PreTrainedTokenizer):
                     if len(timeline) > max_length:
                         # Calculate a random start index
                         start_index: int = random.randint(0, len(timeline) - max_length)
-                        truncated_batch.append(timeline[start_index:start_index + max_length])
+                        new_timeline = timeline[start_index:start_index + max_length]
+                        assert new_timeline.shape[0] == max_length, f"Error in truncating by random positions: new_timeline.shape = {new_timeline.shape[0]} != max_length={max_length}"
+                        truncated_batch.append(new_timeline)
                     else:
                         truncated_batch.append(timeline)
                 if kwargs.get('return_tensors') == 'pt':
-                    tokenized_batch[key] = torch.tensor(truncated_batch)
+                    tokenized_batch[key] = torch.stack(truncated_batch, dim=0)
                 else:
                     tokenized_batch[key] = truncated_batch
         else:
@@ -204,7 +206,8 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
                                                             max_length=max_length,
                                                             is_truncation_random=is_truncation_random,
                                                             seed=seed, 
-                                                            add_special_tokens=True)
+                                                            add_special_tokens=True,
+                                                            return_tensors='pt')
     return {
         'patient_ids' : [ x[0] for x in batch ],
         'tokens' : tokens,
