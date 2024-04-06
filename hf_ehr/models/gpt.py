@@ -1,10 +1,12 @@
+import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoConfig
+from transformers import AutoModelForCausalLM, AutoConfig
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
-from hf_ehr.models.modules import CausalModel
+from typing import Dict, Any, Optional
+from hf_ehr.models.modules import BaseModel
 
-class GPTLanguageModel(CausalModel):
+class GPTLanguageModel(BaseModel):
     """
     GPT2 with a Language Model head.
     """
@@ -22,5 +24,23 @@ class GPTLanguageModel(CausalModel):
         self.hidden_size = model_config.n_embd
 
         # Model
-        self.model = AutoModel.from_config(model_config)
-        self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
+        self.model = AutoModelForCausalLM.from_config(model_config)
+
+    def training_step(self, 
+                      batch: Dict[str, Any],
+                      batch_idx: int) -> Optional[torch.Tensor]:
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        B: int = tokens['input_ids'].shape[0]
+
+        outputs = self.model(**tokens)
+        loss: torch.Tensor = outputs.loss
+        
+        # Learning rate scheduler
+        lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
+        sch = self.lr_schedulers()
+        sch.step()
+        
+        # Logging + Metrics
+        self.log_training_step(loss.detach(), B, tokens, lr)
+
+        return loss

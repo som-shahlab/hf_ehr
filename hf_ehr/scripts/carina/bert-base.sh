@@ -27,9 +27,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         trainer.devices=[0,1,2,3] \
         model.config_kwargs.num_hidden_layers=12 \
         model.config_kwargs.num_attention_heads=12 \
-        model.config_kwargs.hidden_size=768 \
-        main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base/ \
-        logging.wandb.name=bert-base
+        model.config_kwargs.hidden_size=768
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1

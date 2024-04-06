@@ -1,10 +1,12 @@
+import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
-from hf_ehr.models.modules import CausalModel
+from typing import Dict, Any, Optional
+from hf_ehr.models.modules import BaseModel
 
-class MambaLanguageModel(CausalModel):
+class MambaLanguageModel(BaseModel):
     """
    Mamba with a Language Model head.
     """
@@ -24,3 +26,24 @@ class MambaLanguageModel(CausalModel):
         # Model
         self.model = AutoModel.from_config(model_config, trust_remote_code=True)
         self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
+
+    def training_step(self, 
+                      batch: Dict[str, Any],
+                      batch_idx: int) -> Optional[torch.Tensor]:
+        # TODO (@Suhana) -- adapt for Mamba
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        B: int = tokens['input_ids'].shape[0]
+
+        outputs = self.model(**tokens)
+        loss: torch.Tensor = outputs.loss
+        ppl: torch.Tensor = torch.exp(loss).detach()
+        
+        # Learning rate scheduler
+        lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
+        sch = self.lr_schedulers()
+        sch.step()
+        
+        # Logging + Metrics
+        self.log_training_step(loss.detach(), B, tokens, lr)
+
+        return loss

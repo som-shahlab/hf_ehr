@@ -66,7 +66,8 @@ class FEMRTokenizer(PreTrainedTokenizer):
 
             # Tokenize without truncation
             kwargs.pop('max_length')
-            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
+            kwargs.pop('truncation')
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, truncation=None, is_split_into_words=True)
             
             # Truncate at random positions
             random.seed(seed)

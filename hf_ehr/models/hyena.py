@@ -1,11 +1,13 @@
+import torch
 import torch.nn as nn
 from torch import optim
 from transformers import AutoModel, AutoConfig
 from omegaconf import DictConfig
-from hf_ehr.models.modules import CausalModel
+from typing import Dict, Any, Optional
+from hf_ehr.models.modules import BaseModel
 from hf_ehr.utils import lr_warmup_with_constant_plateau
 
-class HyenaLanguageModel(CausalModel):
+class HyenaLanguageModel(BaseModel):
     """
     Hyena with a Language Model head.
     """
@@ -43,3 +45,23 @@ class HyenaLanguageModel(CausalModel):
             return [ optimizer ], [ scheduler ]
 
         return [optimizer]
+    def training_step(self, 
+                      batch: Dict[str, Any],
+                      batch_idx: int) -> Optional[torch.Tensor]:
+        # TODO (@Suhana) -- adapt for Hyena
+        tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
+        B: int = tokens['input_ids'].shape[0]
+
+        outputs = self.model(**tokens)
+        loss: torch.Tensor = outputs.loss
+        ppl: torch.Tensor = torch.exp(loss).detach()
+        
+        # Learning rate scheduler
+        lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
+        sch = self.lr_schedulers()
+        sch.step()
+        
+        # Logging + Metrics
+        self.log_training_step(loss.detach(), B, tokens, lr)
+
+        return loss
