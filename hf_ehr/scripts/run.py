@@ -20,7 +20,7 @@ from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
-# from hf_ehr.models.t5 import T5LanguageModel
+from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 print("====> Done loading imports: ", time.time() - start, "s")
 
@@ -214,8 +214,7 @@ def main(config: DictConfig) -> None:
     elif 'mamba' in model_name:
         model = MambaLanguageModel(config, tokenizer)
     elif 't5' in model_name:
-        raise NotImplementedError("T5 model not implemented.")
-        # model = T5LanguageModel(config, tokenizer)
+        model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
     logger.info(f"Parameter count of model = {model.get_param_count()}")

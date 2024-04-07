@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoConfig
+from transformers import AutoModel, AutoConfig, AutoModelForCausalLM
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
+from jaxtyping import Float
 from typing import Dict, Any, Optional
 from hf_ehr.models.modules import BaseModel
 
@@ -21,11 +22,12 @@ class MambaLanguageModel(BaseModel):
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"
             setattr(model_config, key, val)
+        self.model_config = model_config
         self.hidden_size = model_config.d_model
 
         # Model
-        self.model = AutoModel.from_config(model_config, trust_remote_code=True)
-        self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
+        self.model = AutoModelForCausalLM.from_config(model_config)
+        
 
     def training_step(self, 
                       batch: Dict[str, Any],
@@ -36,7 +38,6 @@ class MambaLanguageModel(BaseModel):
 
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
-        ppl: torch.Tensor = torch.exp(loss).detach()
         
         # Learning rate scheduler
         lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
