@@ -16,6 +16,7 @@ SPLIT_VAL_CUTOFF: float = 85
 
 class FEMRTokenizer(PreTrainedTokenizer):
     def __init__(self, code_2_count: Dict[str, int], min_code_count: Optional[int] = None) -> None:
+        self.code_2_count = code_2_count
         # Only keep codes with >= `min_code_count` occurrences in our dataset
         codes: List[str] = sorted(list(code_2_count.keys()))
         if min_code_count is not None:
