@@ -29,7 +29,6 @@ class HyenaLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config, trust_remote_code=True)
-        self.lm_head = nn.Linear(self.hidden_size, tokenizer.vocab_size, bias=False)
     
     """
     def configure_optimizers(self):
@@ -98,10 +97,10 @@ class HyenaLanguageModel(BaseModel):
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
         # TODO (@Suhana) -- adapt for Hyena
-        #tokens = {key: value for key, value in batch['tokens'].items() if key != 'attention_mask'}
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens'].copy()
         B: int = tokens['input_ids'].shape[0]
         
+        # Need to adjust for Hyena
         tokens.pop("attention_mask", None)
         tokens.pop("token_type_ids", None)
         
@@ -114,35 +113,12 @@ class HyenaLanguageModel(BaseModel):
         sch.step()
         
         # Logging + Metrics
-        self.log_training_step(loss.detach(), B, tokens, lr)
+        # TODO -- need to fix attention first
+        # self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
-    
-    def log_training_step(self, loss, B, tokens, lr):
-    # Check if 'attention_mask' is available
-        if 'attention_mask' in tokens:
-            train_batch_tokens_PAD = (1 - tokens['attention_mask']).sum()
-            # Proceed with your logging using train_batch_tokens_PAD
-        else:
-            # Handle the case where 'attention_mask' is not available
-            # Maybe log a warning or use a default value
-            print("Warning: 'attention_mask' not available for logging.")
-        
-        # Continue with other logging as needed
-        # Example logging statement
-        # self.logger.log({"loss": loss, "batch_size": B, "learning_rate": lr})
 
     def validation_step(self, batch: Dict[str, Any], batch_idx: int) -> Optional[torch.Tensor]:
-        """
-        Perform a validation step.
-
-        Args:
-            batch (Dict[str, Any]): The batch of data from the validation DataLoader.
-            batch_idx (int): The index of the current batch.
-
-        Returns:
-            Optional[torch.Tensor]: The validation loss of the current batch.
-        """
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
         
