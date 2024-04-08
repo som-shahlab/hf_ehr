@@ -9,6 +9,57 @@ from jaxtyping import Float
 from hf_ehr.models.modules import BaseModel
 from hf_ehr.utils import lr_warmup_with_constant_plateau
 
+def hyena_forward(
+    self: AutoModelForCausalLM,
+    input_ids: torch.LongTensor = None,
+    inputs_embeds: Optional[torch.FloatTensor] = None,
+    labels: Optional[torch.LongTensor] = None,
+    output_hidden_states: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+    pad_token_id: int = None,
+) -> Union[Tuple, CausalLMOutput]:
+
+    output_hidden_states = (
+        output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+    )
+    return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+    # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+    outputs = self.hyena(
+        input_ids=input_ids,
+        inputs_embeds=inputs_embeds,
+        output_hidden_states=output_hidden_states,
+        return_dict=return_dict,
+    )
+
+    hidden_states = outputs[0]
+    logits = self.lm_head(hidden_states)
+    logits = logits.float()
+
+    # TODO (@Suhana) -- ignore pad tokens in loss calculation (see my old modules.py::CausalModel forward() for reference)
+    loss = None
+    if labels is not None:
+        # Shift so that tokens < n predict n
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        # Flatten the tokens
+        loss_fct = nn.CrossEntropyLoss()
+        shift_logits = shift_logits.view(-1, self.vocab_size)
+        shift_labels = shift_labels.view(-1)
+        # Enable model parallelism
+        shift_labels = shift_labels.to(shift_logits.device)
+        loss = loss_fct(shift_logits, shift_labels)
+
+    if not return_dict:
+        output = (logits,) + outputs[1:]
+        return (loss,) + output if loss is not None else output
+
+    return CausalLMOutput(
+        loss=loss,
+        logits=logits,
+        hidden_states=outputs.hidden_states,
+    )
+
 class HyenaLanguageModel(BaseModel):
     """
     Hyena with a Language Model head.
@@ -104,7 +155,7 @@ class HyenaLanguageModel(BaseModel):
         tokens.pop("attention_mask", None)
         tokens.pop("token_type_ids", None)
         
-        outputs = self.model(**tokens)
+        outputs = hyena_forward(self.model, **tokens, pad_token_id=self.pad_token_id)
         loss: torch.Tensor = outputs.loss
         
         # Learning rate scheduler
@@ -126,7 +177,7 @@ class HyenaLanguageModel(BaseModel):
         tokens.pop("token_type_ids", None)
         
         # Forward pass
-        outputs = self.model(**tokens)
+        outputs = hyena_forward(self.model, **tokens, pad_token_id=self.pad_token_id)
         loss: torch.Tensor = outputs.loss
 
         # Logging
