@@ -12,11 +12,13 @@ export WANDB_DIR="/share/pi/nigam/mwornow/wandb_cache/"
 export TRITON_CACHE_DIR="/share/pi/nigam/mwornow/triton_cache/"
 export WANDB__SERVICE_WAIT=300
 
-ENV_NAME = "hf_env"
+source /share/sw/open/anaconda/3.10.2/etc/profile.d/conda.sh
+
+ENV_NAME="hf_env"
 if [[ "$USER" == "suhana" ]]; then
-    ENV_NAME = "hf_env_suhana"
+    ENV_NAME="hf_env_suhana"
 elif [[ "$USER" == "migufuen" ]]; then
-    ENV_NAME = "hf_env_miguel"
+    ENV_NAME="hf_env_miguel"
 fi
 
 if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
