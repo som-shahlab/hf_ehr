@@ -12,6 +12,13 @@ export WANDB_DIR="/share/pi/nigam/mwornow/wandb_cache/"
 export TRITON_CACHE_DIR="/share/pi/nigam/mwornow/triton_cache/"
 export WANDB__SERVICE_WAIT=300
 
+ENV_NAME = "hf_env"
+if [[ "$USER" == "suhana" ]]; then
+    ENV_NAME = "hf_env_suhana"
+elif [[ "$USER" == "migufuen" ]]; then
+    ENV_NAME = "hf_env_miguel"
+fi
+
 if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     # If a100 partition:
     echo "Detected A100 Partition"
@@ -19,7 +26,7 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /local-scratch/nigam/hf_ehr/ # one-time setup
     fi
 
-    conda activate /local-scratch/nigam/hf_ehr/hf_env
+    conda activate /local-scratch/nigam/hf_ehr/$ENV_NAME
     # conda activate /local-scratch/nigam/hf_ehr/hf_env_miguel
     # conda activate /local-scratch/nigam/hf_ehr/hf_env_suhana
 
@@ -32,7 +39,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /local-scratch-nvme/nigam/hf_ehr/ # one-time setup
     fi
 
-    conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env
+    conda activate /local-scratch-nvme/nigam/hf_ehr/$ENV_NAME
     # conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env_miguel
     # conda activate /local-scratch-nvme/nigam/hf_ehr/hf_env_suhana
 
@@ -45,7 +52,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
 
-    conda activate /home/hf_ehr/hf_env
+    conda activate /home/hf_ehr/$ENV_NAME
     # conda activate /home/hf_ehr/hf_env_miguel
     # conda activate /home/hf_ehr/hf_env_suhana
 

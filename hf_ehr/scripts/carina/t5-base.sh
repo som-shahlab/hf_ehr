@@ -12,9 +12,8 @@ source base.sh
 
 python3 ../run.py \
     +models=t5 \
-    +data=v8 \
     data.dataloader.batch_size=2 \
-    trainer.accumulate_grad_batches=16 \
+    trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
     trainer.devices=[0,1,2,3] \
     model.config_kwargs.num_layers=12 \
@@ -22,5 +21,5 @@ python3 ../run.py \
     model.config_kwargs.d_model=768 \
     model.config_kwargs.d_ff=3072 \
     model.config_kwargs.n_positions=1024 \
-    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/t5-base-v8/ \
-    logging.wandb.name=t5-base-v8
+    main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/t5-base/ \
+    logging.wandb.name=t5-base
