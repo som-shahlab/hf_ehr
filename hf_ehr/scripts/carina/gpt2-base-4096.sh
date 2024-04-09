@@ -20,5 +20,5 @@ python3 ../run.py \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
     model.config_kwargs.n_embd=768 \
-    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-base-4096/ \
+    main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base-4096/ \
     logging.wandb.name=gpt2-base-4096

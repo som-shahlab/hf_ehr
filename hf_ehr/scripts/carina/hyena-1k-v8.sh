@@ -24,5 +24,5 @@ python3 ../run.py \
     model.config_kwargs.d_inner=2048 \
     model.config_kwargs.max_seq_len=1024 \
     data.dataloader.max_length=1024 \
-    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-1k-v8/ \
+    main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/hyena-1k-v8/ \
     logging.wandb.name=hyena-1k-v8
