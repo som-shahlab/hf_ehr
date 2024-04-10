@@ -21,5 +21,5 @@ python3 ../run.py \
     model.config_kwargs.d_model=1024 \
     model.config_kwargs.d_ff=4096 \
     model.config_kwargs.n_positions=1024 \
-    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/t5-large/ \
+    main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/t5-large/ \
     logging.wandb.name=t5-large

@@ -22,7 +22,7 @@ python3 ../run.py \
     trainer.is_use_bf16=True \
     optimizer.lr=1e-4 \
     scheduler.num_warmup_steps=50000 \
-    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-large/ \
+    main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-large/ \
     logging.wandb.name=gpt2-large
 
 #SBATCH --partition=gpu
