@@ -13,7 +13,6 @@ source base.sh
 
 python3 ../run.py \
     +models=hyena \
-    +data=v8 \
     data.dataloader.batch_size=8 \
     trainer.accumulate_grad_batches=8 \
     trainer.optimizer.lr=6e-4 \
