@@ -189,7 +189,7 @@ def main(config: DictConfig) -> None:
         if rank_zero_only.rank == 0:
             if not is_resume_from_ckpt:
                 wandb_config = OmegaConf.to_container(config, resolve=True)
-                wandb_config.pop('config', None)
+                # wandb_config.pop('config', None)
                 wandb.config.update(wandb_config)
             wandb.define_metric('train/loss', summary='min')
             wandb.define_metric('val/loss', summary='min')
