@@ -195,6 +195,7 @@ def main(config: DictConfig) -> None:
                 wandb_config = OmegaConf.to_container(config, resolve=True)
                 # wandb_config.pop('config', None)
                 wandb.config.update(wandb_config)
+            wandb.init()
             wandb.define_metric('train/loss', summary='min')
             wandb.define_metric('val/loss', summary='min')
 
@@ -221,11 +222,14 @@ def main(config: DictConfig) -> None:
         model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
-    logger.info(f"Parameter count of model = {model.get_param_count()}")
+    #logger.info(f"Parameter count of model = {model.get_param_count()}")
     
     # Datasets
     logger.info(f"Loading FEMR datasets...")
     datasets: Dict[str, FEMRDataset] = load_datasets(config)
+        
+    for key, val in datasets.items():
+        logger.info(f"{key} dataset size: {len(val)}")
     
     # Dataloaders
     logger.info(f"Loading FEMR dataloaders...")

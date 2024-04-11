@@ -17,7 +17,7 @@ source /share/sw/open/anaconda/3.10.2/etc/profile.d/conda.sh
 if [[ "$USER" == "mwornow" ]]; then
     ENV_NAME="hf_env"
 elif [[ "$USER" == "suhana" ]]; then
-    ENV_NAME="hf_env_suhana"
+    ENV_NAME="hf_env_suhana_1"
 elif [[ "$USER" == "migufuen" ]]; then
     ENV_NAME="hf_env_miguel"
 else

@@ -21,6 +21,11 @@ data:
     max_length: ${model.config_kwargs.n_positions}
 
 trainer:
+  # If true uses bf16 mixed precision (A100 only)
+  is_use_bf16: False
+  # If true uses fp16 mixed precision
+  is_use_fp16: False
+  # Limits training to a minimum number of epochs
   optimizer:
     # Learning rate
     lr: 3e-4

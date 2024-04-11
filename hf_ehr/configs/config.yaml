@@ -26,6 +26,18 @@ callbacks:
     every_n_train_steps: 10_000
 
 data:
+  # Sampling strategy for dataset: "random", "stratified", "skillit"
+  sampling_strat: "random"
+  # Kwargs specific for each sampling strategy
+  sampling_kwargs:
+    # For random sampling, the fraction of the dataset to sample
+    percent: 50
+    # For stratified sampling, the demographics used to stratify the dataset
+    age: False
+    race: True
+    sex: False
+  # Min number of tokens required for a patient timeline to be included in the dataset
+  min_token_count: 
   dataset:
     # Path to FEMR extract
     path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite
