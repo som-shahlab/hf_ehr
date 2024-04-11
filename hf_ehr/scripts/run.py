@@ -222,6 +222,9 @@ def main(config: DictConfig) -> None:
     # Datasets
     logger.info(f"Loading FEMR datasets...")
     datasets: Dict[str, FEMRDataset] = load_datasets(config)
+        
+    for key, val in datasets.items():
+        logger.info(f"{key} dataset size: {len(val)}")
     
     # Dataloaders
     logger.info(f"Loading FEMR dataloaders...")
