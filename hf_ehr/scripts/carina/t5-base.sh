@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=t5-base-v8
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/t5-base-v8_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/t5-base-v8_%A.err
+#SBATCH --job-name=t5-base
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/t5-base_%A.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/t5-base_%A.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=gpu
 #SBATCH --mem=200G

@@ -48,3 +48,9 @@ class MambaLanguageModel(BaseModel):
         self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
+
+if __name__ == '__main__':
+    model = MambaLanguageModel()
+    
+    outputs = model.model(**tokens)
+    model.model.backward(outputs.loss)

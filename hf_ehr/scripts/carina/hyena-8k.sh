@@ -12,7 +12,6 @@ source base.sh
 
 python3 run.py \
     +models=hyena \
-    +data=v8 \
     data.dataloader.batch_size=2 \
     trainer.accumulate_grad_batches=32 \
     data.dataloader.n_workers=10 \
