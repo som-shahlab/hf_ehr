@@ -5,10 +5,13 @@ from torch.utils.data import Dataset
 import femr.datasets
 import os
 import numpy as np
+from omegaconf import DictConfig 
 from jaxtyping import Float
 import json
 from hf_ehr.config import GPU_BASE_DIR
 from transformers import PreTrainedTokenizer
+import datetime
+import time
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
@@ -117,13 +120,15 @@ class FEMRDataset(Dataset):
     '''
     def __init__(self, 
                  path_to_femr_extract: str, 
-                 split: str = 'train', 
+                 split: str = 'train',
+                 config: DictConfig = None,
                  min_events: Optional[int] = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
         self.femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
         self.split: str = split
+        self.config: DictConfig = config
         
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
@@ -131,7 +136,11 @@ class FEMRDataset(Dataset):
         self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
         self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
         self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
+        if config is not None:
+            self.train_pids: np.ndarray = self.get_sampled_pids(self.train_pids)
+
         
+            
         # Filter out patients
         # if min_events is not None:
         #     # Filter out patients with timelines shorter than `min_events`
@@ -140,6 +149,147 @@ class FEMRDataset(Dataset):
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
         assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
         assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+
+    def get_sampled_pids(self, train_pids: np.ndarray) -> np.ndarray:
+        """Returns sampled patient_ids based on the sample strategy"""
+        start_time = time.time()  # Start timing
+        if self.config.data.sampling_strat == 'random':
+            assert self.config.data.sampling_kwargs.percent is not None, "If sampling_strat is 'random', then you must provide a value for `percent`"
+            size = len(train_pids) * self.config.data.sampling_kwargs.percent // 100
+            indices = np.random.choice(len(train_pids), size=size, replace=False)
+            train_pids = train_pids[indices]
+        elif self.config.data.sampling_strat == "stratified":
+            assert self.config.data.sampling_kwargs.age or self.config.data.sampling_kwargs.race or self.config.data.sampling_kwargs.sex,\
+                "If sampling_strat is 'stratified', then you must provide a value for `age`, `race`, or `sex`"
+            train_pids = self._get_stratified_pids(train_pids)
+        
+        end_time = time.time()  # End timing
+        elapsed_time = end_time - start_time
+        print(f"Time taken to get sampled pids: {elapsed_time:.2f} seconds")
+            
+        return train_pids
+
+    def _get_stratified_pids(self, train_pids: np.ndarray) -> np.ndarray:
+        """Returns stratified patient_ids based on the sample strategy"""
+        
+        demographics = {
+            'age': {
+                'age_20': [],
+                'age_40': [],
+                'age_60': [],
+                'age_80': [],
+                'age_plus': []
+            },
+            'race': {
+                'white': [],
+                'pacific_islander': [],
+                'black': [],
+                # 'asian': [],
+                'american_indian': [],
+                'unknown': []
+            },
+            'sex': {
+                'male': [],
+                'female': []
+            }
+        }
+        for pid in train_pids:
+            # unique_visits = set()
+            # for e in self.femr_db[pid].events:
+            #     print("patient object")
+            #     for key, val in vars(self.femr_db[pid]).items():
+            #         print(key, val)
+            #     print(f"Events length: {len(self.femr_db[pid].events)}")
+                
+            #     if e.visit_id is not None:
+            #         print("event object", vars(e))
+            #         unique_visits.add(e.visit_id)
+            if self.config.data.sampling_kwargs.age:
+                end_age = self.femr_db[pid].events[-1].start
+                start_age = self.femr_db[pid].events[0].start
+                age = end_age - start_age
+                if age <= datetime.timedelta(days=20*365):
+                    demographics['age']['age_20'].append(pid)
+                elif datetime.timedelta(days=20*365) < age <= datetime.timedelta(days=40*365):  
+                    demographics['age']['age_40'].append(pid)
+                elif datetime.timedelta(days=40*365) < age < datetime.timedelta(days=60*365):
+                    demographics['age']['age_60'].append(pid)
+                elif datetime.timedelta(days=60*365) < age < datetime.timedelta(days=80*365):
+                    demographics['age']['age_80'].append(pid)
+                elif datetime.timedelta(days=80*365) < age:
+                    demographics['age']['age_plus'].append(pid)
+            elif self.config.data.sampling_kwargs.race:
+                race_codes = {'Race/5': 'white', 'Race/4': 'pacific_islander', 
+                          'Race/3': 'black', 'Race/2': 'asian', 'Race/1': 'american_indian'}
+                race = 'unknown'
+                for e in self.femr_db[pid].events:
+                    if e.code in race_codes:
+                        demographics['race'][race_codes[e.code]].append(pid)
+                        race = race_codes[e.code]
+                        break
+                if race == 'unknown':
+                    demographics['race']['unknown'].append(pid)
+            elif self.config.data.sampling_kwargs.sex:
+                for e in self.femr_db[pid].events:
+                    if e.code == 'Gender/M':
+                        demographics['sex']['male'].append(pid)
+                        break
+                    elif e.code == 'Gender/F':
+                        demographics['sex']['female'].append(pid)
+                        break
+        pids = []
+        
+        if self.config.data.sampling_kwargs.age:
+            demographic = 'age'
+        elif self.config.data.sampling_kwargs.race:
+            demographic = 'race'
+        elif self.config.data.sampling_kwargs.sex:
+            demographic = 'sex'
+            
+        min_key = min(demographics[demographic], key=lambda k: len(demographics[demographic][k]))
+        for val in demographics[demographic].values():
+            pids.extend(val[:len(demographics[demographic][min_key])])
+        
+        return pids
+            # is_hispanic: bool = False
+            # # ethnicity
+            # for e in self.femr_db[pid].events:
+            #     if e.code == 'Ethnicity/Hispanic':
+            #         is_hispanic = True
+            #         break
+            #     elif e.code == 'Ethnicity/Not Hispanic':
+            #         is_hispanic = False
+            #         break
+            # race
+            
+            # # number of events
+            # num_events: int = len(self.femr_db[pid].events)
+            # # number of visits
+            # unique_visits = set()
+            # for e in self.femr_db[pid].events:
+            #     if e.visit_id is not None:
+            #         unique_visits.add(e.visit_id)
+            # num_visits: int = len(unique_visits)
+            # # split
+            # split: str = 'train'
+            
+            # print({
+            #     'split' : split,
+            #     'patient_id' : pid,
+            #     'age' : age.days / 365.25,
+            #     'age_20' : age <= datetime.timedelta(days=20*365),
+            #     'age_40' : datetime.timedelta(days=20*365) < age <= datetime.timedelta(days=40*365),
+            #     'age_60' : datetime.timedelta(days=40*365) < age < datetime.timedelta(days=60*365),
+            #     'age_80' : datetime.timedelta(days=60*365) < age < datetime.timedelta(days=80*365),
+            #     'age_plus' : datetime.timedelta(days=80*365) < age,
+            #     'is_male' : is_male,
+            #     'is_hispanic' : is_hispanic,
+            #     'race' : race,
+            #     'num_events' : num_events,
+            #     'timeline_length' : age.days / 365.25,
+            #     'num_visits' : num_visits,
+            # })
+        
 
     def __len__(self):
         if self.split == 'train':

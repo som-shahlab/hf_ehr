@@ -25,7 +25,6 @@ class T5LanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForSeq2SeqLM.from_config(model_config)
-        self.model.train()
         
     def training_step(self, 
                       batch: Dict[str, Any],
@@ -34,11 +33,8 @@ class T5LanguageModel(BaseModel):
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         del tokens['token_type_ids']
         B: int = tokens['input_ids'].shape[0]
-
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
-        
-        # Learning rate scheduler
         lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
         sch = self.lr_schedulers()
         sch.step()
