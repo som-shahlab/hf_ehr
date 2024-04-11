@@ -16,7 +16,7 @@ def hyena_forward(
     labels: Optional[torch.LongTensor] = None,
     output_hidden_states: Optional[bool] = None,
     return_dict: Optional[bool] = None,
-    pad_token_id: int = None,
+    pad_token_id: Optional[int] = None,
 ) -> Union[Tuple, CausalLMOutput]:
 
     output_hidden_states = (
@@ -42,13 +42,23 @@ def hyena_forward(
         # Shift so that tokens < n predict n
         shift_logits = logits[..., :-1, :].contiguous()
         shift_labels = labels[..., 1:].contiguous()
-        # Flatten the tokens
-        loss_fct = nn.CrossEntropyLoss()
+        # Add the ignore_index flag to the CrossEntropyLoss initialization
+        loss_fct = nn.CrossEntropyLoss()  # Use pad_token_id for ignore_index - ignore_index=pad_token_id
         shift_logits = shift_logits.view(-1, self.vocab_size)
         shift_labels = shift_labels.view(-1)
         # Enable model parallelism
         shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits, shift_labels)
+        """
+        # mask to retrieve non-pad tokens
+        pad_mask = shift_labels != self.pad_token_id
+        #filtered labels and logits
+        shift_logits_filtered = shift_logits[pad_mask].view(-1, self.vocab_size)
+        shift_labels_filtered = shift_labels[pad_mask]
+        # Enable model parallelism
+        loss_fct = nn.CrossEntropyLoss()
+        loss = loss_fct(shift_logits_filtered, shift_labels_filtered)
+        """
 
     if not return_dict:
         output = (logits,) + outputs[1:]
@@ -59,7 +69,7 @@ def hyena_forward(
         logits=logits,
         hidden_states=outputs.hidden_states,
     )
-
+    
 class HyenaLanguageModel(BaseModel):
     """
     Hyena with a Language Model head.
@@ -71,6 +81,7 @@ class HyenaLanguageModel(BaseModel):
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
         model_config.vocab_size = tokenizer.vocab_size
+        #self.lm_head = nn.Linear(model_config.d_model, model_config.vocab_size, bias=False)
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {self.model_name} does not have attribute {key}"
@@ -81,69 +92,6 @@ class HyenaLanguageModel(BaseModel):
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config, trust_remote_code=True)
     
-    """
-    def configure_optimizers(self):
-        #Sets Learning rate for different parameter groups.
-        lr: float = self.config.trainer.optimizer.lr
-
-        # Optimizer
-        optimizer = optim.Adam(self.parameters(), lr=lr)
-
-        # Scheduler
-        if self.config.trainer.scheduler:
-            scheduler = lr_warmup_with_constant_plateau(optimizer, 
-                                                        num_warmup_steps=self.config.trainer.scheduler.num_warmup_steps, 
-                                                        num_decay_steps=self.config.trainer.scheduler.num_decay_steps, 
-                                                        initial_lr=self.config.trainer.scheduler.initial_lr, 
-                                                        final_lr=self.config.trainer.scheduler.final_lr)
-
-            return [ optimizer ], [ scheduler ]
-
-        return [optimizer]
-    
-    def forward(
-        self,
-        input_ids: torch.LongTensor = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, CausalLMOutput]:
-
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.model_config.output_hidden_states
-        )
-        return_dict = return_dict if return_dict is not None else self.model_config.use_return_dict
-
-        outputs = self.model(
-            input_ids=input_ids,
-            inputs_embeds=inputs_embeds,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-
-        hidden_states = outputs[0]
-        logits = self.lm_head(hidden_states)
-        logits = logits.float()
-
-        loss = None
-        if labels is not None:
-            shift_logits = logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(shift_logits.view(-1, self.vocab_size), shift_labels.view(-1))
-
-        if not return_dict:
-            output = (logits,) + outputs[1:]
-            return ((loss,) + output) if loss is not None else output
-
-        return CausalLMOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-        )
-    """
-
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
