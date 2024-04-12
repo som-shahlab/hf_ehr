@@ -3,12 +3,11 @@ start = time.time()
 import os
 import json
 import hydra
-import torch
+import wandb
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Callback
 from lightning.pytorch.utilities import rank_zero_only
-from lightning.pytorch.profilers import PyTorchProfiler
 
 from loguru import logger
 from torch.utils.data import DataLoader
@@ -163,8 +162,8 @@ def main(config: DictConfig) -> None:
                 loggers[-1].log_hyperparams(mlflow_config)
 
     ## Wandb
+    # NOTE: There's a lot of `init()` calls below. Idk why they are all necessary, but they seem to be. Don't any!
     if is_wandb:
-        import wandb
         if is_resume_from_ckpt:
             # Load existing wandb run ID
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
@@ -177,8 +176,15 @@ def main(config: DictConfig) -> None:
                                     resume='allow',
                                     id=wandb_run_id)
             ]
+            wandb.init(project='hf_ehr', 
+                        dir=path_to_log_dir, 
+                        name=config.logging.wandb.name,
+                        resume='allow', 
+                        id=wandb_run_id)
         else:
-            wandb.init()
+            wandb.init(project='hf_ehr', 
+                        dir=path_to_log_dir, 
+                        name=config.logging.wandb.name)
             loggers += [ 
                         WandbLogger(project='hf_ehr',
                                     log_model=False,
@@ -195,7 +201,6 @@ def main(config: DictConfig) -> None:
                 wandb_config = OmegaConf.to_container(config, resolve=True)
                 # wandb_config.pop('config', None)
                 wandb.config.update(wandb_config)
-            wandb.init()
             wandb.define_metric('train/loss', summary='min')
             wandb.define_metric('val/loss', summary='min')
 

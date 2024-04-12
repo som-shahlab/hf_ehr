@@ -10,67 +10,19 @@
 
 source base.sh
 
-python3 run.py \
-    +models=gpt2 \
-    data.dataloader.batch_size=2 \
-    trainer.accumulate_grad_batches=1 \
-    data.dataloader.n_workers=1 \
-    trainer.devices=[0] \
-    model.config_kwargs.n_layer=2 \
-    model.config_kwargs.n_head=2 \
-    model.config_kwargs.n_embd=256 \
-    trainer.max_epochs=1 \
-    trainer.limit_train_batches=50 \
-    trainer.limit_val_batches=0
-
-
-python3 run.py \
-    +models=gpt2 \
-    data.dataloader.batch_size=4 \
-    trainer.accumulate_grad_batches=16 \
-    data.dataloader.n_workers=4 \
-    trainer.devices=[0,1,2,3] \
-    model.config_kwargs.n_layer=12 \
-    model.config_kwargs.n_head=12 \
-    model.config_kwargs.n_embd=768 \
-    trainer.max_epochs=1 > large-results-full.txt 2>&1
-
-python3 ../run.py \
-    +models=bert \
-    data.dataloader.batch_size=4 \
-    trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=10 \
-    trainer.devices=[0,1,2,3] \
-    model.config_kwargs.num_hidden_layers=2 \
-    model.config_kwargs.num_attention_heads=2 \
-    model.config_kwargs.hidden_size=256 \
-    trainer.max_epochs=1 > test.txt 2>&1
-
-python3 ../run.py \
-    +models=bert \
-    data.dataloader.batch_max_tokens=1000 \
-    trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=1 \
-    trainer.devices=[0] \
-    model.config_kwargs.num_hidden_layers=2 \
-    model.config_kwargs.num_attention_heads=2 \
-    model.config_kwargs.hidden_size=256 \
-    trainer.limit_train_batches=50 \
-    trainer.max_epochs=1 \
-    data.dataset.is_debug=True
-
-
 python3 ../run.py \
     +models=gpt2 \
     data.dataloader.approx_batch_sampler.max_tokens=4000 \
     data.dataloader.approx_batch_sampler.bucket_size=10 \
     trainer.accumulate_grad_batches=16 \
     data.dataloader.n_workers=1 \
-    trainer.devices=[0,1] \
+    trainer.devices=[0] \
     model.config_kwargs.n_layer=2 \
     model.config_kwargs.n_head=2 \
     model.config_kwargs.n_embd=128 \
-    trainer.limit_train_batches=50 \
-    trainer.limit_val_batches=2 \
-    trainer.max_epochs=1 \
-    data.dataset.is_debug=True
+    trainer.limit_train_batches=100 \
+    trainer.limit_val_batches=0 \
+    trainer.max_epochs=2 \
+    data.dataset.is_debug=True \
+    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/test/ \
+    logging.wandb.name=test
