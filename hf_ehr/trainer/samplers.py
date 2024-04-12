@@ -14,7 +14,7 @@ class SortishSampler(Sampler):
     def __init__(self, sequence_lengths: List[int], bucket_size: int, 
                     is_random_shuffle_across_buckets: bool = False, is_random_shuffle_within_buckets: bool = False,
                     num_replicas: int = 1):
-        self.data: np.ndarray = np.argsort(-1 * sequence_lengths) # sort longest -> shortest; NOTE: keep so that if we blow out memory, we do so earlier rather than later
+        self.data: np.ndarray = np.argsort(-1 * np.array(sequence_lengths)) # sort longest -> shortest; NOTE: keep so that if we blow out memory, we do so earlier rather than later
         self.num_replicas: int = num_replicas
         self.num_samples: int = int(math.ceil(len(self.data) * 1.0 / self.num_replicas))
         self.bucket_size: int = bucket_size
