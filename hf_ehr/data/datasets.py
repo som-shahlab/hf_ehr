@@ -151,26 +151,26 @@ class FEMRDataset(Dataset):
         assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
 
     def get_sampled_pids(self, train_pids: np.ndarray) -> np.ndarray:
-        """Returns sampled patient_ids based on the sample strategy"""
+        '''Returns sampled patient_ids based on the sample strategy'''
         start_time = time.time()  # Start timing
         if self.config.data.sampling_strat == 'random':
-            assert self.config.data.sampling_kwargs.percent is not None, "If sampling_strat is 'random', then you must provide a value for `percent`"
+            assert self.config.data.sampling_kwargs.percent is not None, 'If sampling_strat is "random", then you must provide a value for `percent`'
             size = len(train_pids) * self.config.data.sampling_kwargs.percent // 100
             indices = np.random.choice(len(train_pids), size=size, replace=False)
             train_pids = train_pids[indices]
-        elif self.config.data.sampling_strat == "stratified":
+        elif self.config.data.sampling_strat == 'stratified':
             assert self.config.data.sampling_kwargs.age or self.config.data.sampling_kwargs.race or self.config.data.sampling_kwargs.sex,\
-                "If sampling_strat is 'stratified', then you must provide a value for `age`, `race`, or `sex`"
+                'If sampling_strat is "stratified", then you must provide a value for `age`, `race`, or `sex`'
             train_pids = self._get_stratified_pids(train_pids)
         
         end_time = time.time()  # End timing
         elapsed_time = end_time - start_time
-        print(f"Time taken to get sampled pids: {elapsed_time:.2f} seconds")
+        print(f'Time taken to get sampled pids: {elapsed_time:.2f} seconds')
             
         return train_pids
 
     def _get_stratified_pids(self, train_pids: np.ndarray) -> np.ndarray:
-        """Returns stratified patient_ids based on the sample strategy"""
+        '''Returns stratified patient_ids based on the sample strategy'''
         
         demographics = {
             'age': {
@@ -184,7 +184,7 @@ class FEMRDataset(Dataset):
                 'white': [],
                 'pacific_islander': [],
                 'black': [],
-                # 'asian': [],
+                'asian': [],
                 'american_indian': [],
                 'unknown': []
             },
@@ -194,12 +194,12 @@ class FEMRDataset(Dataset):
             }
         }
         for pid in train_pids:
-            # unique_visits = set()
-            # for e in self.femr_db[pid].events:
-            #     print("patient object")
-            #     for key, val in vars(self.femr_db[pid]).items():
-            #         print(key, val)
-            #     print(f"Events length: {len(self.femr_db[pid].events)}")
+            unique_visits = set()
+            for e in self.femr_db[pid].events:
+                print("patient object")
+                for key, val in vars(self.femr_db[pid]).items():
+                    print(key, val)
+                print(f"Events length: {len(self.femr_db[pid].events)}")
                 
             #     if e.visit_id is not None:
             #         print("event object", vars(e))
@@ -392,6 +392,8 @@ if __name__ == '__main__':
     train_dataset = FEMRDataset(path_to_femr_extract, split='train')
     val_dataset = FEMRDataset(path_to_femr_extract, split='val')
     test_dataset = FEMRDataset(path_to_femr_extract, split='test')
+    
+    
     
     # Stats
     print('train', len(train_dataset))
