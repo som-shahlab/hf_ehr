@@ -42,8 +42,10 @@ data:
     # Path to FEMR extract
     path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite
   dataloader:
-    # Batch size to be used.
-    batch_size: 4
+    # # Batch size to be used.  [note: exclusive with `batch_max_tokens`]
+    # batch_size: 4
+    # Max tokens in batch to allow  [note: exclusive with `batch_size`]
+    batch_max_tokens: 1_024
     # Number of data loader workers to use.
     n_workers: 10
     # Max number of codes to feed into model at once per patient.

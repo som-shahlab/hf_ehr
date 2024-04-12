@@ -98,6 +98,10 @@ def main(config: DictConfig) -> None:
     path_to_tokenizer_code_2_count: str = config.data.tokenizer.path_to_code_2_count
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     seed: int = config.main.seed
+    
+    # Argument validation
+    if config.data.dataloader.batch_size is not None and config.data.dataloader.batch_max_tokens is not None:
+        raise ValueError(f"Cannot specify both `data.dataloader.batch_size` and `data.dataloader.batch_max_tokens` in config.yaml")
 
     # Random seed
     pl.seed_everything(seed, workers=True)
@@ -278,27 +282,6 @@ def main(config: DictConfig) -> None:
     ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
-    
-    profiler = PyTorchProfiler(
-        dirpath=os.path.join(path_to_output_dir),
-        filename='pytorch_profiler',
-        emit_nvtx=True,
-        # on_trace_ready = torch.profiler.tensorboard_trace_handler(os.path.join(path_to_output_dir, "profiler/tb_logs")),
-        trace_memory=True,
-        export_to_chrome=True,
-        # schedule = torch.profiler.schedule(skip_first=10, wait=1, warmup=1, active=20)
-    )
-    """
-    profiler = PyTorchProfiler(
-        # You can specify various options here, such as:
-        profile_memory=True,  # Whether to report tensor memory allocation/deallocation.
-        with_stack=True,  # Whether to record source information.
-        record_shapes=True,  # Whether to record tensor shapes.
-        profile_mlops=True, # Whether to profile model operations.
-        export_to_chrome=True,
-        # There are other parameters available depending on your needs.
-    )
-    """
 
     # Trainer
     trainer = pl.Trainer(
@@ -318,6 +301,7 @@ def main(config: DictConfig) -> None:
         accumulate_grad_batches=config.trainer.accumulate_grad_batches,
         gradient_clip_val=config.trainer.gradient_clip_value,
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
+        replace_sampler_ddp=False if config.data.dataloader.batch_max_tokens else True, # dont wrap ApproxBatchSampler (based on max_tokens) if using DDP
     )
 
     # Run
