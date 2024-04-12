@@ -120,8 +120,8 @@ class FEMRDataset(Dataset):
     '''
     def __init__(self, 
                  path_to_femr_extract: str, 
-                 split: str = 'train',
-                 sampling_strat: str):
+                 sampling_strat: str,
+                 split: str = 'train',):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
