@@ -33,8 +33,6 @@ class GPTLanguageModel(BaseModel):
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
         
-        print(torch.distributed.get_rank(), "|", batch_idx, "|", tokens['input_ids'].shape, tokens['attention_mask'].sum().item(), tokens['input_ids'][0, :10])
-
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
         

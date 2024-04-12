@@ -1,0 +1,9 @@
+# @package _global_
+
+data:
+  sampling_strat: "stratified"
+  sampling_kwargs:
+    # For stratified sampling, the demographics used to stratify the dataset
+    age: False
+    race: True
+    sex: False

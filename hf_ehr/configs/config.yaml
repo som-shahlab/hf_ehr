@@ -27,15 +27,8 @@ callbacks:
 
 data:
   # Sampling strategy for dataset: "random", "stratified", "skillit"
-  sampling_strat: "stratified"
-  # Kwargs specific for each sampling strategy
-  sampling_kwargs:
-    # For random sampling, the fraction of the dataset to sample
-    percent: 50
-    # For stratified sampling, the demographics used to stratify the dataset
-    age: False
-    race: True
-    sex: False
+  sampling_strat: null
+  sampling_kwargs: null
   # Min number of tokens required for a patient timeline to be included in the dataset
   min_token_count: 
   dataset:

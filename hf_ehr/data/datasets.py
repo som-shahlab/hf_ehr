@@ -365,9 +365,11 @@ class FEMRDataset(Dataset):
                     if len(lengths) == len(pids):
                         return lengths
                 print(f"The seq_lengths in `{path_to_cache_file}` didn't match this dataset's `uuid` or exact `pids`, so recreating from scratch")
+            else:
+                print(f"No cache file found at `{path_to_cache_file}` for uuid={self.get_uuid()}`")
 
         # Calculate seq lengths
-        lengths: List[int] = [ len(self.__getitem__(idx)[1]) for idx in tqdm(range(len(pids)), desc='get_train_seq_lengths()') ]
+        lengths: List[int] = [ len(self.__getitem__(idx)[1]) for idx in tqdm(range(len(pids)), desc='get_seq_lengths()') ]
         os.makedirs(os.path.dirname(path_to_cache_file), exist_ok=True)
         json.dump({ 'uuid' : self.get_uuid(), 'lengths' : lengths }, open(path_to_cache_file, 'w'))
         return lengths
