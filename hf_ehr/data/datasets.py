@@ -151,7 +151,7 @@ class FEMRDataset(Dataset):
             self.val_pids = self.val_pids[:1000]
             self.test_pids = self.test_pids[:1000]
 
-    def get_sampled_pids(self, config: DictConfig, pids: np.ndarray, is_force_refresh: bool = False) -> np.ndarray:
+    def get_sampled_pids(self, pids: np.ndarray, is_force_refresh: bool = False) -> np.ndarray:
         """Returns sampled patient_ids based on the sample strategy"""
         # Check if cache exists
         path_to_cache_file: str = os.path.join(self.get_path_to_cache_folder(), 'sample_splits.json')
@@ -182,18 +182,8 @@ class FEMRDataset(Dataset):
         json.dump({ 'uuid' : self.get_uuid(), 'pids' : pids }, open(path_to_cache_file, 'w'))
         return pids
 
-    # def calculate_patient_properties(self):
-    #     dict = {
-    #         patient_id: {
-    #             sex: 
-    #             age: 
-    #             race:
-    #             timeline_len:
-                
-    #         }
-    #     }
     def _get_stratified_pids(self, train_pids: np.ndarray) -> np.ndarray:
-        """Returns stratified patient_ids based on the sample strategy"""
+        '''Returns stratified patient_ids based on the sample strategy'''
         
         demographics = {
             'age': {
@@ -207,7 +197,7 @@ class FEMRDataset(Dataset):
                 'white': [],
                 'pacific_islander': [],
                 'black': [],
-                # 'asian': [],
+                'asian': [],
                 'american_indian': [],
                 'unknown': []
             },
@@ -217,17 +207,17 @@ class FEMRDataset(Dataset):
             }
         }
         for pid in train_pids:
-            # unique_visits = set()
-            # for e in self.femr_db[pid].events:
-            #     print("patient object")
-            #     for key, val in vars(self.femr_db[pid]).items():
-            #         print(key, val)
-            #     print(f"Events length: {len(self.femr_db[pid].events)}")
+            unique_visits = set()
+            for e in self.femr_db[pid].events:
+                print("patient object")
+                for key, val in vars(self.femr_db[pid]).items():
+                    print(key, val)
+                print(f"Events length: {len(self.femr_db[pid].events)}")
                 
             #     if e.visit_id is not None:
             #         print("event object", vars(e))
             #         unique_visits.add(e.visit_id)
-            if self.config.data.sampling_kwargs.age:
+            if sampling_kwargs.age:
                 end_age = self.femr_db[pid].events[-1].start
                 start_age = self.femr_db[pid].events[0].start
                 age = end_age - start_age
@@ -241,7 +231,7 @@ class FEMRDataset(Dataset):
                     demographics['age']['age_80'].append(pid)
                 elif datetime.timedelta(days=80*365) < age:
                     demographics['age']['age_plus'].append(pid)
-            elif self.config.data.sampling_kwargs.race:
+            elif sampling_kwargs.race:
                 race_codes = {'Race/5': 'white', 'Race/4': 'pacific_islander', 
                           'Race/3': 'black', 'Race/2': 'asian', 'Race/1': 'american_indian'}
                 race = 'unknown'
@@ -252,7 +242,7 @@ class FEMRDataset(Dataset):
                         break
                 if race == 'unknown':
                     demographics['race']['unknown'].append(pid)
-            elif self.config.data.sampling_kwargs.sex:
+            elif sampling_kwargs.sex:
                 for e in self.femr_db[pid].events:
                     if e.code == 'Gender/M':
                         demographics['sex']['male'].append(pid)
@@ -262,11 +252,11 @@ class FEMRDataset(Dataset):
                         break
         pids = []
         
-        if self.config.data.sampling_kwargs.age:
+        if sampling_kwargs.age:
             demographic = 'age'
-        elif self.config.data.sampling_kwargs.race:
+        elif sampling_kwargs.race:
             demographic = 'race'
-        elif self.config.data.sampling_kwargs.sex:
+        elif sampling_kwargs.sex:
             demographic = 'sex'
             
         min_key = min(demographics[demographic], key=lambda k: len(demographics[demographic][k]))
@@ -464,6 +454,8 @@ if __name__ == '__main__':
     train_dataset = FEMRDataset(path_to_femr_extract, split='train')
     val_dataset = FEMRDataset(path_to_femr_extract, split='val')
     test_dataset = FEMRDataset(path_to_femr_extract, split='test')
+    
+    
     
     # Stats
     print('train', len(train_dataset))
