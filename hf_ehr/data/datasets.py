@@ -121,13 +121,17 @@ class FEMRDataset(Dataset):
     def __init__(self, 
                  path_to_femr_extract: str, 
                  split: str = 'train',
-                 sampling_strat: str):
+                 sampling_strat: Optional[str] = None,
+                 sampling_kwargs: Optional[Dict] = None,
+                 is_debug: bool = False):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
         self.femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
         self.split: str = split
-        self.sampling_strat: str = sampling_strat
+        self.sampling_strat: Optional[str] = sampling_strat
+        self.sampling_kwargs: Optional[Dict] = sampling_kwargs
+        self.is_debug: bool = is_debug
         
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
@@ -140,11 +144,17 @@ class FEMRDataset(Dataset):
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
         assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
         assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+        
+        # If debug, then shrink to 1k patients
+        if is_debug:
+            self.train_pids = self.train_pids[:1000]
+            self.val_pids = self.val_pids[:1000]
+            self.test_pids = self.test_pids[:1000]
 
     def get_sampled_pids(self, config: DictConfig, pids: np.ndarray, is_force_refresh: bool = False) -> np.ndarray:
         """Returns sampled patient_ids based on the sample strategy"""
         # Check if cache exists
-        path_to_cache_file: str = os.path.join(self.path_to_cache_dir(), 'sample_splits.json')
+        path_to_cache_file: str = os.path.join(self.get_path_to_cache_folder(), 'sample_splits.json')
         if not is_force_refresh:
             if os.path.exists(path_to_cache_file):
                 data = json.load(open(path_to_cache_file, 'r'))
@@ -153,25 +163,35 @@ class FEMRDataset(Dataset):
                     return pids
 
         # Generate from scratch
-        if config.data.sampling_strat == 'random':
+        if self.sampling_strat == 'random':
             # Random sampling -- i.e. select a random X% subset of patients (without replacement)
-            assert config.data.sampling_kwargs.percent is not None, "If sampling_strat is 'random', then you must provide a value for `percent`"
-            size: int = len(pids) * config.data.sampling_kwargs.percent // 100
+            assert self.sampling_kwargs.percent is not None, "If sampling_strat is 'random', then you must provide a value for `percent`"
+            size: int = len(pids) * self.sampling_kwargs.percent // 100
             indices: np.ndarray = np.random.choice(len(pids), size=size, replace=False)
             pids: np.ndarray = pids[indices]
-        elif config.data.sampling_strat == "stratified":
+        elif self.sampling_strat == "stratified":
             # Stratified sampling based on demographics
-            assert config.data.sampling_kwargs.age or config.data.sampling_kwargs.race or self.config.data.sampling_kwargs.sex,\
+            assert self.sampling_kwargs.age or self.sampling_kwargs.race or self.sampling_kwargs.sex,\
                 "If sampling_strat is 'stratified', then you must provide a value for `age`, `race`, or `sex`"
             pids = self._get_stratified_pids(pids)
         else:
-            raise ValueError(f"Unsupported sampling strategy: {config.data.sampling_strat}")
+            raise ValueError(f"Unsupported sampling strategy: {self.sampling_strat}")
 
         # Save to cache
         os.makedirs(os.path.dirname(path_to_cache_file), exist_ok=True)
         json.dump({ 'uuid' : self.get_uuid(), 'pids' : pids }, open(path_to_cache_file, 'w'))
         return pids
 
+    # def calculate_patient_properties(self):
+    #     dict = {
+    #         patient_id: {
+    #             sex: 
+    #             age: 
+    #             race:
+    #             timeline_len:
+                
+    #         }
+    #     }
     def _get_stratified_pids(self, train_pids: np.ndarray) -> np.ndarray:
         """Returns stratified patient_ids based on the sample strategy"""
         
@@ -322,13 +342,15 @@ class FEMRDataset(Dataset):
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
         uuid = f'starr_omop_v9-{self.split}'
-        if self.sampling_strat:
-            uuid += f'-{sampling_strat}'
+        if self.sampling_strat is not None:
+            uuid += f'-{self.sampling_strat}'
+        if self.is_debug:
+            uuid += f'-is_debug'
         return uuid
 
     def get_path_to_cache_folder(self) -> str:
         """Returns path to cache folder for this dataset (e.g. storing things like sampling split, seq lengths, etc.)"""
-        v: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
+        path_to_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
         return path_to_cache_dir
         
     def get_seq_lengths(self, is_force_refresh: bool = False) -> List[int]:
@@ -343,16 +365,19 @@ class FEMRDataset(Dataset):
             raise ValueError(f"Invalid split: {self.split}")
 
         # Check if cache exists (otherwise takes ~10 mins to iterate over 500k patients)
-        path_to_cache_file: str = os.path.join(self.path_to_cache_dir(), 'seq_lengths.json')
+        path_to_cache_file: str = os.path.join(self.get_path_to_cache_folder(), 'seq_lengths.json')
         if not is_force_refresh:
             if os.path.exists(path_to_cache_file):
+                print(f"Loading seq_lengths from `{path_to_cache_file}`")
                 data = json.load(open(path_to_cache_file, 'r'))
                 if data['uuid'] == self.get_uuid(): # confirm UUID matches
                     lengths: List[int] = data['lengths']
-                    return lengths
+                    if len(lengths) == len(pids):
+                        return lengths
+                print(f"The seq_lengths in `{path_to_cache_file}` didn't match this dataset's `uuid` or exact `pids`, so recreating from scratch")
 
         # Calculate seq lengths
-        lengths: List[int] = [ self.__getitem__(idx) for idx in tqdm(range(len(pids)), desc='get_train_seq_lengths()') ]
+        lengths: List[int] = [ len(self.__getitem__(idx)[1]) for idx in tqdm(range(len(pids)), desc='get_train_seq_lengths()') ]
         os.makedirs(os.path.dirname(path_to_cache_file), exist_ok=True)
         json.dump({ 'uuid' : self.get_uuid(), 'lengths' : lengths }, open(path_to_cache_file, 'w'))
         return lengths
@@ -410,8 +435,15 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
                                                                         seed=seed, 
                                                                         add_special_tokens=True,
                                                                         return_tensors='pt')
+    
+    # Set labels
     if is_mlm:
+        # Masked LM
         tokens["input_ids"], tokens["labels"] = torch_mask_tokens(tokenizer, tokens["input_ids"], mlm_prob)
+    else:
+        # Causal LM
+        tokens['labels'] = tokens['input_ids']
+
     return {
         'patient_ids' : [ x[0] for x in batch ],
         'tokens' : tokens,
@@ -438,7 +470,12 @@ if __name__ == '__main__':
     print('val', len(val_dataset))
     print('test', len(test_dataset))
     
-    breakpoint()
+    train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
+    val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
+    test_seq_lengths: List[int] = test_dataset.get_seq_lengths()
+    assert len(train_seq_lengths) == len(train_dataset)
+    assert len(val_seq_lengths) == len(val_dataset)
+    assert len(test_seq_lengths) == len(test_dataset)
 
     # Sanity checking
     print(train_dataset)

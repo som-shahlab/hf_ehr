@@ -5,6 +5,7 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
 from typing import Dict, Any, Optional
 from hf_ehr.models.modules import BaseModel
+from jaxtyping import Float
 
 class GPTLanguageModel(BaseModel):
     """
@@ -31,6 +32,8 @@ class GPTLanguageModel(BaseModel):
                       batch_idx: int) -> Optional[torch.Tensor]:
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
+        
+        print(torch.distributed.get_rank(), "|", batch_idx, "|", tokens['input_ids'].shape, tokens['attention_mask'].sum().item(), tokens['input_ids'][0, :10])
 
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss

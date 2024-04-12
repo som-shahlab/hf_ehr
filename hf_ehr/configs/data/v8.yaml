@@ -1,9 +1,0 @@
-# @package _global_
-
-data:
-  dataset:
-    path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes
-  tokenizer:
-    path_to_code_2_int: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_int.json
-    path_to_code_2_count: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_count.json
-    min_code_count: 10

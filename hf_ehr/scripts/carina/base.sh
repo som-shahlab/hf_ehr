@@ -43,11 +43,13 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
     conda activate /home/hf_ehr/$ENV_NAME
+elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
+    conda activate /home/hf_ehr/$ENV_NAME
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1
 fi
 
-# InstallInstall hf_ehr + Python packages
+# Install hf_ehr + Python packages
 python -m pip install -r ../../../requirements.txt # need this `-m` to write to correct /local-scratch-nvme/ env path and not the one on /share/pi
 python -m pip install -e ../../../

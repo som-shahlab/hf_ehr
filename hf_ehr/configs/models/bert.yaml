@@ -17,6 +17,7 @@ data:
   dataloader:
     # Max number of codes to feed into model at once per patient.
     max_length: ${model.config_kwargs.max_position_embeddings}
+  mlm_prob: 0.15
 
 trainer:
   # For models that use MLM training, this is the percent of tokens to randomly mask

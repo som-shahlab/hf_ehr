@@ -95,15 +95,18 @@ class BaseModel(L.LightningModule):
         loss: torch.Tensor = outputs.loss
 
         # Logging
-        self.log_validation_step(loss.detach())
+        self.log_validation_step(loss)
 
         return loss
+
+    def on_train_epoch_end(self):
+        # Needed for ApproxBatchSampler to reset random seed after every epoch
+        self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
     
     def log_validation_step(self, loss: torch.Tensor):
-        loss = loss.detach()
         ppl: torch.Tensor = torch.exp(loss)
 
-        self.log('val/loss', loss.detach(), prog_bar=True, on_epoch=True, sync_dist=True)
+        self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
 
     def log_training_step(self, loss: torch.Tensor, B: int, tokens: Dict[str, Any], lr: float):

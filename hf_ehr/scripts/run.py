@@ -100,7 +100,7 @@ def main(config: DictConfig) -> None:
     seed: int = config.main.seed
     
     # Argument validation
-    if config.data.dataloader.batch_size is not None and config.data.dataloader.batch_max_tokens is not None:
+    if hasattr(config.data.dataloader, 'batch_size') and hasattr(config.data.dataloader, 'batch_max_tokens'):
         raise ValueError(f"Cannot specify both `data.dataloader.batch_size` and `data.dataloader.batch_max_tokens` in config.yaml")
 
     # Random seed
@@ -301,7 +301,7 @@ def main(config: DictConfig) -> None:
         accumulate_grad_batches=config.trainer.accumulate_grad_batches,
         gradient_clip_val=config.trainer.gradient_clip_value,
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
-        replace_sampler_ddp=False if config.data.dataloader.batch_max_tokens else True, # dont wrap ApproxBatchSampler (based on max_tokens) if using DDP
+        use_distributed_sampler=False if hasattr(config.data.dataloader, 'approx_batch_sampler') else True, # dont wrap ApproxBatchSampler (based on max_tokens) if using DDP
     )
 
     # Run
