@@ -26,15 +26,5 @@ if __name__ == '__main__':
     json.dump(code_2_count, open(os.path.join(path_to_tokenizer_dir, 'code_2_count.json'), 'w'))
     print("# of unique codes: ", len(code_2_count))
     print("# of total codes: ", sum([ x for x in code_2_count.values() ]))
-    
-    # Map codes to unique ints
-    unique_codes: List[str] = list(code_2_count.keys())
-    unique_codes = sorted(unique_codes, key=lambda x: code_2_count[x], reverse=True)
-    # Add special tokens
-    unique_codes = [ '[PAD]', '[BOS]', '[EOS]', '[UNK]', '[MASK]', ] + unique_codes
-
-    # Save vocab
-    code_2_int: Dict[str, int] = { code: idx for idx, code in enumerate(unique_codes) }
-    json.dump(code_2_int, open(os.path.join(path_to_tokenizer_dir, 'code_2_int.json'), 'w'))
 
     print("DONE")
