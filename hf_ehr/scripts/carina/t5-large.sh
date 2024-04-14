@@ -12,7 +12,7 @@ source base.sh
 
 python3 ../run.py \
     +models=t5 \
-    data.dataloader.batch_size=4 \
+    data.dataloader.approx_batch_sampler.max_tokens=3072 \
     trainer.accumulate_grad_batches=16 \
     data.dataloader.n_workers=10 \
     trainer.devices=[0,1,2,3] \
