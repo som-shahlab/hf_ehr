@@ -123,7 +123,8 @@ class FEMRDataset(Dataset):
                  split: str = 'train',
                  sampling_strat: Optional[str] = None,
                  sampling_kwargs: Optional[Dict] = None,
-                 is_debug: bool = False):
+                 is_debug: bool = False,
+                 seed: int = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
@@ -132,11 +133,16 @@ class FEMRDataset(Dataset):
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
         self.is_debug: bool = is_debug
+        self.seed: int = seed
         
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
         hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
-        self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        train_pids = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        if not sampling_strat:
+            self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        else:
+            self.train_pids: np.ndarray = self.get_sampled_pids(train_pids)
         self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
         self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
 
@@ -151,9 +157,10 @@ class FEMRDataset(Dataset):
             self.val_pids = self.val_pids[:1000]
             self.test_pids = self.test_pids[:1000]
 
-    def get_sampled_pids(self, pids: np.ndarray, is_force_refresh: bool = False) -> np.ndarray:
+    def get_sampled_pids(self, pids: np.ndarray, is_force_refresh: bool = True) -> np.ndarray:
         """Returns sampled patient_ids based on the sample strategy"""
         # Check if cache exists
+        np.random.seed(self.seed)
         path_to_cache_file: str = os.path.join(self.get_path_to_cache_folder(), 'sample_splits.json')
         if not is_force_refresh:
             if os.path.exists(path_to_cache_file):
@@ -167,6 +174,7 @@ class FEMRDataset(Dataset):
             # Random sampling -- i.e. select a random X% subset of patients (without replacement)
             assert self.sampling_kwargs.percent is not None, "If sampling_strat is 'random', then you must provide a value for `percent`"
             size: int = len(pids) * self.sampling_kwargs.percent // 100
+            print("Random sampling size: ", size)
             indices: np.ndarray = np.random.choice(len(pids), size=size, replace=False)
             pids: np.ndarray = pids[indices]
         elif self.sampling_strat == "stratified":
@@ -179,7 +187,8 @@ class FEMRDataset(Dataset):
 
         # Save to cache
         os.makedirs(os.path.dirname(path_to_cache_file), exist_ok=True)
-        json.dump({ 'uuid' : self.get_uuid(), 'pids' : pids }, open(path_to_cache_file, 'w'))
+        json.dump({ 'uuid' : self.get_uuid(), 'pids' : pids.tolist() }, open(path_to_cache_file, 'w'))
+        print("Successfully saved sampled pids to cache: ", path_to_cache_file)
         return pids
 
     def _get_stratified_pids(self, train_pids: np.ndarray) -> np.ndarray:

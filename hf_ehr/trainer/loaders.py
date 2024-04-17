@@ -85,9 +85,10 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     sampling_strat: Optional[str] = config.data.sampling_strat
     sampling_kwargs: Optional[Dict] = config.data.sampling_kwargs
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug)
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug)
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug)
+    seed: int = config.main.seed
+    train_dataset = FEMRDataset(path_to_femr_extract, split='train', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
+    val_dataset = FEMRDataset(path_to_femr_extract, split='val', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
+    test_dataset = FEMRDataset(path_to_femr_extract, split='test', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
     
     return { 
             'train' : train_dataset, 
