@@ -138,18 +138,23 @@ class FEMRDataset(Dataset):
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
         hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
-        train_pids = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
-        if not sampling_strat:
-            self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        if split == 'train':
+            train_pids = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+            if not sampling_strat:
+                self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+            else:
+                self.train_pids: np.ndarray = self.get_sampled_pids(train_pids)
+        elif split == 'val':
+            self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
+        elif split == 'test':
+            self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
         else:
-            self.train_pids: np.ndarray = self.get_sampled_pids(train_pids)
-        self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
-        self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
-
+            raise ValueError(f"Invalid split: {split}")
+        
         # Confirm disjoint train/val/test
-        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
-        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
-        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+        # assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
+        # assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
+        # assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
         
         # If debug, then shrink to 1k patients
         if is_debug:
@@ -174,7 +179,6 @@ class FEMRDataset(Dataset):
             # Random sampling -- i.e. select a random X% subset of patients (without replacement)
             assert self.sampling_kwargs.percent is not None, "If sampling_strat is 'random', then you must provide a value for `percent`"
             size: int = len(pids) * self.sampling_kwargs.percent // 100
-            print("Random sampling size: ", size)
             indices: np.ndarray = np.random.choice(len(pids), size=size, replace=False)
             pids: np.ndarray = pids[indices]
         elif self.sampling_strat == "stratified":
