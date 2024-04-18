@@ -65,7 +65,7 @@ trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
   accumulate_grad_batches: 4
   # Value for gradient clipping
-  gradient_clip_value: 3
+  gradient_clip_value: 1.0
   # Whether to clip the gradients based on their 'norm' or 'value'
   gradient_clip_algorithm: norm
   # List of devices to run on
@@ -88,6 +88,12 @@ trainer:
   val_check_interval: 0.35
   # OPTIMIZER
   optimizer:
+    # type
+    type: AdamW
+    # Adam specific parameters
+    betas: (0.9, 0.95)
+    # weight decay
+    weight_decay: 0.1
     # Learning rate
     lr: 8e-4
   # SCHEDULER
