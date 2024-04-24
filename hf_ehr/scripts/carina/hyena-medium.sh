@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=gpt2-base
-#SBATCH --output=/share/pi/nigam/migufuen/hf_ehr/slurm_logs/gpt2-base_%A.out
-#SBATCH --error=/share/pi/nigam/migufuen/hf_ehr/slurm_logs/gpt2-base_%A.err
+#SBATCH --job-name=hyena-32k-v8
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/hyena-medium.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/hyena-medium.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu,nigam-v100
+#SBATCH --partition=gpu
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 #SBATCH --gres=gpu:4
@@ -20,17 +20,18 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     echo "Detected GPU Partition"
     # GPU Partition Settings (batch_size=6 fills GPUs up to about 31950 / 32768 MB)
     python3 ../run.py \
-        +models=gpt2 \
-        data.dataloader.batch_size=4 \
-        trainer.accumulate_grad_batches=4 \
+        +models=hyena \
+        data.dataloader.batch_size=2 \
+        trainer.accumulate_grad_batches=16 \
+        trainer.optimizer.lr=2e-4 \
         data.dataloader.n_workers=10 \
         trainer.devices=[0,1,2,3] \
-        trainer.max_epochs=1 \
-        model.config_kwargs.n_layer=12 \
-        model.config_kwargs.n_head=12 \
-        model.config_kwargs.n_embd=768 \
-        main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base/ \
-        logging.wandb.name=gpt2-base
+        model.config_kwargs.d_model=256 \
+        model.config_kwargs.n_layer=8 \
+        model.config_kwargs.max_seq_len=1024 \
+        data.dataloader.max_length=1024 \
+        main.path_to_output_dir=/share/pi/nigam/suhana/hf_ehr/cache/runs/hyena-1k-v8/ \
+        logging.wandb.name=hyena-medium 
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1

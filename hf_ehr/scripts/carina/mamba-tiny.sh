@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=gpt2-medium
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt2-medium_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt2-medium_%A.err
+#SBATCH --job-name=mamba
+#SBATCH --output=/share/pi/nigam/suhana/hf_ehr/cache/runs/slurm_logs/mamba_tiny.out
+#SBATCH --error=/share/pi/nigam/suhana/hf_ehr/cache/runs/slurm_logs/mamba_tiny.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=gpu
 #SBATCH --mem=200G
@@ -20,16 +20,18 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     echo "Detected GPU Partition"
     # GPU Partition Settings (batch_size=6 fills GPUs up to about 31950 / 32768 MB)
     python3 ../run.py \
-        +models=gpt2 \
+        +models=mamba \
         data.dataloader.batch_size=2 \
-        trainer.accumulate_grad_batches=8 \
+        trainer.accumulate_grad_batches=4 \
         data.dataloader.n_workers=10 \
-        trainer.devices=[0,1,2,3] \
+        trainer.devices=[0] \
+        model.config_kwargs.d_model=768 \
         model.config_kwargs.n_layer=24 \
-        model.config_kwargs.n_head=16 \
-        model.config_kwargs.n_embd=1024 \
-        main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-medium/ \
-        logging.wandb.name=gpt2-medium
+        model.config_kwargs.num_hidden_layers=24 \
+        data.dataloader.seq_length=1024 \
+        callbacks.model_checkpointing.every_n_train_steps=100 \
+        main.path_to_output_dir=/share/pi/nigam/suhana/hf_ehr/cache/runs/mamba-test/ \
+        logging.wandb.name=mamba-tiny
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1
