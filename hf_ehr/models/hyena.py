@@ -113,7 +113,7 @@ class HyenaLanguageModel(BaseModel):
         
         # Logging + Metrics
         # TODO -- need to fix attention first
-        # self.log_training_step(loss.detach(), B, tokens, lr)
+        self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
 
