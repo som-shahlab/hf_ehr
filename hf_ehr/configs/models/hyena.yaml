@@ -7,20 +7,21 @@ model:
   hf_name: LongSafari/hyenadna-large-1m-seqlen-hf
   # Kwargs for ModelConfig
   config_kwargs:
-    #n_layer: 8
     max_seq_len: 1024
-    d_model: 512
+    d_model: 128
+    n_layer: 2
     #d_inner: ${eval:4 * ${.d_model}}
 
 data:
   dataloader:
     # Max number of codes to feed into model at once per patient.
+    batch_size: 2
     max_length: ${model.config_kwargs.max_seq_len}
 
 trainer:
   optimizer:
     # Learning rate
-    lr: 3e-4
+    lr: 2e-4
     weight_decay: 0.1
 
   scheduler:
@@ -28,5 +29,3 @@ trainer:
     num_warmup_steps: 40_000
     # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
     num_decay_steps: 4_000_000
-    initial_lr: 3e-6
-    final_lr: 3e-5

@@ -7,11 +7,9 @@ model:
   hf_name: state-spaces/mamba-130m-hf
   # Model configuration parameters
   config_kwargs:
-    d_model: 96
-    hidden_size: 96
-    intermediate_size: 96
-    n_layer: 48
-    num_hidden_layers: 48
+    d_model: 128
+    n_layer: 2
+    num_hidden_layers: 2
     state_size: 16
 
 
@@ -20,11 +18,11 @@ data:
   # Data loader configuration
   dataloader:
     # Batch size for each training step
-    #batch_size: 64
+    batch_size: 2
     # Shuffle data each epoch
     shuffle: true
     # Sequence length for time series data
-    seq_length: 50
+    seq_length: 1024
     # Data transformation or normalization parameters, if any
     transform:
       - normalize
@@ -34,18 +32,12 @@ trainer:
   # Training optimizer
   optimizer:
     # Type of optimizer, e.g., Adam, SGD
-    type: Adam
+    type: AdamW
     # Adam specific parameters
-    betas: (0.9, 0.999)
+    betas: (0.9, 0.95)
     epsilon: 1e-08
     # Learning rate
-    lr: 1e-3
-
-  # Learning rate scheduler - https://huggingface.co/xiuyul/mamba-2.8b-zephyr
-  scheduler:
-    # Type of scheduler, e.g., StepLR, ExponentialLR
-    type: linear
-    warmup_ratio: 0.1
+    lr: 2e-4
 
   # Training epochs
   epochs: 10
