@@ -176,13 +176,15 @@ def main(config: DictConfig) -> None:
                                     resume='allow',
                                     id=wandb_run_id)
             ]
-            wandb.init(project='hf_ehr', 
-                        dir=path_to_log_dir, 
-                        name=config.logging.wandb.name,
-                        resume='allow', 
-                        id=wandb_run_id)
+            if rank_zero_only.rank == 0:
+                wandb.init(project='hf_ehr', 
+                            dir=path_to_log_dir, 
+                            name=config.logging.wandb.name,
+                            resume='allow', 
+                            id=wandb_run_id)
         else:
-            wandb.init(project='hf_ehr', 
+            if rank_zero_only.rank == 0:
+                wandb.init(project='hf_ehr', 
                         dir=path_to_log_dir, 
                         name=config.logging.wandb.name)
             loggers += [ 
