@@ -5,7 +5,6 @@ from torch.utils.data import Dataset
 import femr.datasets
 import os
 import numpy as np
-from omegaconf import DictConfig 
 from jaxtyping import Float
 import json
 from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
@@ -13,6 +12,8 @@ from transformers import PreTrainedTokenizer
 from tqdm import tqdm
 import datetime
 import time
+from omegaconf import OmegaConf
+
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
@@ -123,7 +124,8 @@ class FEMRDataset(Dataset):
                  split: str = 'train',
                  sampling_strat: Optional[str] = None,
                  sampling_kwargs: Optional[Dict] = None,
-                 is_debug: bool = False):
+                 is_debug: bool = False,
+                 seed: int = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
@@ -132,18 +134,28 @@ class FEMRDataset(Dataset):
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
         self.is_debug: bool = is_debug
+        self.seed: int = seed
         
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
         hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
-        self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
-        self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
-        self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
-
+        if split == 'train':
+            train_pids = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+            if not sampling_strat:
+                self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+            else:
+                self.train_pids: np.ndarray = self.get_sampled_pids(train_pids)
+        elif split == 'val':
+            self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
+        elif split == 'test':
+            self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
+        else:
+            raise ValueError(f"Invalid split: {split}")
+        
         # Confirm disjoint train/val/test
-        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
-        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
-        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+        # assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
+        # assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
+        # assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
         
         # If debug, then shrink to 1k patients
         if is_debug:
@@ -154,13 +166,13 @@ class FEMRDataset(Dataset):
     def get_sampled_pids(self, pids: np.ndarray, is_force_refresh: bool = False) -> np.ndarray:
         """Returns sampled patient_ids based on the sample strategy"""
         # Check if cache exists
+        np.random.seed(self.seed)
         path_to_cache_file: str = os.path.join(self.get_path_to_cache_folder(), 'sample_splits.json')
         if not is_force_refresh:
             if os.path.exists(path_to_cache_file):
-                data = json.load(open(path_to_cache_file, 'r'))
+                data: Dict = json.load(open(path_to_cache_file, 'r'))
                 if data['uuid'] == self.get_uuid(): # confirm UUID matches
-                    pids: List[int] = data['pids']
-                    return pids
+                    return pids[data['pids']]
 
         # Generate from scratch
         if self.sampling_strat == 'random':
@@ -171,16 +183,87 @@ class FEMRDataset(Dataset):
             pids: np.ndarray = pids[indices]
         elif self.sampling_strat == "stratified":
             # Stratified sampling based on demographics
-            assert self.sampling_kwargs.age or self.sampling_kwargs.race or self.sampling_kwargs.sex,\
-                "If sampling_strat is 'stratified', then you must provide a value for `age`, `race`, or `sex`"
-            pids = self._get_stratified_pids(pids)
+            assert self.sampling_kwargs.demographic in ['age', 'race', 'sex'], "If sampling_strat is 'stratified', then you must provide a value for `age`, `race`, or `sex`"
+            demographics = self._get_demographics_dict(pids)
+            indices: np.ndarray = self._get_stratified_indices(demographics)
         else:
             raise ValueError(f"Unsupported sampling strategy: {self.sampling_strat}")
-
+        
         # Save to cache
         os.makedirs(os.path.dirname(path_to_cache_file), exist_ok=True)
-        json.dump({ 'uuid' : self.get_uuid(), 'pids' : pids }, open(path_to_cache_file, 'w'))
+        json.dump({ 'uuid' : self.get_uuid(), 'pids' : indices.tolist() }, open(path_to_cache_file, 'w'))
+        print("Successfully saved sampled pids to cache: ", path_to_cache_file)
         return pids
+
+    def _get_demographics_dict(self, pids: np.ndarray) -> Dict[str, Any]:
+        '''Returns dict of demographics'''
+        demographics = {
+            'age': {
+                'age_20': [],
+                'age_40': [],
+                'age_60': [],
+                'age_80': [],
+                'age_plus': []
+            },
+            'race': {
+                'white': [],
+                'pacific_islander': [],
+                'black': [],
+                'asian': [],
+                'american_indian': [],
+                'unknown': []
+            },
+            'sex': {
+                'male': [],
+                'female': []
+            }
+        }
+        for pid in pids:
+            if self.sampling_kwargs.demographic == 'age':
+                end_age = self.femr_db[pid].events[-1].start
+                start_age = self.femr_db[pid].events[0].start
+                age = end_age - start_age
+                if age <= datetime.timedelta(days=20*365):
+                    demographics['age']['age_20'].append(pid)
+                elif datetime.timedelta(days=20*365) < age <= datetime.timedelta(days=40*365):  
+                    demographics['age']['age_40'].append(pid)
+                elif datetime.timedelta(days=40*365) < age < datetime.timedelta(days=60*365):
+                    demographics['age']['age_60'].append(pid)
+                elif datetime.timedelta(days=60*365) < age < datetime.timedelta(days=80*365):
+                    demographics['age']['age_80'].append(pid)
+                elif datetime.timedelta(days=80*365) < age:
+                    demographics['age']['age_plus'].append(pid)
+            elif self.sampling_kwargs.demographic == 'race':
+                race_codes = {'Race/5': 'white', 'Race/4': 'pacific_islander', 
+                          'Race/3': 'black', 'Race/2': 'asian', 'Race/1': 'american_indian'}
+                race = 'unknown'
+                for e in self.femr_db[pid].events:
+                    if e.code in race_codes:
+                        demographics['race'][race_codes[e.code]].append(pid)
+                        race = race_codes[e.code]
+                        break
+                if race == 'unknown':
+                    demographics['race']['unknown'].append(pid)
+            elif self.sampling_kwargs.demographic == 'sex':
+                for e in self.femr_db[pid].events:
+                    if e.code == 'Gender/M':
+                        demographics['sex']['male'].append(pid)
+                        break
+                    elif e.code == 'Gender/F':
+                        demographics['sex']['female'].append(pid)
+                        break
+        return demographics
+        
+    def _get_stratified_indices(self, demographics: Dict) ->  np.ndarray:
+        '''Returns stratified patient_ids based on the selected demographic'''
+        np.random.seed(self.seed)
+        pids = []
+        demographic = self.sampling_kwargs.demographic
+        min_key = min(demographics[demographic], key=lambda k: len(demographics[demographic][k]))
+        for val in demographics[demographic].values():
+            sampled_pids = np.random.choice(val, len(demographics[demographic][min_key]), replace=False)
+            pids.extend(sampled_pids)
+        return np.array(pids)
 
     def __len__(self):
         if self.split == 'train':
@@ -212,6 +295,10 @@ class FEMRDataset(Dataset):
         uuid = f'starr_omop_v9-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
+            if self.sampling_strat == 'random':
+                uuid += f'-{str(self.sampling_kwargs.percent)}'
+            if self.sampling_strat == 'stratified':
+                uuid += f'-{self.sampling_kwargs.demographic}'
         if self.is_debug:
             uuid += f'-is_debug'
         return uuid
@@ -472,6 +559,12 @@ if __name__ == '__main__':
     val_dataset = FEMRDataset(path_to_femr_extract, split='val')
     test_dataset = FEMRDataset(path_to_femr_extract, split='test')
 
+    sampling_strat = 'stratified'
+    sampling_kwargs = OmegaConf.create({ 'demographic': 'race' })
+    train_dataset = FEMRDataset(path_to_femr_extract, split='train', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)
+    val_dataset = FEMRDataset(path_to_femr_extract, split='val', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)
+    test_dataset = FEMRDataset(path_to_femr_extract, split='test', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)
+    
     # Stats
     print('train', len(train_dataset))
     print('val', len(val_dataset))

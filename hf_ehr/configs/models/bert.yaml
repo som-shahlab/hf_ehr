@@ -17,6 +17,7 @@ data:
   dataloader:
     # Max number of codes to feed into model at once per patient.
     max_length: ${model.config_kwargs.max_position_embeddings}
+    batch_size: 2
   mlm_prob: 0.15
 
 trainer:
@@ -24,12 +25,12 @@ trainer:
   mlm_mask_pct: 0.15
   optimizer:
     # Learning rate
-    lr: 1e-4
+    lr: 2e-4
 
   scheduler:
     # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
-    num_warmup_steps: 40_000
+    #num_warmup_steps: 40_000
     # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
-    num_decay_steps: 4_000_000
-    initial_lr: 3e-6
-    final_lr: 3e-5
+    #num_decay_steps: 4_000_000
+    #initial_lr: 1e-6
+    #final_lr: 1e-5

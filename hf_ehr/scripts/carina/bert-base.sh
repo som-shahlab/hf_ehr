@@ -25,6 +25,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         trainer.accumulate_grad_batches=4 \
         data.dataloader.n_workers=10 \
         trainer.devices=[0,1,2,3] \
+        trainer.optimizer.lr=2e-4 \
         model.config_kwargs.num_hidden_layers=12 \
         model.config_kwargs.num_attention_heads=12 \
         model.config_kwargs.hidden_size=768
