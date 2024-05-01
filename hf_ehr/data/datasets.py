@@ -182,128 +182,6 @@ class FEMRDataset(Dataset):
         json.dump({ 'uuid' : self.get_uuid(), 'pids' : pids }, open(path_to_cache_file, 'w'))
         return pids
 
-    def _get_stratified_pids(self, train_pids: np.ndarray) -> np.ndarray:
-        '''Returns stratified patient_ids based on the sample strategy'''
-        
-        demographics = {
-            'age': {
-                'age_20': [],
-                'age_40': [],
-                'age_60': [],
-                'age_80': [],
-                'age_plus': []
-            },
-            'race': {
-                'white': [],
-                'pacific_islander': [],
-                'black': [],
-                'asian': [],
-                'american_indian': [],
-                'unknown': []
-            },
-            'sex': {
-                'male': [],
-                'female': []
-            }
-        }
-        for pid in train_pids:
-            unique_visits = set()
-            for e in self.femr_db[pid].events:
-                print("patient object")
-                for key, val in vars(self.femr_db[pid]).items():
-                    print(key, val)
-                print(f"Events length: {len(self.femr_db[pid].events)}")
-                
-            #     if e.visit_id is not None:
-            #         print("event object", vars(e))
-            #         unique_visits.add(e.visit_id)
-            if sampling_kwargs.age:
-                end_age = self.femr_db[pid].events[-1].start
-                start_age = self.femr_db[pid].events[0].start
-                age = end_age - start_age
-                if age <= datetime.timedelta(days=20*365):
-                    demographics['age']['age_20'].append(pid)
-                elif datetime.timedelta(days=20*365) < age <= datetime.timedelta(days=40*365):  
-                    demographics['age']['age_40'].append(pid)
-                elif datetime.timedelta(days=40*365) < age < datetime.timedelta(days=60*365):
-                    demographics['age']['age_60'].append(pid)
-                elif datetime.timedelta(days=60*365) < age < datetime.timedelta(days=80*365):
-                    demographics['age']['age_80'].append(pid)
-                elif datetime.timedelta(days=80*365) < age:
-                    demographics['age']['age_plus'].append(pid)
-            elif sampling_kwargs.race:
-                race_codes = {'Race/5': 'white', 'Race/4': 'pacific_islander', 
-                          'Race/3': 'black', 'Race/2': 'asian', 'Race/1': 'american_indian'}
-                race = 'unknown'
-                for e in self.femr_db[pid].events:
-                    if e.code in race_codes:
-                        demographics['race'][race_codes[e.code]].append(pid)
-                        race = race_codes[e.code]
-                        break
-                if race == 'unknown':
-                    demographics['race']['unknown'].append(pid)
-            elif sampling_kwargs.sex:
-                for e in self.femr_db[pid].events:
-                    if e.code == 'Gender/M':
-                        demographics['sex']['male'].append(pid)
-                        break
-                    elif e.code == 'Gender/F':
-                        demographics['sex']['female'].append(pid)
-                        break
-        pids = []
-        
-        if sampling_kwargs.age:
-            demographic = 'age'
-        elif sampling_kwargs.race:
-            demographic = 'race'
-        elif sampling_kwargs.sex:
-            demographic = 'sex'
-            
-        min_key = min(demographics[demographic], key=lambda k: len(demographics[demographic][k]))
-        for val in demographics[demographic].values():
-            pids.extend(val[:len(demographics[demographic][min_key])])
-        
-        return pids
-            # is_hispanic: bool = False
-            # # ethnicity
-            # for e in self.femr_db[pid].events:
-            #     if e.code == 'Ethnicity/Hispanic':
-            #         is_hispanic = True
-            #         break
-            #     elif e.code == 'Ethnicity/Not Hispanic':
-            #         is_hispanic = False
-            #         break
-            # race
-            
-            # # number of events
-            # num_events: int = len(self.femr_db[pid].events)
-            # # number of visits
-            # unique_visits = set()
-            # for e in self.femr_db[pid].events:
-            #     if e.visit_id is not None:
-            #         unique_visits.add(e.visit_id)
-            # num_visits: int = len(unique_visits)
-            # # split
-            # split: str = 'train'
-            
-            # print({
-            #     'split' : split,
-            #     'patient_id' : pid,
-            #     'age' : age.days / 365.25,
-            #     'age_20' : age <= datetime.timedelta(days=20*365),
-            #     'age_40' : datetime.timedelta(days=20*365) < age <= datetime.timedelta(days=40*365),
-            #     'age_60' : datetime.timedelta(days=40*365) < age < datetime.timedelta(days=60*365),
-            #     'age_80' : datetime.timedelta(days=60*365) < age < datetime.timedelta(days=80*365),
-            #     'age_plus' : datetime.timedelta(days=80*365) < age,
-            #     'is_male' : is_male,
-            #     'is_hispanic' : is_hispanic,
-            #     'race' : race,
-            #     'num_events' : num_events,
-            #     'timeline_length' : age.days / 365.25,
-            #     'num_visits' : num_visits,
-            # })
-        
-
     def __len__(self):
         if self.split == 'train':
             return len(self.train_pids)
@@ -407,6 +285,143 @@ def torch_mask_tokens(tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, sp
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
     return inputs, labels
 
+
+class AllTokensDataset(Dataset):
+    '''Dataset that merges all patients into one long sequence of tokens, with each patient sandwiched by a [BOS] and [EOS] token
+    '''
+    def __init__(self,
+                 path_to_femr_extract: str, 
+                 path_to_dataset_dir: str,
+                 split: str = 'train',
+                 sampling_strat: Optional[str] = None,
+                 sampling_kwargs: Optional[Dict] = None,
+                 is_debug: bool = False):
+        assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
+        assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
+        self.path_to_femr_extract: str = path_to_femr_extract
+        self.femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
+        self.split: str = split
+        self.sampling_strat: Optional[str] = sampling_strat
+        self.sampling_kwargs: Optional[Dict] = sampling_kwargs
+        self.is_debug: bool = is_debug
+        
+        # Pre-calculate canonical splits based on patient ids
+        all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
+        hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
+        self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
+        self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
+
+        # Confirm disjoint train/val/test
+        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
+        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
+        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+        
+        # If debug, then shrink to 1k patients
+        if is_debug:
+            self.train_pids = self.train_pids[:1000]
+            self.val_pids = self.val_pids[:1000]
+            self.test_pids = self.test_pids[:1000]
+    
+    def generate_dataset(self, tokenizer: FEMRTokenizer, n_tokens_per_file: int = 10_000_000):
+        """Default to 10M tokens => 10 * 4 => 40MB files"""
+        if self.split == 'train':
+            pids = self.train_pids
+        elif self.split == 'val':
+            pids = self.val_pids
+        elif self.split == 'test':
+            pids = self.test_pids
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+        
+        import multiprocessing
+
+        def encode_data(item):
+            """ Function to encode data, to be executed by pool workers. """
+            global tokenizer  # Assuming tokenizer is available globally or passed some other way
+            return tokenizer.encode([e.code for e in item], truncate=False)
+
+        def save_to_disk(data):
+            """ Save data to disk as a numpy array. """
+            np.save('result_data.npy', np.array(data, dtype=np.int32))
+
+        def process_data(pids, chunk_size=10000):
+            """ Process data using a pool of workers and save results periodically. """
+            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            results = []
+            
+            for pid in pids:
+                result = pool.apply_async(encode_data, (pid,))
+                results.append(result.get())
+
+                # Check if results should be flushed to disk
+                if len(results) >= chunk_size:
+                    save_to_disk(results)
+                    results = []
+
+            # Save any remaining results to disk
+            if results:
+                save_to_disk(results)
+
+            pool.close()
+            pool.join()
+
+        if __name__ == "__main__":
+            tokenizer = YourTokenizer()  # Define or import your tokenizer
+            pids = [your_data]  # Replace with your actual data set
+            process_data(pids)
+
+
+        # Write chunks of np.ndarray's full of int32 (4 bytes) tokens to disk
+        queue = []
+        for pid in pids:
+            tokens = tokenizer.encode([ e.code for e in self.femr_db[pid] ], truncate=False)
+            queue.extend(tokens)
+            if len(queue) > 10000:
+                np.save(np.array(queue))
+                queue = []
+        
+
+    def __len__(self):
+        if self.split == 'train':
+            return len(self.train_pids)
+        elif self.split == 'val':
+            return len(self.val_pids)
+        elif self.split == 'test':
+            return len(self.test_pids)
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+    
+    def __getitem__(self, idx: int) -> Tuple[int, List[str]]:
+        '''Return all event codes for this patient at `idx` in `self.split`'''
+        if self.split == 'train':
+            pid = self.train_pids[idx]
+        elif self.split == 'val':
+            pid = self.val_pids[idx]
+        elif self.split == 'test':
+            pid = self.test_pids[idx]
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+        # For negative `idx`, we need to unwrap `pid`
+        if len(pid.shape) > 0:
+            pid = pid[0]
+        return (pid, [ e.code for e in self.femr_db[pid].events ])
+
+    def get_uuid(self) -> str:
+        """Returns unique UUID for this dataset version. Useful for caching files"""
+        uuid = f'starr_omop_v9-{self.split}'
+        if self.sampling_strat is not None:
+            uuid += f'-{self.sampling_strat}'
+        if self.is_debug:
+            uuid += f'-is_debug'
+        return uuid
+
+    def get_path_to_cache_folder(self) -> str:
+        """Returns path to cache folder for this dataset (e.g. storing things like sampling split, seq lengths, etc.)"""
+        path_to_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
+        return path_to_cache_dir
+
+    
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
                              tokenizer: FEMRTokenizer, 
                              max_length: int,
@@ -456,9 +471,7 @@ if __name__ == '__main__':
     train_dataset = FEMRDataset(path_to_femr_extract, split='train')
     val_dataset = FEMRDataset(path_to_femr_extract, split='val')
     test_dataset = FEMRDataset(path_to_femr_extract, split='test')
-    
-    
-    
+
     # Stats
     print('train', len(train_dataset))
     print('val', len(val_dataset))

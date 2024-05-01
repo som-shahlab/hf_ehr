@@ -227,7 +227,7 @@ def main(config: DictConfig) -> None:
         model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
-    #logger.info(f"Parameter count of model = {model.get_param_count()}")
+    logger.info(f"Parameter count of model = {model.get_param_count()}")
     
     # Datasets
     logger.info(f"Loading FEMR datasets...")
