@@ -372,6 +372,143 @@ def torch_mask_tokens(tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, sp
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
     return inputs, labels
 
+
+class AllTokensDataset(Dataset):
+    '''Dataset that merges all patients into one long sequence of tokens, with each patient sandwiched by a [BOS] and [EOS] token
+    '''
+    def __init__(self,
+                 path_to_femr_extract: str, 
+                 path_to_dataset_dir: str,
+                 split: str = 'train',
+                 sampling_strat: Optional[str] = None,
+                 sampling_kwargs: Optional[Dict] = None,
+                 is_debug: bool = False):
+        assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
+        assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
+        self.path_to_femr_extract: str = path_to_femr_extract
+        self.femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
+        self.split: str = split
+        self.sampling_strat: Optional[str] = sampling_strat
+        self.sampling_kwargs: Optional[Dict] = sampling_kwargs
+        self.is_debug: bool = is_debug
+        
+        # Pre-calculate canonical splits based on patient ids
+        all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
+        hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
+        self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
+        self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
+
+        # Confirm disjoint train/val/test
+        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
+        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
+        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+        
+        # If debug, then shrink to 1k patients
+        if is_debug:
+            self.train_pids = self.train_pids[:1000]
+            self.val_pids = self.val_pids[:1000]
+            self.test_pids = self.test_pids[:1000]
+    
+    def generate_dataset(self, tokenizer: FEMRTokenizer, n_tokens_per_file: int = 10_000_000):
+        """Default to 10M tokens => 10 * 4 => 40MB files"""
+        if self.split == 'train':
+            pids = self.train_pids
+        elif self.split == 'val':
+            pids = self.val_pids
+        elif self.split == 'test':
+            pids = self.test_pids
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+        
+        import multiprocessing
+
+        def encode_data(item):
+            """ Function to encode data, to be executed by pool workers. """
+            global tokenizer  # Assuming tokenizer is available globally or passed some other way
+            return tokenizer.encode([e.code for e in item], truncate=False)
+
+        def save_to_disk(data):
+            """ Save data to disk as a numpy array. """
+            np.save('result_data.npy', np.array(data, dtype=np.int32))
+
+        def process_data(pids, chunk_size=10000):
+            """ Process data using a pool of workers and save results periodically. """
+            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            results = []
+            
+            for pid in pids:
+                result = pool.apply_async(encode_data, (pid,))
+                results.append(result.get())
+
+                # Check if results should be flushed to disk
+                if len(results) >= chunk_size:
+                    save_to_disk(results)
+                    results = []
+
+            # Save any remaining results to disk
+            if results:
+                save_to_disk(results)
+
+            pool.close()
+            pool.join()
+
+        if __name__ == "__main__":
+            tokenizer = YourTokenizer()  # Define or import your tokenizer
+            pids = [your_data]  # Replace with your actual data set
+            process_data(pids)
+
+
+        # Write chunks of np.ndarray's full of int32 (4 bytes) tokens to disk
+        queue = []
+        for pid in pids:
+            tokens = tokenizer.encode([ e.code for e in self.femr_db[pid] ], truncate=False)
+            queue.extend(tokens)
+            if len(queue) > 10000:
+                np.save(np.array(queue))
+                queue = []
+        
+
+    def __len__(self):
+        if self.split == 'train':
+            return len(self.train_pids)
+        elif self.split == 'val':
+            return len(self.val_pids)
+        elif self.split == 'test':
+            return len(self.test_pids)
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+    
+    def __getitem__(self, idx: int) -> Tuple[int, List[str]]:
+        '''Return all event codes for this patient at `idx` in `self.split`'''
+        if self.split == 'train':
+            pid = self.train_pids[idx]
+        elif self.split == 'val':
+            pid = self.val_pids[idx]
+        elif self.split == 'test':
+            pid = self.test_pids[idx]
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+        # For negative `idx`, we need to unwrap `pid`
+        if len(pid.shape) > 0:
+            pid = pid[0]
+        return (pid, [ e.code for e in self.femr_db[pid].events ])
+
+    def get_uuid(self) -> str:
+        """Returns unique UUID for this dataset version. Useful for caching files"""
+        uuid = f'starr_omop_v9-{self.split}'
+        if self.sampling_strat is not None:
+            uuid += f'-{self.sampling_strat}'
+        if self.is_debug:
+            uuid += f'-is_debug'
+        return uuid
+
+    def get_path_to_cache_folder(self) -> str:
+        """Returns path to cache folder for this dataset (e.g. storing things like sampling split, seq lengths, etc.)"""
+        path_to_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
+        return path_to_cache_dir
+
+    
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
                              tokenizer: FEMRTokenizer, 
                              max_length: int,
@@ -418,6 +555,10 @@ if __name__ == '__main__':
     tokenizer = FEMRTokenizer(code_2_count)
     
     # Dataset
+    train_dataset = FEMRDataset(path_to_femr_extract, split='train')
+    val_dataset = FEMRDataset(path_to_femr_extract, split='val')
+    test_dataset = FEMRDataset(path_to_femr_extract, split='test')
+
     sampling_strat = 'stratified'
     sampling_kwargs = OmegaConf.create({ 'demographic': 'race' })
     train_dataset = FEMRDataset(path_to_femr_extract, split='train', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)

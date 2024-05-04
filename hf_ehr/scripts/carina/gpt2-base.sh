@@ -5,10 +5,8 @@
 #SBATCH --time=48:00:00
 #SBATCH --partition=gpu,nigam-v100
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:4
-
-source base.sh
 
 if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     echo "Detected A100 Partition"
