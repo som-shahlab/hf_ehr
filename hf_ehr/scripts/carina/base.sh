@@ -25,6 +25,8 @@ else
     exit 1
 fi
 
+REQUIREMENTS="../../../requirements.txt"
+
 if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     echo "Detected A100 Partition"
     if [[ ! -e "/local-scratch/nigam/hf_ehr/hf_env" ]]; then
@@ -48,7 +50,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     if [[ ! -e "/home/hf_ehr/hf_env" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
-    conda activate /home/hf_ehr/$ENV_NAME
+    REQUIREMENTS="../../../requirements_h100.txt"
+    conda activate /home/hf_ehr/hf_env_h100
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     conda activate /share/pi/nigam/envs/$ENV_NAME
 else
@@ -57,5 +60,5 @@ else
 fi
 
 # Install hf_ehr + Python packages
-python -m pip install -r ../../../requirements.txt # need this `-m` to write to correct /local-scratch-nvme/ env path and not the one on /share/pi
+python -m pip install -r $REQUIREMENTS
 python -m pip install -e ../../../
