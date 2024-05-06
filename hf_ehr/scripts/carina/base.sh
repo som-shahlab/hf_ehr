@@ -19,7 +19,7 @@ if [[ "$USER" == "mwornow" ]]; then
 elif [[ "$USER" == "suhana" ]]; then
     ENV_NAME="hf_env_suhana_1"
 elif [[ "$USER" == "migufuen" ]]; then
-    ENV_NAME="hf_env_miguel"
+    ENV_NAME="hf_env_miguel_1"
 else
     echo "Unknown user: $USER"
     exit 1
@@ -44,14 +44,15 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ ! -e "/home/hf_ehr/hf_env" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
-    conda activate /home/hf_ehr/$ENV_NAME
+    conda activate /home/hf_ehr/hf_env_miguel_1
+    #conda activate /home/hf_ehr/$ENV_NAME
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     echo "Detected H100 Partition"
     if [[ ! -e "/home/hf_ehr/hf_env" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
     REQUIREMENTS="../../../requirements_h100.txt"
-    conda activate /home/hf_ehr/hf_env_h100
+    conda activate /home/hf_ehr/hf_env_h100_1
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     conda activate /share/pi/nigam/envs/$ENV_NAME
 else
