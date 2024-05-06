@@ -14,7 +14,10 @@ def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], token
     approx_batch_sampler: Optional[Any] = getattr(config.data.dataloader, 'approx_batch_sampler', None)
     max_length: int = config.data.dataloader.max_length
     is_truncation_random: bool = config.data.dataloader.is_truncation_random
-    is_mlm: bool = config.model.name == 'bert'
+    is_mlm = False  # Assume non-MLM by default for GPT
+    if 'model' in config and 'name' in config.model:
+        if config.model.name == 'bert':
+            is_mlm = True  # MLM is typically associated with BERT
     mlm_prob: float = config.data.mlm_prob if is_mlm else 0.0
     n_workers: int = config.data.dataloader.n_workers
     seed: int = config.main.seed
