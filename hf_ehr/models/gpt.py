@@ -37,11 +37,18 @@ class GPTLanguageModel(BaseModel):
         loss: torch.Tensor = outputs.loss
         
         # Learning rate scheduler
-        lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
-        sch = self.lr_schedulers()
-        sch.step()
+        if self.trainer:
+            lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]
+            sch = self.lr_schedulers()
+            sch.step()
         
         # Logging + Metrics
         self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
+    
+    def on_load_checkpoint(self, checkpoint):
+        """Custom checkpoint loading logic."""
+        # Handle anything specific here, ensuring no direct access to the trainer
+        # that could raise an error if the trainer isn't yet attached.
+        pass

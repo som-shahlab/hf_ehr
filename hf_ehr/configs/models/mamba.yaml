@@ -35,7 +35,6 @@ trainer:
     type: AdamW
     # Adam specific parameters
     betas: (0.9, 0.95)
-    epsilon: 1e-08
     # Learning rate
     lr: 2e-4
 
