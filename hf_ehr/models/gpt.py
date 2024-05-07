@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 from transformers import AutoModelForCausalLM, AutoConfig
 from typing import Dict, List, Any, Optional, Union, Tuple
 from omegaconf import DictConfig
@@ -35,6 +36,19 @@ class GPTLanguageModel(BaseModel):
         
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
+        
+        # Check if loss is NaN and handle it
+        # Check if loss is NaN and synchronize this information across processes
+        if torch.isnan(loss).any():
+            nan_detected = torch.tensor([1.0], device=self.device)
+        else:
+            nan_detected = torch.tensor([0.0], device=self.device)
+
+        dist.all_reduce(nan_detected, op=dist.ReduceOp.MAX)
+        if nan_detected.item() == 1:
+            print("NaN detected in loss, skipping this batch across all processes.")
+            return  # Skip this batch on all processes
+
         
         # Learning rate scheduler
         if self.trainer:
