@@ -52,7 +52,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
     REQUIREMENTS="../../../requirements_h100.txt"
-    conda activate /home/hf_ehr/hf_env_h100_1
+    # conda activate /home/hf_ehr/hf_env_h100_1
+    conda activate /local-scratch/nigam/users/hf_ehr/hf_env_h100
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     conda activate /share/pi/nigam/envs/$ENV_NAME
 else
