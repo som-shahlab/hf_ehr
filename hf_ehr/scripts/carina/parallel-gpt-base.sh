@@ -29,6 +29,8 @@ exp4=gpt_base_exp4
 # First experiment
 python3 ../run.py \
     +models=gpt2 \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
@@ -45,6 +47,8 @@ child_pids+=($!)
 # Second experiment
 python3 ../run.py \
     +models=gpt2 \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
@@ -61,6 +65,8 @@ child_pids+=($!)
 # Third experiment
 python3 ../run.py \
     +models=gpt2 \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
@@ -77,6 +83,8 @@ child_pids+=($!)
 # Fourth experiment
 python3 ../run.py \
     +models=gpt2 \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \

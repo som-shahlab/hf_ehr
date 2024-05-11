@@ -29,6 +29,9 @@ exp4=exp4
 # First experiment
 python3 ../run.py \
     +models=bert \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=6 \
+    data.dataloader.approx_batch_sampler.max_tokens=6144 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
     trainer.devices=[0] \
@@ -44,6 +47,9 @@ child_pids+=($!)
 # Second experiment
 python3 ../run.py \
     +models=bert \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=6 \
+    data.dataloader.approx_batch_sampler.max_tokens=6144 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
     trainer.devices=[1] \
@@ -59,6 +65,9 @@ child_pids+=($!)
 # Third experiment
 python3 ../run.py \
     +models=bert \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=6 \
+    data.dataloader.approx_batch_sampler.max_tokens=6144 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
     trainer.devices=[2] \
@@ -74,6 +83,9 @@ child_pids+=($!)
 # Fourth experiment
 python3 ../run.py \
     +models=bert \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=6 \
+    data.dataloader.approx_batch_sampler.max_tokens=6144 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \
     trainer.devices=[3] \

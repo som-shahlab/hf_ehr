@@ -25,6 +25,7 @@ print("====> Done loading imports: ", time.time() - start, "s")
 
 V100_BASE_DIR: str = '/local-scratch-nvme/nigam/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
+H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
 GPU_BASE_DIR: str = '/home/hf_ehr/'
 
 class GradNormCallback(Callback):
@@ -67,6 +68,17 @@ def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
         config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
         config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
         print(f"Loading data from local-scratch: `{A100_BASE_DIR}`.")
+    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-h100':
+        if not os.path.exists(H100_BASE_DIR):
+            # Copy over the cache files
+            os.makedirs(H100_BASE_DIR, exist_ok=True)
+            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite {H100_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {H100_BASE_DIR}')
+            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {H100_BASE_DIR}')
+        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', H100_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', H100_BASE_DIR)
+        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', H100_BASE_DIR)
+        print(f"Loading data from local-scratch: `{H100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
         if not os.path.exists(GPU_BASE_DIR):
             os.makedirs(GPU_BASE_DIR, exist_ok=True)
@@ -97,10 +109,6 @@ def main(config: DictConfig) -> None:
     path_to_tokenizer_code_2_count: str = config.data.tokenizer.path_to_code_2_count
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     seed: int = config.main.seed
-    
-    # Argument validation
-    if hasattr(config.data.dataloader, 'batch_size') and hasattr(config.data.dataloader, 'batch_max_tokens'):
-        raise ValueError(f"Cannot specify both `data.dataloader.batch_size` and `data.dataloader.batch_max_tokens` in config.yaml")
 
     # Random seed
     pl.seed_everything(seed, workers=True)
@@ -308,7 +316,7 @@ def main(config: DictConfig) -> None:
         accumulate_grad_batches=config.trainer.accumulate_grad_batches,
         gradient_clip_val=config.trainer.gradient_clip_value,
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
-        use_distributed_sampler=False if hasattr(config.data.dataloader, 'approx_batch_sampler') else True, # dont wrap ApproxBatchSampler (based on max_tokens) if using DDP
+        use_distributed_sampler=False if getattr(config.data.dataloader, 'mode', 'batch') == 'approx' else True
     )
 
     # Run

@@ -12,6 +12,7 @@ source base.sh
 
 python3 ../run.py \
     +models=gpt2 \
+    data.dataloader.mode=approx \
     data.dataloader.approx_batch_sampler.max_tokens=4000 \
     data.dataloader.approx_batch_sampler.bucket_size=10 \
     trainer.accumulate_grad_batches=16 \

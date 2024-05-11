@@ -12,7 +12,9 @@ source base.sh
 
 python3 ../run.py \
     +models=gpt2 \
+    data.dataloader.mode=batch \
     data.dataloader.batch_size=1 \
+    data.dataloader.approx_batch_sampler.max_tokens=1024 \
     trainer.accumulate_grad_batches=16 \
     data.dataloader.n_workers=10 \
     data.dataloader.max_length=4096 \

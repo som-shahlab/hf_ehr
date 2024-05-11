@@ -22,7 +22,9 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     # GPU Partition Settings (batch_size=6 fills GPUs up to about 31950 / 32768 MB)
     python3 ../run.py \
         +models=hyena \
+        data.dataloader.mode=batch \
         data.dataloader.batch_size=2 \
+        data.dataloader.approx_batch_sampler.max_tokens=2048 \
         trainer.accumulate_grad_batches=8 \
         trainer.optimizer.lr=2e-4 \
         data.dataloader.n_workers=10 \

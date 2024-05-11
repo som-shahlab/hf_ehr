@@ -1,4 +1,4 @@
--i https://download.pytorch.org/whl/cu118
+--extra-index-url https://download.pytorch.org/whl/cu118
 polars==0.19.5
 transformers==4.39.3
 femr==0.1.16

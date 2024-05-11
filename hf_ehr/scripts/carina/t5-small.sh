@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=t5-base-v8
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/t5-base-v8_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/t5-base-v8_%A.err
+#SBATCH --output=/share/pi/nigam/migufuen/hf_ehr/slurm_logs/t5-base-v8_%A.out
+#SBATCH --error=/share/pi/nigam/migufuen/hf_ehr/slurm_logs/t5-base-v8_%A.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=gpu
 #SBATCH --mem=200G
@@ -14,6 +14,8 @@ source base.sh
 
 python3 ../run.py \
     +models=t5 \
+    data.dataloader.mode=approx \
+    data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
     data.dataloader.n_workers=10 \

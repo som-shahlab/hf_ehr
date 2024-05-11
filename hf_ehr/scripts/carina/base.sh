@@ -44,7 +44,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ ! -e "/home/hf_ehr/hf_env" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /home/hf_ehr/ # one-time setup
     fi
-    conda activate /home/hf_ehr/hf_env_miguel_1
+    conda activate /home/hf_ehr/$ENV_NAME
     #conda activate /home/hf_ehr/$ENV_NAME
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     echo "Detected H100 Partition"

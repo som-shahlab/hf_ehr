@@ -12,6 +12,7 @@ import torch
 def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], tokenizer: FEMRTokenizer) -> Dict[str, DataLoader]:
     batch_size: Optional[int] = getattr(config.data.dataloader, 'batch_size', None)
     approx_batch_sampler: Optional[Any] = getattr(config.data.dataloader, 'approx_batch_sampler', None)
+    dataloader_mode: str = getattr(config.data.dataloader, 'mode', 'batch')
     max_length: int = config.data.dataloader.max_length
     is_truncation_random: bool = config.data.dataloader.is_truncation_random
     is_mlm = False  # Assume non-MLM by default for GPT
@@ -24,7 +25,7 @@ def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], token
     n_replicas: int = len(config.trainer.devices)
     
     # Samplers
-    if approx_batch_sampler is not None:
+    if dataloader_mode == 'approx':
         logger.info("====> Loading ApproxBatchSampler")
         # Train -- randomize (if desired) within/across batch sequence ordering
         train_bucket_size = approx_batch_sampler.bucket_size
