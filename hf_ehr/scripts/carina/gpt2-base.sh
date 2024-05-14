@@ -31,6 +31,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         model.config_kwargs.n_layer=12 \
         model.config_kwargs.n_head=12 \
         model.config_kwargs.n_embd=768 \
+        model.config_kwargs.n_positions=1024 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base/ \
         logging.wandb.name=gpt2-base
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
@@ -48,6 +49,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
         model.config_kwargs.n_layer=12 \
         model.config_kwargs.n_head=12 \
         model.config_kwargs.n_embd=768 \
+        model.config_kwargs.n_positions=1024 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base-h100-1gpu/ \
         logging.wandb.name=gpt2-base-h100-test
 else

@@ -30,6 +30,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         model.config_kwargs.n_layer=24 \
         model.config_kwargs.n_head=16 \
         model.config_kwargs.n_embd=1024 \
+        model.config_kwargs.n_positions=1024 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-medium/ \
         logging.wandb.name=gpt2-medium
 else

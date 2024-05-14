@@ -18,7 +18,6 @@ class MambaLanguageModel(BaseModel):
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
         model_config.vocab_size = tokenizer.vocab_size
-        model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"
             setattr(model_config, key, val)

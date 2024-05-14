@@ -1,7 +1,4 @@
 # @package _global_
-
-# TODO (@Miguel)
-
 model:
   # Name of model to load
   name: t5
@@ -13,28 +10,4 @@ model:
     num_heads: 8
     d_model: 512
     d_ff: 2048
-    n_positions: 1024
-
-data:
-  dataloader:
-    # Max number of codes to feed into model at once per patient.
-    max_length: ${model.config_kwargs.n_positions}
-
-trainer:
-  # If true uses bf16 mixed precision (A100 only)
-  is_use_bf16: False
-  # If true uses fp16 mixed precision
-  is_use_fp16: False
-  # Limits training to a minimum number of epochs
-  optimizer:
-    # Learning rate
-    lr: 2e-4
-    weight_decay: 0.1
-
-  scheduler:
-    # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
-    num_warmup_steps: 40_000
-    # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
-    num_decay_steps: 4_000_000
-    initial_lr: 1e-6
-    final_lr: 1e-5
+    n_positions: ${data.dataloader.max_length}

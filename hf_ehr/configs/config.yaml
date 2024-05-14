@@ -23,7 +23,7 @@ callbacks:
     # useful for resuming training after a crash
     most_recent_every_n_train_steps: 5_000
     # Save model every N global steps; persists permanently
-    every_n_train_steps: 10_000
+    every_n_train_steps: 30_000
 
 data:
   # Sampling strategy for dataset: "random", "stratified", "skillit"

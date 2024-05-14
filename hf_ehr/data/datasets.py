@@ -266,25 +266,14 @@ class FEMRDataset(Dataset):
         return np.array(pids)
 
     def __len__(self):
-        if self.split == 'train':
-            return len(self.train_pids)
-        elif self.split == 'val':
-            return len(self.val_pids)
-        elif self.split == 'test':
-            return len(self.test_pids)
-        else:
-            raise ValueError(f"Invalid split: {self.split}")
+        pids: np.ndarray = self.get_pids()
+        return len(pids)
     
     def __getitem__(self, idx: int) -> Tuple[int, List[str]]:
         '''Return all event codes for this patient at `idx` in `self.split`'''
-        if self.split == 'train':
-            pid = self.train_pids[idx]
-        elif self.split == 'val':
-            pid = self.val_pids[idx]
-        elif self.split == 'test':
-            pid = self.test_pids[idx]
-        else:
-            raise ValueError(f"Invalid split: {self.split}")
+        pids: np.ndarray = self.get_pids()
+        pid: int = pids[idx]
+
         # For negative `idx`, we need to unwrap `pid`
         if len(pid.shape) > 0:
             pid = pid[0]
@@ -307,9 +296,8 @@ class FEMRDataset(Dataset):
         """Returns path to cache folder for this dataset (e.g. storing things like sampling split, seq lengths, etc.)"""
         path_to_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
         return path_to_cache_dir
-        
-    def get_seq_lengths(self, is_force_refresh: bool = False) -> List[int]:
-        """Return a list of sequence lengths for all patients in dataset"""
+    
+    def get_pids(self) -> np.ndarray:
         if self.split == 'train':
             pids = self.train_pids
         elif self.split == 'val':
@@ -318,6 +306,11 @@ class FEMRDataset(Dataset):
             pids = self.test_pids
         else:
             raise ValueError(f"Invalid split: {self.split}")
+        return pids
+
+    def get_seq_lengths(self, is_force_refresh: bool = False) -> List[int]:
+        """Return a list of sequence lengths for all patients in dataset"""
+        pids: np.ndarray = self.get_pids()
 
         # Check if cache exists (otherwise takes ~10 mins to iterate over 500k patients)
         path_to_cache_file: str = os.path.join(self.get_path_to_cache_folder(), 'seq_lengths.json')
@@ -373,101 +366,53 @@ def torch_mask_tokens(tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, sp
     return inputs, labels
 
 
+def _generate_dataset(args):
+    dataset: FEMRDataset = args[0]
+    tokenizer: FEMRTokenizer = args[1]
+    path_to_femr_extract: str = args[2]
+    n_tokens_per_file: str = args[3]
+    pids: np.ndarray = args[4]
+
+    tokens = tokenizer.encode([ e.code for e in self.femr_db[pid] ], truncate=False)
+    queue.extend(tokens)
+    if len(queue) > 10000:
+        np.save(np.array(queue))
+        queue = []
+
+    # # Tokenizer
+    # code_2_count: Dict[str, int] = json.load(open(path_to_code_2_count, 'r'))
+    # tokenizer = FEMRTokenizer(code_2_count)
+    
+    # FEMR DB
+    femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
+    
+    for pid in pids.tolist():
+        events = [ e.code for e in femr_db[pid].events ]
+        tokens += tokenizer.encode(events)['input_ids']
+
 class AllTokensDataset(Dataset):
     '''Dataset that merges all patients into one long sequence of tokens, with each patient sandwiched by a [BOS] and [EOS] token
     '''
     def __init__(self,
                  path_to_femr_extract: str, 
-                 path_to_dataset_dir: str,
-                 split: str = 'train',
-                 sampling_strat: Optional[str] = None,
-                 sampling_kwargs: Optional[Dict] = None,
+                 dataset: FEMRDataset,
                  is_debug: bool = False):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
-        assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
-        self.femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
-        self.split: str = split
-        self.sampling_strat: Optional[str] = sampling_strat
-        self.sampling_kwargs: Optional[Dict] = sampling_kwargs
-        self.is_debug: bool = is_debug
-        
-        # Pre-calculate canonical splits based on patient ids
-        all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
-        hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
-        self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
-        self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
-        self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
+        self.dataset: FEMRDataset = dataset
 
-        # Confirm disjoint train/val/test
-        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
-        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
-        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
-        
-        # If debug, then shrink to 1k patients
-        if is_debug:
-            self.train_pids = self.train_pids[:1000]
-            self.val_pids = self.val_pids[:1000]
-            self.test_pids = self.test_pids[:1000]
-    
-    def generate_dataset(self, tokenizer: FEMRTokenizer, n_tokens_per_file: int = 10_000_000):
+    def generate_dataset(self, tokenizer: FEMRTokenizer, n_tokens_per_file: int = 10_000_000, n_procs: int = 10):
         """Default to 10M tokens => 10 * 4 => 40MB files"""
-        if self.split == 'train':
-            pids = self.train_pids
-        elif self.split == 'val':
-            pids = self.val_pids
-        elif self.split == 'test':
-            pids = self.test_pids
-        else:
-            raise ValueError(f"Invalid split: {self.split}")
+        # Chunk pids
+        pids: np.ndarray = self.dataset.get_pids()
+        tasks: List[Tuple] = [
+            (self.dataset, tokenizer, self.path_to_femr_extract, n_tokens_per_file, pids[chunk_start:chunk_start + len(pids) // n_procs],)
+            for chunk_start in range(0, len(pids), len(pids) // n_procs)
+        ]
         
         import multiprocessing
-
-        def encode_data(item):
-            """ Function to encode data, to be executed by pool workers. """
-            global tokenizer  # Assuming tokenizer is available globally or passed some other way
-            return tokenizer.encode([e.code for e in item], truncate=False)
-
-        def save_to_disk(data):
-            """ Save data to disk as a numpy array. """
-            np.save('result_data.npy', np.array(data, dtype=np.int32))
-
-        def process_data(pids, chunk_size=10000):
-            """ Process data using a pool of workers and save results periodically. """
-            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-            results = []
-            
-            for pid in pids:
-                result = pool.apply_async(encode_data, (pid,))
-                results.append(result.get())
-
-                # Check if results should be flushed to disk
-                if len(results) >= chunk_size:
-                    save_to_disk(results)
-                    results = []
-
-            # Save any remaining results to disk
-            if results:
-                save_to_disk(results)
-
-            pool.close()
-            pool.join()
-
-        if __name__ == "__main__":
-            tokenizer = YourTokenizer()  # Define or import your tokenizer
-            pids = [your_data]  # Replace with your actual data set
-            process_data(pids)
-
-
-        # Write chunks of np.ndarray's full of int32 (4 bytes) tokens to disk
-        queue = []
-        for pid in pids:
-            tokens = tokenizer.encode([ e.code for e in self.femr_db[pid] ], truncate=False)
-            queue.extend(tokens)
-            if len(queue) > 10000:
-                np.save(np.array(queue))
-                queue = []
-        
+        with multiprocessing.get_context("forkserver").Pool(n_procs) as pool:
+            pool.imap_unordered(_generate_dataset, tasks)
 
     def __len__(self):
         if self.split == 'train':

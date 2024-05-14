@@ -3,22 +3,26 @@
 data:
   dataloader:
     max_length: 1024
-    batch_size: 2
 
 model:
   # Name of model to load
-  name: hyena
+  name: t5
   # Name/path to pass to HF.from_pretrained()
-  hf_name: LongSafari/hyenadna-large-1m-seqlen-hf
+  hf_name: t5-base
   # Kwargs for ModelConfig
   config_kwargs:
-    max_seq_len: ${data.dataloader.max_length}
-    d_model: 128
-    n_layer: 2
-    #d_inner: ${eval:4 * ${.d_model}}
-
+    num_layers: 6
+    num_heads: 8
+    d_model: 512
+    d_ff: 2048
+    n_positions: ${data.dataloader.max_length}
 
 trainer:
+  # If true uses bf16 mixed precision (A100 only)
+  is_use_bf16: False
+  # If true uses fp16 mixed precision
+  is_use_fp16: False
+  # Limits training to a minimum number of epochs
   optimizer:
     # Learning rate
     lr: 2e-4
@@ -29,3 +33,5 @@ trainer:
     num_warmup_steps: 40_000
     # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
     num_decay_steps: 4_000_000
+    initial_lr: 1e-6
+    final_lr: 1e-5

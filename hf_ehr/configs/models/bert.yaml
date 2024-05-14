@@ -1,5 +1,11 @@
 # @package _global_
 
+data:
+  dataloader:
+    max_length: 1024
+    batch_size: 2
+  mlm_prob: 0.15
+
 model:
   # Name of HF model to load
   name: bert
@@ -11,14 +17,7 @@ model:
     num_attention_heads: 12
     hidden_size: 768
     # Max context window
-    max_position_embeddings: 1024
-
-data:
-  dataloader:
-    # Max number of codes to feed into model at once per patient.
-    max_length: ${model.config_kwargs.max_position_embeddings}
-    batch_size: 2
-  mlm_prob: 0.15
+    max_position_embeddings: ${data.dataloader.max_length}
 
 trainer:
   # For models that use MLM training, this is the percent of tokens to randomly mask

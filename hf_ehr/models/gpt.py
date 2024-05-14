@@ -60,9 +60,3 @@ class GPTLanguageModel(BaseModel):
         self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
-    
-    def on_load_checkpoint(self, checkpoint):
-        """Custom checkpoint loading logic."""
-        # Handle anything specific here, ensuring no direct access to the trainer
-        # that could raise an error if the trainer isn't yet attached.
-        pass

@@ -15,12 +15,12 @@ python3 ../run.py \
     data.dataloader.mode=batch \
     data.dataloader.batch_size=1 \
     data.dataloader.approx_batch_sampler.max_tokens=1024 \
-    trainer.accumulate_grad_batches=16 \
     data.dataloader.n_workers=10 \
-    data.dataloader.max_length=4096 \
+    trainer.accumulate_grad_batches=16 \
     trainer.devices=[0,1,2,3] \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
     model.config_kwargs.n_embd=768 \
+    model.config_kwargs.n_positions=4096 \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base-4096/ \
     logging.wandb.name=gpt2-base-4096

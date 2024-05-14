@@ -31,6 +31,7 @@ python3 ../run.py \
     data.dataloader.mode=approx \
     data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
+    data.dataloader.max_length=1024 \
     trainer.accumulate_grad_batches=8 \
     data.dataloader.n_workers=10 \
     trainer.devices=[0] \
@@ -39,7 +40,6 @@ python3 ../run.py \
     model.config_kwargs.d_model=128 \
     model.config_kwargs.n_layer=4 \
     model.config_kwargs.max_seq_len=1024 \
-    data.dataloader.max_length=1024 \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp1/ \
     logging.wandb.name=$exp1 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp1}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp1}_${SLURM_JOB_ID}.err &
 child_pids+=($!)

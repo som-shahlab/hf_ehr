@@ -24,13 +24,13 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         data.dataloader.mode=batch \
         data.dataloader.batch_size=2 \
         data.dataloader.approx_batch_sampler.max_tokens=2048 \
-        trainer.accumulate_grad_batches=4 \
+        data.dataloader.max_length=1024 \
         data.dataloader.n_workers=10 \
+        trainer.accumulate_grad_batches=4 \
         trainer.devices=[0] \
         model.config_kwargs.d_model=1536 \
         model.config_kwargs.n_layer=48 \
         model.config_kwargs.num_hidden_layers=48 \
-        data.dataloader.seq_length=1024 \
         callbacks.model_checkpointing.every_n_train_steps=100 \
         main.path_to_output_dir=/share/pi/nigam/suhana/hf_ehr/cache/runs/mamba-test/ \
         logging.wandb.name=mamba-medium

@@ -30,6 +30,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         model.config_kwargs.n_layer=36 \
         model.config_kwargs.n_head=20 \
         model.config_kwargs.n_embd=1280 \
+        model.config_kwargs.n_positions=1024 \
         trainer.is_use_bf16=True \
         #scheduler.num_warmup_steps=50000 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-large/ \
