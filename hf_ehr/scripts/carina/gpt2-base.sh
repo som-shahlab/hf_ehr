@@ -21,16 +21,13 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     # GPU Partition Settings (batch_size=6 fills GPUs up to about 31950 / 32768 MB)
     python3 ../run.py \
         +models=gpt2 \
+        +sizes=gpt2-base \
+        +trainer=multi_gpu \
         data.dataloader.mode=batch \
         data.dataloader.batch_size=4 \
         data.dataloader.approx_batch_sampler.max_tokens=4096 \
         trainer.accumulate_grad_batches=4 \
-        data.dataloader.n_workers=10 \
-        trainer.devices=[0,1,2,3] \
         trainer.max_epochs=10 \
-        model.config_kwargs.n_layer=12 \
-        model.config_kwargs.n_head=12 \
-        model.config_kwargs.n_embd=768 \
         model.config_kwargs.n_positions=1024 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base/ \
         logging.wandb.name=gpt2-base
@@ -39,6 +36,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     
     python3 ../run.py \
         +models=gpt2 \
+        +sizes=gpt2-base \
+        +trainer=multi_gpu \
         data.dataloader.mode=approx \
         data.dataloader.batch_size=9 \
         data.dataloader.approx_batch_sampler.max_tokens=9216 \
@@ -46,9 +45,6 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
         data.dataloader.n_workers=4 \
         trainer.devices=[0] \
         trainer.max_epochs=10 \
-        model.config_kwargs.n_layer=12 \
-        model.config_kwargs.n_head=12 \
-        model.config_kwargs.n_embd=768 \
         model.config_kwargs.n_positions=1024 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base-h100-1gpu/ \
         logging.wandb.name=gpt2-base-h100-test
