@@ -307,7 +307,7 @@ def main(config: DictConfig) -> None:
         limit_train_batches=config.trainer.limit_train_batches,
         limit_val_batches=config.trainer.limit_val_batches,
         log_every_n_steps=config.logging.log_every_n_steps,
-        precision="bf16" if config.trainer.is_use_bf16 else (16 if config.trainer.is_use_fp16 else 32),
+        precision="bf16" if torch.cuda.is_bf16_supported() else 16,
         val_check_interval=config.trainer.val_check_interval, # check val set every 10% of training batches (useful for large training datasets, rather than wait for full epoch to finish)
         check_val_every_n_epoch=config.trainer.check_val_every_n_epoch, # log val PPL at end of every epoch
         max_epochs=config.trainer.max_epochs,
