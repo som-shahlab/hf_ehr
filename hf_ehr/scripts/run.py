@@ -3,6 +3,7 @@ import os
 import json
 import hydra
 import wandb
+import torch
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Callback
