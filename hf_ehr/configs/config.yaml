@@ -76,10 +76,6 @@ trainer:
   devices: 0, 1, 2, 3
   # Supports: dp, ddp, ddp2, fsdp, deepspeed
   distributed_backend: ddp
-  # If true uses bf16 mixed precision (A100 / H100 only)
-  is_use_bf16: True
-  # If true uses fp16 mixed precision
-  is_use_fp16: False
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
