@@ -74,10 +74,6 @@ trainer:
   devices: 0, 1, 2, 3
   # Supports: dp, ddp, ddp2, fsdp, deepspeed
   distributed_backend: ddp
-  # If true uses bf16 mixed precision (A100 only)
-  is_use_bf16: False
-  # If true uses fp16 mixed precision
-  is_use_fp16: True
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
@@ -88,6 +84,8 @@ trainer:
   limit_val_batches: null
   # How often we check the validation set within an epoch - `int` is every N batches and `float` is a fraction of the training dataset
   val_check_interval: 0.35
+  # Log val at end of every epoch
+  check_val_every_n_epoch: 1
   # OPTIMIZER
   optimizer:
     # type
