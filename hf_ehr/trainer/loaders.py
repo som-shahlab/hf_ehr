@@ -83,16 +83,33 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
         - Takes ~8s for each dataset to load using /share/pi/.
     """
     path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
-    path_to_code_2_detail: str =  config.data.dataset.path_to_code_2_detail
+    path_to_code_2_detail: str =  config.data.tokenizer.path_to_code_2_detail
+    
     sampling_strat: Optional[str] = config.data.sampling_strat
     sampling_kwargs: Optional[Dict] = config.data.sampling_kwargs
+    is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
     seed: int = config.main.seed
     
     # Load datasetes
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train', path_to_code_2_detail=path_to_code_2_detail, sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val', path_to_code_2_detail=path_to_code_2_detail, sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test', path_to_code_2_detail=path_to_code_2_detail, sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
+    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', 
+                                sampling_strat=sampling_strat, 
+                                sampling_kwargs=sampling_kwargs, 
+                                is_remap_numerical_codes=is_remap_numerical_codes,
+                                is_debug=is_debug, 
+                                seed=seed)
+    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', 
+                                sampling_strat=sampling_strat, 
+                                sampling_kwargs=sampling_kwargs, 
+                                is_remap_numerical_codes=is_remap_numerical_codes,
+                                is_debug=is_debug, 
+                                seed=seed)
+    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', 
+                                sampling_strat=sampling_strat, 
+                                sampling_kwargs=sampling_kwargs, 
+                                is_remap_numerical_codes=is_remap_numerical_codes,
+                                is_debug=is_debug, 
+                                seed=seed)
     
     return { 
             'train' : train_dataset, 

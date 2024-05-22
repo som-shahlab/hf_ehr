@@ -130,10 +130,10 @@ class FEMRDataset(Dataset):
     '''
     def __init__(self, 
                  path_to_femr_extract: str, 
+                 path_to_code_2_detail: Optional[str],
                  split: str = 'train',
                  sampling_strat: Optional[str] = None,
                  sampling_kwargs: Optional[Dict] = None,
-                 path_to_code_2_detail: str = None, # type: ignore
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  is_debug: bool = False,
                  seed: int = 1):
@@ -539,9 +539,9 @@ if __name__ == '__main__':
     tokenizer = FEMRTokenizer(path_to_code_2_detail)
     
     # Dataset
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train', path_to_code_2_detail=path_to_code_2_detail)
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val', path_to_code_2_detail=path_to_code_2_detail)
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test', path_to_code_2_detail=path_to_code_2_detail)
+    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
+    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
+    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
 
     # Stats
     print('train', len(train_dataset))
