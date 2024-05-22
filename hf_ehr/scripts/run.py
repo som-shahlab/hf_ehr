@@ -1,6 +1,4 @@
-import time
 import os
-import json
 import hydra
 import wandb
 import lightning.pytorch as pl
@@ -20,11 +18,7 @@ from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
-
-V100_BASE_DIR: str = '/local-scratch-nvme/nigam/hf_ehr/'
-A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
-H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
-GPU_BASE_DIR: str = '/home/hf_ehr/'
+from hf_ehr.config import rewrite_paths_for_carina_from_config
 
 class GradNormCallback(Callback):
     """
@@ -43,54 +37,6 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
-def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
-    """Rewrite paths for Carina partitions to use local-scratch directories."""
-    if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
-        if not os.path.exists(V100_BASE_DIR):
-            os.makedirs(V100_BASE_DIR, exist_ok=True)
-            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9 {V100_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {V100_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {V100_BASE_DIR}')
-        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', V100_BASE_DIR)
-        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', V100_BASE_DIR)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', V100_BASE_DIR)
-        print(f"Loading data from local-scratch: `{V100_BASE_DIR}`.")
-    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-a100':
-        if not os.path.exists(A100_BASE_DIR):
-            # Copy over the cache files
-            os.makedirs(A100_BASE_DIR, exist_ok=True)
-            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9 {A100_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {A100_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {A100_BASE_DIR}')
-        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
-        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
-        print(f"Loading data from local-scratch: `{A100_BASE_DIR}`.")
-    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-h100':
-        if not os.path.exists(H100_BASE_DIR):
-            # Copy over the cache files
-            os.makedirs(H100_BASE_DIR, exist_ok=True)
-            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9 {H100_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {H100_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {H100_BASE_DIR}')
-        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', H100_BASE_DIR)
-        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', H100_BASE_DIR)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', H100_BASE_DIR)
-        print(f"Loading data from local-scratch: `{H100_BASE_DIR}`.")
-    elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
-        if not os.path.exists(GPU_BASE_DIR):
-            os.makedirs(GPU_BASE_DIR, exist_ok=True)
-            os.system(f'cp -r /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9 {GPU_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json {GPU_BASE_DIR}')
-            os.system(f'cp /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json {GPU_BASE_DIR}')
-        config.data.tokenizer.path_to_code_2_int = config.data.tokenizer.path_to_code_2_int.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
-        config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
-        print(f"Loading data from local-scratch: `{GPU_BASE_DIR}`.")
-    else:
-        print("No local-scratch directory found. Using default `/share/pi/` paths.")
-    return config
-
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
@@ -103,14 +49,13 @@ def main(config: DictConfig) -> None:
     is_mlflow: bool = config.logging.mlflow.is_mlflow
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
-    path_to_tokenizer_code_2_int: str = config.data.tokenizer.path_to_code_2_int
-    path_to_tokenizer_code_2_count: str = config.data.tokenizer.path_to_code_2_count
+    path_to_tokenizer_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     seed: int = config.main.seed
 
     # Random seed
     pl.seed_everything(seed, workers=True)
-    
+
     # Check if resuming from checkpoint
     is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
     path_to_resume_ckpt: Optional[str] = os.path.join(path_to_output_dir, 'ckpts/last.ckpt') if is_resume_from_ckpt else None
@@ -131,7 +76,7 @@ def main(config: DictConfig) -> None:
     # IMPORTANT! Keep this key (i.e. a pointer to the `tokenizer` object) out of the config, otherwise stuff is slow / logging breaks
     if hasattr(config, 'tokenizer'):
         config.__delattr__('tokenizer')
-    
+
     ## MLFlow
     if is_mlflow:
         if is_resume_from_ckpt:
@@ -214,11 +159,10 @@ def main(config: DictConfig) -> None:
 
     logger.info("========================== Starting main ==========================")
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
-    
+
     # Tokenizer
-    logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_int}`")
-    femr_vocab_count: Dict[str, int] = json.load(open(path_to_tokenizer_code_2_count, 'r'))
-    tokenizer = FEMRTokenizer(femr_vocab_count, min_code_count=tokenizer_min_code_count)
+    logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_detail}`")
+    tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model

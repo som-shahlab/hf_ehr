@@ -4,10 +4,7 @@ from hf_ehr.trainer.samplers import ApproxBatchSampler, SortishSampler
 from omegaconf import DictConfig 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, collate_femr_timelines
 from loguru import logger
-from collections import OrderedDict
 import numpy as np
-from random import shuffle
-import torch
 
 def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], tokenizer: FEMRTokenizer) -> Dict[str, DataLoader]:
     batch_size: Optional[int] = getattr(config.data.dataloader, 'batch_size', None)
@@ -86,13 +83,16 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
         - Takes ~8s for each dataset to load using /share/pi/.
     """
     path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
+    path_to_code_2_detail: str =  config.data.dataset.path_to_code_2_detail
     sampling_strat: Optional[str] = config.data.sampling_strat
     sampling_kwargs: Optional[Dict] = config.data.sampling_kwargs
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
     seed: int = config.main.seed
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
+    
+    # Load datasetes
+    train_dataset = FEMRDataset(path_to_femr_extract, split='train', path_to_code_2_detail=path_to_code_2_detail, sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
+    val_dataset = FEMRDataset(path_to_femr_extract, split='val', path_to_code_2_detail=path_to_code_2_detail, sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
+    test_dataset = FEMRDataset(path_to_femr_extract, split='test', path_to_code_2_detail=path_to_code_2_detail, sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs, is_debug=is_debug, seed=seed)
     
     return { 
             'train' : train_dataset, 

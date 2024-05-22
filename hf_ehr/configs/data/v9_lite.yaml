@@ -1,0 +1,7 @@
+# @package _global_
+
+data:
+  dataset:
+    path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite
+  tokenizer:
+    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json

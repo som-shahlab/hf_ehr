@@ -1,5 +1,5 @@
 import random
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Tuple, Union, Any, TypedDict
 import torch
 from torch.utils.data import Dataset
 import femr.datasets
@@ -7,31 +7,40 @@ import os
 import numpy as np
 from jaxtyping import Float
 import json
-from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
 from transformers import PreTrainedTokenizer
 from tqdm import tqdm
 import datetime
-import time
 from omegaconf import OmegaConf
+from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
+from hf_ehr.utils import convert_lab_value_to_token
 
+class Detail(TypedDict):
+    count: int
+    unit_2_quartiles: Optional[List[float]]
+    is_numeric: Optional[bool]
+
+class Code2Detail(TypedDict):
+    code: Detail
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
 SPLIT_VAL_CUTOFF: float = 85
 
 class FEMRTokenizer(PreTrainedTokenizer):
-    def __init__(self, code_2_count: Dict[str, int], min_code_count: Optional[int] = None) -> None:
-        self.code_2_count = code_2_count
+    def __init__(self, 
+                 path_to_code_2_detail: str, 
+                 min_code_count: Optional[int] = None) -> None:
+        self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
         # Only keep codes with >= `min_code_count` occurrences in our dataset
-        codes: List[str] = sorted(list(code_2_count.keys()))
+        codes: List[str] = sorted(list(code_2_detail.keys()))
         if min_code_count is not None:
-            codes = [ x for x in codes if self.code_2_count[x] >= min_code_count ]
+            codes = [ x for x in codes if self.code_2_detail[x]['count'] >= min_code_count ]
 
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
         self.non_special_tokens = codes
         self.vocab = self.special_tokens + self.non_special_tokens
-        
+
         # Map tokens -> idxs
         self.token_2_idx = { x: idx for idx, x in enumerate(self.vocab) }
         self.idx_2_token = { idx: x for idx, x in enumerate(self.vocab) }
@@ -124,6 +133,8 @@ class FEMRDataset(Dataset):
                  split: str = 'train',
                  sampling_strat: Optional[str] = None,
                  sampling_kwargs: Optional[Dict] = None,
+                 path_to_code_2_detail: str = None, # type: ignore
+                 is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  is_debug: bool = False,
                  seed: int = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
@@ -135,6 +146,14 @@ class FEMRDataset(Dataset):
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
         self.is_debug: bool = is_debug
         self.seed: int = seed
+        
+        # Augmentations
+        self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r')) if path_to_code_2_detail is not None else None # type: ignore
+        self.is_remap_numerical_codes: bool = is_remap_numerical_codes
+        
+        # Sanity check
+        if self.is_remap_numerical_codes:
+            assert self.code_2_detail is not None, f"self.code_2_detail cannot be NONE if self.is_remap_numerical_codes=True"
         
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
@@ -153,10 +172,10 @@ class FEMRDataset(Dataset):
             raise ValueError(f"Invalid split: {split}")
         
         # Confirm disjoint train/val/test
-        # assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
-        # assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
-        # assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
-        
+        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
+        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
+        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+
         # If debug, then shrink to 1k patients
         if is_debug:
             self.train_pids = self.train_pids[:1000]
@@ -265,9 +284,8 @@ class FEMRDataset(Dataset):
             pids.extend(sampled_pids)
         return np.array(pids)
 
-    def __len__(self):
-        pids: np.ndarray = self.get_pids()
-        return len(pids)
+    def __len__(self) -> int:
+        return len(self.get_pids())
     
     def __getitem__(self, idx: int) -> Tuple[int, List[str]]:
         '''Return all event codes for this patient at `idx` in `self.split`'''
@@ -277,7 +295,32 @@ class FEMRDataset(Dataset):
         # For negative `idx`, we need to unwrap `pid`
         if len(pid.shape) > 0:
             pid = pid[0]
-        return (pid, [ e.code for e in self.femr_db[pid].events ])
+        
+        # Get codes
+        codes: List[str] = []
+        for e in self.femr_db[pid].events:
+            if self.is_remap_numerical_codes:
+                # if we hit a numerical code and need to remap it, follow tokenizer template format
+                # to map (code, unit, value) => quantile for (code, unit)
+                if (
+                    hasattr(e, 'value') # `e` has a `value`
+                    and e.value is not None # `value` is not None
+                    and ( # `value` is numeric
+                        isinstance(e.value, float)
+                        or isinstance(e.value, int)
+                    )
+                ):
+                    unit: str = str(e.unit)
+                    quantiles: List[float] = self.code_2_detail[e.code]['unit_2_quartile'][unit]
+
+                    # Determine quantile for (code, unit, value)
+                    token: str = convert_lab_value_to_token(e.code, unit, e.value, quantiles)
+                    
+                    # Remap code => token
+                    codes.append(token)
+                    continue
+            codes.append(e.code)
+        return (pid, codes)
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
@@ -380,8 +423,8 @@ def _generate_dataset(args):
         queue = []
 
     # # Tokenizer
-    # code_2_count: Dict[str, int] = json.load(open(path_to_code_2_count, 'r'))
-    # tokenizer = FEMRTokenizer(code_2_count)
+    # code_2_detail: Dict[str, int] = json.load(open(path_to_code_2_detail, 'r'))
+    # tokenizer = FEMRTokenizer(code_2_detail)
     
     # FEMR DB
     femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
@@ -409,7 +452,6 @@ class AllTokensDataset(Dataset):
             (self.dataset, tokenizer, self.path_to_femr_extract, n_tokens_per_file, pids[chunk_start:chunk_start + len(pids) // n_procs],)
             for chunk_start in range(0, len(pids), len(pids) // n_procs)
         ]
-        
         import multiprocessing
         with multiprocessing.get_context("forkserver").Pool(n_procs) as pool:
             pool.imap_unordered(_generate_dataset, tasks)
@@ -490,31 +532,29 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 
 if __name__ == '__main__':
-    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'
-    path_to_femr_extract = path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
-    path_to_code_2_count: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json'
-    path_to_code_2_count = path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
+    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/', GPU_BASE_DIR)
     
     # Tokenizer
-    code_2_count: Dict[str, int] = json.load(open(path_to_code_2_count, 'r'))
-    tokenizer = FEMRTokenizer(code_2_count)
+    tokenizer = FEMRTokenizer(path_to_code_2_detail)
     
     # Dataset
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train')
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val')
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test')
+    train_dataset = FEMRDataset(path_to_femr_extract, split='train', path_to_code_2_detail=path_to_code_2_detail)
+    val_dataset = FEMRDataset(path_to_femr_extract, split='val', path_to_code_2_detail=path_to_code_2_detail)
+    test_dataset = FEMRDataset(path_to_femr_extract, split='test', path_to_code_2_detail=path_to_code_2_detail)
 
-    sampling_strat = 'stratified'
-    sampling_kwargs = OmegaConf.create({ 'demographic': 'race' })
-    train_dataset = FEMRDataset(path_to_femr_extract, split='train', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)
-    val_dataset = FEMRDataset(path_to_femr_extract, split='val', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)
-    test_dataset = FEMRDataset(path_to_femr_extract, split='test', sampling_strat=sampling_strat, sampling_kwargs=sampling_kwargs)
-    
     # Stats
     print('train', len(train_dataset))
     print('val', len(val_dataset))
     print('test', len(test_dataset))
     
+    # Check numerical codes
+    breakpoint()
+    print(train_dataset[-1])
+    print(tokenizer(train_dataset[-1:][1])['input_ids'])
+    print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
+
+    exit()    
     train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
     val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
     test_seq_lengths: List[int] = test_dataset.get_seq_lengths()

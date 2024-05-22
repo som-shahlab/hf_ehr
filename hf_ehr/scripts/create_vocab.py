@@ -4,27 +4,48 @@ import collections
 from typing import List, Dict
 import os
 from tqdm import tqdm
+import shutil
 
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR, PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_v8_DIR
-
-VERSION: int = 8
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
 
 if __name__ == '__main__':
-    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v9_DIR if VERSION == 9 else PATH_TO_TOKENIZER_v8_DIR
-    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v9 if VERSION == 9 else PATH_TO_FEMR_EXTRACT_v8
+    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v9_DIR
+    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v9
+    path_to_code_2_detail_json: str = os.path.join(path_to_tokenizer_dir, 'code_2_detail.json')
+    path_to_code_2_numerical_vocab_json: str = os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_numerical_vocab.json')
 
     os.makedirs(path_to_tokenizer_dir, exist_ok=True)
     femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
 
-    code_2_count = collections.defaultdict(int)
+    # Get all codes
+    code_2_detail = collections.defaultdict(dict)
     for patient_id in tqdm(femr_db):
         for event in femr_db[patient_id].events:
-            code_2_count[event.code] += 1
+            if 'count' not in code_2_detail[event.code]: code_2_detail[event.code]['count'] = 0
+            code_2_detail[event.code]['count'] += 1
+    code_2_detail = dict(code_2_detail)
     
-    # Map codes to count of occurrences
-    code_2_count = dict(code_2_count)
-    json.dump(code_2_count, open(os.path.join(path_to_tokenizer_dir, 'code_2_count.json'), 'w'))
-    print("# of unique codes: ", len(code_2_count))
-    print("# of total codes: ", sum([ x for x in code_2_count.values() ]))
+    # Remap numerical codes
+    code_2_numerical_vocab = json.load(open(path_to_code_2_numerical_vocab_json, 'r'))
+    for code, vocab in code_2_numerical_vocab.items():
+        # Remove existing code
+        count: int = 0
+        if code in code_2_detail:
+            count = code_2_detail[code]['count']
+            del code_2_detail[code]
+
+        # Add each quantile/unit version of this code back
+        for token in code_2_numerical_vocab[code]['tokens']:
+            code_2_detail[token] = {
+                'count' : count // len(code_2_numerical_vocab[code]['tokens']), # even split of token counts b/c quantiles
+                'is_numeric' : True,
+                'unit_2_quartiles' : code_2_numerical_vocab[code]['unit_2_quartiles'],
+            }
+
+    # Save vocab to file
+    json.dump(code_2_detail, open(path_to_code_2_detail_json, 'w'), indent=2)
+    print("# of unique codes: ", len(code_2_detail))
+    print(f"# of numerical codes: ", len(code_2_numerical_vocab))
+    print("# of total code occurrences (minus numericals): ", sum([ detail['count'] for code, detail in code_2_detail.items() ]))
 
     print("DONE")

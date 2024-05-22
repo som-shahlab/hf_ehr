@@ -57,11 +57,9 @@ data:
   tokenizer:
     # Path to tokenizer
     # v9:
-    path_to_code_2_int: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json
-    path_to_code_2_count: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json
+    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json
     # v8:
-    # path_to_code_2_int: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_int.json
-    # path_to_code_2_count: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_count.json
+    # path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
     # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines
     min_code_count: null
 

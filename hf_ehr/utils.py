@@ -1,5 +1,16 @@
 from functools import partial
+from typing import List
 import torch
+
+def convert_lab_value_to_token(code: str, unit: str, value: float, quantiles: List[float]) -> str:
+    # Note: If we have Q1, Q2, Q3, Q4, then `len(quantiles) == 3` b/c have [0.25, 0.5, 0.75]
+    for q_idx, q in enumerate(quantiles):
+        if value <= q: 
+            return get_lab_value_token_name(code, unit, str(q_idx + 1))
+    return get_lab_value_token_name(code, unit, str(len(quantiles) + 1))
+
+def get_lab_value_token_name(code: str, unit: str, quantile: str) -> str:
+    return f"{code} || {unit} || Q{quantile}" # "STANFORD_OBS/123 | mmol | Q4"
 
 def _get_linear_schedule_with_warmup_lr_lambda(current_step: int, 
                                                *, 
