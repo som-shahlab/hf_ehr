@@ -7,7 +7,7 @@ import os
 import numpy as np
 from jaxtyping import Float
 import json
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer, AutoTokenizer
 from tqdm import tqdm
 import datetime
 from omegaconf import OmegaConf
@@ -130,22 +130,11 @@ class DescTokenizer(PreTrainedTokenizer):
         # TODO
     """
     def __init__(self, 
-                 path_to_code_2_detail: str, 
-                 min_code_count: Optional[int] = None) -> None:
-        self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
-        # Only keep codes with >= `min_code_count` occurrences in our dataset
-        codes: List[str] = sorted(list(self.code_2_detail.keys()))
-        if min_code_count is not None:
-            codes = [ x for x in codes if self.code_2_detail[x]['count'] >= min_code_count ]
-
-        # Create vocab
+                 tokenizer: AutoTokenizer) -> None:
+        self.tokenizer = tokenizer
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
         self.non_special_tokens = codes
         self.vocab = self.special_tokens + self.non_special_tokens
-
-        # Map tokens -> idxs
-        self.token_2_idx = { x: idx for idx, x in enumerate(self.vocab) }
-        self.idx_2_token = { idx: x for idx, x in enumerate(self.vocab) }
 
         # Create tokenizer
         super().__init__(
@@ -184,7 +173,7 @@ class DescTokenizer(PreTrainedTokenizer):
             # Tokenize without truncation
             kwargs.pop('max_length')
             kwargs.pop('truncation')
-            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, truncation=None, is_split_into_words=True)
+            tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs, truncation=None, is_split_into_words=True)
             
             # Truncate at random positions
             random.seed(seed)
@@ -204,27 +193,27 @@ class DescTokenizer(PreTrainedTokenizer):
                 else:
                     tokenized_batch[key] = truncated_batch
         else:
-            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
+            tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs, is_split_into_words=True)
 
         return tokenized_batch
 
     """Mandatory overwrites of base class"""
     @property
     def vocab_size(self) -> int:
-        return len(self.vocab)
+        return len(self.tokenizer.get_vocab())
 
     def get_vocab(self) -> Dict[str, int]:
-        return self.token_2_idx
+        return self.tokenizer.get_vocab()
 
     def _tokenize(self, text: str, **kwargs):
         """Default to splitting by ' ' since the tokenizer will join together tokens using a space"""
         raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
 
     def _convert_token_to_id(self, token: str) -> int:
-        return self.token_2_idx[token]
+        return self.tokenizer._convert_token_to_id(token)
 
     def _convert_id_to_token(self, index: int) -> str:
-        raise self.idx_2_token[index]
+        return self.tokenizer._convert_id_to_token(index)
 
 class FEMRDataset(Dataset):
     '''Dataset that returns patients in a FEMR extract.
