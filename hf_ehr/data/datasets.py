@@ -15,9 +15,9 @@ from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
 from hf_ehr.utils import convert_lab_value_to_token
 
 class Detail(TypedDict):
-    count: int
-    unit_2_quartiles: Optional[List[float]]
-    is_numeric: Optional[bool]
+    token_2_count: Dict[str, int] # mapping [key] = token, [val] = count of that token
+    unit_2_quartiles: Optional[List[float]] # mapping [key] = unit, [val] = list of quartiles
+    is_numeric: Optional[bool] # if TRUE, then code is a lab value
 
 class Code2Detail(TypedDict):
     code: Detail
@@ -32,7 +32,109 @@ class FEMRTokenizer(PreTrainedTokenizer):
                  min_code_count: Optional[int] = None) -> None:
         self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
         # Only keep codes with >= `min_code_count` occurrences in our dataset
-        codes: List[str] = sorted(list(code_2_detail.keys()))
+        codes: List[str] = sorted(list(self.code_2_detail.keys()))
+        if min_code_count is not None:
+            codes = [ x for x in codes if self.code_2_detail[x]['count'] >= min_code_count ]
+
+        # Create vocab
+        self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
+        self.non_special_tokens = codes
+        self.vocab = self.special_tokens + self.non_special_tokens
+
+        # Map tokens -> idxs
+        self.token_2_idx: Dict[str, int] = { x: idx for idx, x in enumerate(self.vocab) }
+        self.idx_2_token: Dict[int, str] = { idx: x for idx, x in enumerate(self.vocab) }
+
+        # Create tokenizer
+        super().__init__(
+            bos_token='[BOS]',
+            eos_token='[EOS]',
+            unk_token='[UNK]',
+            sep_token='[SEP]',
+            pad_token='[PAD]',
+            cls_token='[CLS]',
+            mask_token='[MASK]',
+        )
+        self.add_tokens(self.non_special_tokens)
+
+    def __call__(self, 
+                 batch: Union[List[str], List[List[str]]],
+                 is_truncation_random: bool = False,
+                 seed: int = 1,
+                 **kwargs) -> Dict[str, torch.Tensor]:
+        '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
+            We add the ability to truncate seqs at random time points.
+            
+            Expects as input a list of codes in either the format of:
+                A list of codes (List[str])
+                A list of lists of codes (List[str])
+            NOTE: Must set `is_split_into_words=True` b/c we've already pre-tokenized our inputs (i.e. we're passing in a List of tokens, not a string)
+        '''
+        if isinstance(batch[0], str):
+            # List[str] => List[str]
+            batch = [ batch ]
+
+        if is_truncation_random:
+            max_length: int = kwargs.get("max_length")
+            if not max_length:
+                raise ValueError(f"If you specify `is_truncation_random`, then you must also provide a non-None value for `max_length`")
+
+            # Tokenize without truncation
+            kwargs.pop('max_length')
+            kwargs.pop('truncation')
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, truncation=None, is_split_into_words=True)
+            
+            # Truncate at random positions
+            random.seed(seed)
+            for key in tokenized_batch.keys():
+                truncated_batch: List[List[int]] = []
+                for timeline in tokenized_batch[key]:
+                    if len(timeline) > max_length:
+                        # Calculate a random start index
+                        start_index: int = random.randint(0, len(timeline) - max_length)
+                        new_timeline = timeline[start_index:start_index + max_length]
+                        assert new_timeline.shape[0] == max_length, f"Error in truncating by random positions: new_timeline.shape = {new_timeline.shape[0]} != max_length={max_length}"
+                        truncated_batch.append(new_timeline)
+                    else:
+                        truncated_batch.append(timeline)
+                if kwargs.get('return_tensors') == 'pt':
+                    tokenized_batch[key] = torch.stack(truncated_batch, dim=0)
+                else:
+                    tokenized_batch[key] = truncated_batch
+        else:
+            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
+
+        return tokenized_batch
+
+    """Mandatory overwrites of base class"""
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
+
+    def get_vocab(self) -> Dict[str, int]:
+        return self.token_2_idx
+
+    def _tokenize(self, text: str, **kwargs):
+        """Default to splitting by ' ' since the tokenizer will join together tokens using a space"""
+        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+
+    def _convert_token_to_id(self, token: str) -> int:
+        return self.token_2_idx[token]
+
+    def _convert_id_to_token(self, index: int) -> str:
+        raise self.idx_2_token[index]
+
+
+class DescTokenizer(PreTrainedTokenizer):
+    """Converts codes => textual descriptions, then tokenizes
+        # TODO
+    """
+    def __init__(self, 
+                 path_to_code_2_detail: str, 
+                 min_code_count: Optional[int] = None) -> None:
+        self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
+        # Only keep codes with >= `min_code_count` occurrences in our dataset
+        codes: List[str] = sorted(list(self.code_2_detail.keys()))
         if min_code_count is not None:
             codes = [ x for x in codes if self.code_2_detail[x]['count'] >= min_code_count ]
 
@@ -135,41 +237,39 @@ class FEMRDataset(Dataset):
                  sampling_strat: Optional[str] = None,
                  sampling_kwargs: Optional[Dict] = None,
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
+                 is_remap_codes_to_desc: bool = False, # if TRUE, then remap all codes to their textual descriptions
                  is_debug: bool = False,
                  seed: int = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_femr_extract: str = path_to_femr_extract
+        self.path_to_code_2_detail: str = path_to_code_2_detail
         self.femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
         self.split: str = split
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
         self.is_debug: bool = is_debug
         self.seed: int = seed
-        
+    
+        # Code vocab
+        self.code_2_detail: Code2Detail = json.load(open(self.path_to_code_2_detail, 'r')) if path_to_code_2_detail is not None else None # type: ignore
+                
         # Augmentations
-        self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r')) if path_to_code_2_detail is not None else None # type: ignore
         self.is_remap_numerical_codes: bool = is_remap_numerical_codes
+        self.is_remap_codes_to_desc: bool = is_remap_codes_to_desc
         
         # Sanity check
         if self.is_remap_numerical_codes:
             assert self.code_2_detail is not None, f"self.code_2_detail cannot be NONE if self.is_remap_numerical_codes=True"
-        
+
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
         hashed_pids: np.ndarray = np.array([ self.femr_db.compute_split(SPLIT_SEED, pid) for pid in all_pids ])
-        if split == 'train':
-            train_pids = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
-            if not sampling_strat:
-                self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
-            else:
-                self.train_pids: np.ndarray = self.get_sampled_pids(train_pids)
-        elif split == 'val':
-            self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
-        elif split == 'test':
-            self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
-        else:
-            raise ValueError(f"Invalid split: {split}")
+        self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
+        if sampling_strat:
+            self.train_pids: np.ndarray = self.get_sampled_pids(self.train_pids)
+        self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
+        self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
         
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
@@ -288,7 +388,9 @@ class FEMRDataset(Dataset):
         return len(self.get_pids())
     
     def __getitem__(self, idx: int) -> Tuple[int, List[str]]:
-        '''Return all event codes for this patient at `idx` in `self.split`'''
+        '''Return all event codes for this patient at `idx` in `self.split`.
+            Does any preprocessing necessary for e.g. converting numerical/desc codes.
+        '''
         pids: np.ndarray = self.get_pids()
         pid: int = pids[idx]
 
@@ -296,12 +398,20 @@ class FEMRDataset(Dataset):
         if len(pid.shape) > 0:
             pid = pid[0]
         
-        # Get codes
-        codes: List[str] = []
+        # Get token for each clinical event in patient timeline
+        tokens: List[str] = []
         for e in self.femr_db[pid].events:
+            # Default the token to just being the literal code
+            token: str = e.code
+            
+            # First, if remap codes to textual descs => change `token` to textual definition of code
+            if self.is_remap_codes_to_desc:
+                # "LOINC/10230-1" => "Left ventricular Ejection fraction"
+                token = self.femr_db.get_ontology().get_text_description(e.code)
+
+            # Second, if remap numerical codes => change numerical codes to bucketed quantiles based on `value`...
             if self.is_remap_numerical_codes:
-                # if we hit a numerical code and need to remap it, follow tokenizer template format
-                # to map (code, unit, value) => quantile for (code, unit)
+                # "LOINC/10230-1" => "LOINC/10230-1 || % (See scan or EMR data for detail) || Q1"
                 if (
                     hasattr(e, 'value') # `e` has a `value`
                     and e.value is not None # `value` is not None
@@ -310,17 +420,17 @@ class FEMRDataset(Dataset):
                         or isinstance(e.value, int)
                     )
                 ):
+                    # if we hit a numerical code and need to remap it, follow tokenizer template format
+                    # to map (code, unit, value) => quantile for (code, unit)
+                    breakpoint()
                     unit: str = str(e.unit)
-                    quantiles: List[float] = self.code_2_detail[e.code]['unit_2_quartile'][unit]
+                    quantiles: List[float] = self.code_2_detail[e.code]['unit_2_quartiles'][unit]
 
                     # Determine quantile for (code, unit, value)
-                    token: str = convert_lab_value_to_token(e.code, unit, e.value, quantiles)
-                    
-                    # Remap code => token
-                    codes.append(token)
-                    continue
-            codes.append(e.code)
-        return (pid, codes)
+                    token = convert_lab_value_to_token(token, unit, e.value, quantiles)
+
+            tokens.append(token)
+        return (pid, tokens)
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
@@ -533,7 +643,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 if __name__ == '__main__':
     path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
-    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/', GPU_BASE_DIR)
+    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
     
     # Tokenizer
     tokenizer = FEMRTokenizer(path_to_code_2_detail)

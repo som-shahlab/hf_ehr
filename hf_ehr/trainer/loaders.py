@@ -88,6 +88,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     sampling_strat: Optional[str] = config.data.sampling_strat
     sampling_kwargs: Optional[Dict] = config.data.sampling_kwargs
     is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
+    is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
     seed: int = config.main.seed
     
@@ -96,18 +97,21 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
                                 is_remap_numerical_codes=is_remap_numerical_codes,
+                                is_remap_codes_to_desc=is_remap_codes_to_desc,
                                 is_debug=is_debug, 
                                 seed=seed)
     val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', 
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
                                 is_remap_numerical_codes=is_remap_numerical_codes,
+                                is_remap_codes_to_desc=is_remap_codes_to_desc,
                                 is_debug=is_debug, 
                                 seed=seed)
     test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', 
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
                                 is_remap_numerical_codes=is_remap_numerical_codes,
+                                is_remap_codes_to_desc=is_remap_codes_to_desc,
                                 is_debug=is_debug, 
                                 seed=seed)
     

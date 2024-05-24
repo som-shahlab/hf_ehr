@@ -7,5 +7,5 @@
 #SBATCH --mem=300G
 #SBATCH --cpus-per-task=30
 
-/share/sw/open/anaconda/3.10.2/bin/conda activate /home/hf_ehr/hf_env_miguel_1/
-python3 create_numerical_vocab.py
+/share/sw/open/anaconda/3.10.2/bin/conda activate /home/hf_ehr/hf_env/
+python3 create_vocab.py

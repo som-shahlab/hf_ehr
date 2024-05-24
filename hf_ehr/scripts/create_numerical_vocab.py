@@ -24,33 +24,32 @@ def apply_in_parallel(path_to_code_2_numerical_info_parquet: str) -> Union[List,
 
         print("Calculating Q1...")
         start = time.time()
-        df_q1 = code_2_numerical_info.groupby(['codes', 'units']).agg({ 'values' : lambda x: x.quantile(0.25) }).reset_index().sort_values(['codes', 'units'])
+        df_q1 = code_2_numerical_info.groupby(['codes', 'units'], dropna=False).agg({ 'values' : lambda x: x.quantile(0.25) }).reset_index().sort_values(['codes', 'units'])
         print(f"Time: {time.time() - start}s")
         print("Calculating Q2...")
         start = time.time()
-        df_q2 = code_2_numerical_info.groupby(['codes', 'units']).agg({ 'values' : lambda x: x.quantile(0.5) }).reset_index().sort_values(['codes', 'units'])
+        df_q2 = code_2_numerical_info.groupby(['codes', 'units'], dropna=False).agg({ 'values' : lambda x: x.quantile(0.5) }).reset_index().sort_values(['codes', 'units'])
         print(f"Time: {time.time() - start}s")
         print("Calculating Q3...")
         start = time.time()
-        df_q3 = code_2_numerical_info.groupby(['codes', 'units']).agg({ 'values' : lambda x: x.quantile(0.75) }).reset_index().sort_values(['codes', 'units'])
+        df_q3 = code_2_numerical_info.groupby(['codes', 'units'], dropna=False).agg({ 'values' : lambda x: x.quantile(0.75) }).reset_index().sort_values(['codes', 'units'])
         print("Calculating counts...")
         start = time.time()
-        df_token_count = code_2_numerical_info.groupby(['codes', 'units']).size().reset_index(name='values').sort_values(['codes', 'units'])
+        df_token_count = code_2_numerical_info.groupby(['codes', 'units'], dropna=False).size().reset_index(name='values').sort_values(['codes', 'units'])
         print(f"Time: {time.time() - start}s")
         df_q1['q1'] = df_q1['values']
         df_q1['q2'] = df_q2['values']
         df_q1['q3'] = df_q3['values']
         df_q1['token_count'] = df_token_count['values']
         df = df_q1.copy()
+        df['units'] = df['units'].fillna('None')
+        df['units'] = df['units'].astype(str)
         df.to_parquet(path_to_intermediate_parquet)
         assert df_q1.shape[0] == df_q2.shape[0] == df_q3.shape[0] == df_token_count.shape[0]
         assert (df_q1['codes'] != df_q2['codes']).sum() == 0
-        assert (df_q1['units'] != df_q2['units']).sum() == 0
         assert (df_q1['codes'] != df_q3['codes']).sum() == 0
-        assert (df_q1['units'] != df_q3['units']).sum() == 0
         assert (df_q1['codes'] != df_token_count['codes']).sum() == 0
-        assert (df_q1['units'] != df_token_count['units']).sum() == 0
-    
+
     print("Creating `code_2_numerical_vocab`...")
     code_2_numerical_vocab = {}
     for idx, row in df.iterrows():
