@@ -71,7 +71,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
             NOTE: Must set `is_split_into_words=True` b/c we've already pre-tokenized our inputs (i.e. we're passing in a List of tokens, not a string)
         '''
         if isinstance(batch[0], str):
-            # List[str] => List[str]
+            # List[str] => List[List[str]]
             batch = [ batch ]
 
         if is_truncation_random:
@@ -127,26 +127,10 @@ class FEMRTokenizer(PreTrainedTokenizer):
 
 class DescTokenizer(PreTrainedTokenizer):
     """Converts codes => textual descriptions, then tokenizes
-        # TODO
     """
-    def __init__(self, 
-                 tokenizer: AutoTokenizer) -> None:
+    def __init__(self, tokenizer: AutoTokenizer) -> None:
         self.tokenizer = tokenizer
-        self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
-        self.non_special_tokens = codes
-        self.vocab = self.special_tokens + self.non_special_tokens
-
-        # Create tokenizer
-        super().__init__(
-            bos_token='[BOS]',
-            eos_token='[EOS]',
-            unk_token='[UNK]',
-            sep_token='[SEP]',
-            pad_token='[PAD]',
-            cls_token='[CLS]',
-            mask_token='[MASK]',
-        )
-        self.add_tokens(self.non_special_tokens)
+        self.code_separator: str = ' ' # separate descriptions with a space by default
 
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
@@ -156,14 +140,17 @@ class DescTokenizer(PreTrainedTokenizer):
         '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
             We add the ability to truncate seqs at random time points.
             
-            Expects as input a list of codes in either the format of:
+            Expects as input a list of text-fied code descriptions in either the format of:
                 A list of codes (List[str])
                 A list of lists of codes (List[str])
-            NOTE: Must set `is_split_into_words=True` b/c we've already pre-tokenized our inputs (i.e. we're passing in a List of tokens, not a string)
         '''
         if isinstance(batch[0], str):
-            # List[str] => List[str]
+            # List[str] => List[List[str]]
             batch = [ batch ]
+
+        # Concatenate all strings together for tokenization by traditional HF tokenizer
+        # List[List[str]] => List[str]
+        batch = [ self.code_separator.join(x) for x in batch ]
 
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
@@ -173,8 +160,8 @@ class DescTokenizer(PreTrainedTokenizer):
             # Tokenize without truncation
             kwargs.pop('max_length')
             kwargs.pop('truncation')
-            tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs, truncation=None, is_split_into_words=True)
-            
+            tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs, truncation=None)
+
             # Truncate at random positions
             random.seed(seed)
             for key in tokenized_batch.keys():
@@ -193,7 +180,7 @@ class DescTokenizer(PreTrainedTokenizer):
                 else:
                     tokenized_batch[key] = truncated_batch
         else:
-            tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs, is_split_into_words=True)
+            tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs)
 
         return tokenized_batch
 
@@ -636,6 +623,7 @@ if __name__ == '__main__':
     
     # Tokenizer
     tokenizer = FEMRTokenizer(path_to_code_2_detail)
+    desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
     
     # Dataset
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
@@ -646,6 +634,11 @@ if __name__ == '__main__':
     print('train', len(train_dataset))
     print('val', len(val_dataset))
     print('test', len(test_dataset))
+    
+    # Dataset with numerical lab remapping
+    train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
+    # Dataset with textual desc code remapping
+    train_dataset_desc = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_codes_to_desc=True)
     
     # Check numerical codes
     breakpoint()
