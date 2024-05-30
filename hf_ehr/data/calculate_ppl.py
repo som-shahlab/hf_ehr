@@ -9,7 +9,7 @@ from pytorch_lightning import Trainer
 from tqdm import tqdm
 
 PATH_TO_TOKENIZER_CODE_2_COUNT = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json'
-PATH_TO_TOKENIZER_CODE_2_INT = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_int.json'
+PATH_TO_TOKENIZER_CODE_2_INT = '/home/hf_ehr/tokenizer_v9/code_2_detail.json'
 
 # Assuming FEMRDataset, GPTLanguageModel and load_datasets from your provided modules
 from hf_ehr.data.datasets import FEMRDataset
@@ -101,7 +101,8 @@ def main(config: DictConfig) -> None:
     #atoi: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER_CODE_2_INT, 'r'))
     code_to_count: Dict[str, int] = json.load(open(PATH_TO_TOKENIZER_CODE_2_COUNT, 'r'))
     min_code_count: Optional[int] = None
-    tokenizer = FEMRTokenizer(code_to_count, min_code_count=min_code_count)
+    tokenizer = FEMRTokenizer(path_to_code_2_detail=PATH_TO_TOKENIZER_CODE_2_INT, min_code_count=min_code_count)
+    #tokenizer = FEMRTokenizer(code_to_count, min_code_count=min_code_count, path_to_code_2_detail=PATH_TO_TOKENIZER_CODE_2_INT)
     
     print("Setting up dataloaders...")
     dataloaders = load_dataloaders(config, datasets, tokenizer)
