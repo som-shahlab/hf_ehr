@@ -29,6 +29,17 @@ python3 ehrshot.py \
     --embed_strat last \
     --chunk_strat last \
     --is_force_refresh
+    
+    
+python3 ehrshot.py \
+    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_model /share/pi/nigam/suhana/hf_ehr/cache/runs/mamba_tiny_16_1e6/ckpts/last-v1.ckpt \
+    --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
+    --embed_strat last \
+    --chunk_strat last \
+    --is_force_refresh
 '''
 
 def parse_args() -> argparse.Namespace:
@@ -78,7 +89,7 @@ if __name__ == "__main__":
     tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL)
     
     # Load model
-    checkpoint = torch.load(PATH_TO_MODEL)
+    checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
     if 'bert' in MODEL:
         model = BERTLanguageModel(**checkpoint['hyper_parameters'], tokenizer=tokenizer)
     elif 'gpt2' in MODEL:
