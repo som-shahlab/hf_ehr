@@ -20,6 +20,7 @@ class Detail(TypedDict):
     is_numeric: Optional[bool] # if TRUE, then code is a lab value
 
 class Code2Detail(TypedDict):
+    """JSON file named `code_2_detail.json` which is a dict with [key] = code from FEMR, [val] = Detail dict"""
     code: Detail
 
 SPLIT_SEED: int = 97
@@ -29,12 +30,21 @@ SPLIT_VAL_CUTOFF: float = 85
 class FEMRTokenizer(PreTrainedTokenizer):
     def __init__(self, 
                  path_to_code_2_detail: str, 
+                 is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  min_code_count: Optional[int] = None) -> None:
         self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
+        
+        # Get vocabulary
+        if is_remap_numerical_codes:
+            # Use the lab-value quantiled version of the FEMR codes
+            codes: List[str] = sorted(list(self.code_2_detail.keys())) # TODO -- get list of codes by looping through `token_2_count` keys()
+        else:
+            # Just use the raw FEMR codes as is
+            codes: List[str] = sorted(list(self.code_2_detail.keys()))
+            
         # Only keep codes with >= `min_code_count` occurrences in our dataset
-        codes: List[str] = sorted(list(self.code_2_detail.keys()))
         if min_code_count is not None:
-            codes = [ x for x in codes if self.code_2_detail[x]['count'] >= min_code_count ]
+            codes = [ x for x in codes if self.code_2_detail[x]['token_2_count'] >= min_code_count ] # TODO loop through `token_2_count` values
 
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
@@ -398,7 +408,6 @@ class FEMRDataset(Dataset):
                 ):
                     # if we hit a numerical code and need to remap it, follow tokenizer template format
                     # to map (code, unit, value) => quantile for (code, unit)
-                    breakpoint()
                     unit: str = str(e.unit)
                     quantiles: List[float] = self.code_2_detail[e.code]['unit_2_quartiles'][unit]
 

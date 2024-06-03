@@ -80,7 +80,7 @@ class BaseModel(L.LightningModule):
                 self.sum_metrics[key] = SumMetric()
                 # Need to rescale SumMetric loaded from checkpoint since its saved value is summed across all GPUs,
                 # but this `on_load_checkpoint()` gets called per GPU. Need to do this quotient/remainder thing in
-                # case the SumMetric's valuvalue is not divisible by the # of GPUs
+                # case the SumMetric's value is not divisible by the # of GPUs
                 remainder: int = checkpoint[key] % (self.trainer.num_devices * self.trainer.num_nodes)
                 quotient: int = checkpoint[key] // (self.trainer.num_devices * self.trainer.num_nodes)
                 self.sum_metrics[key].update(quotient + (remainder if self.trainer.global_rank == 0 else 0))

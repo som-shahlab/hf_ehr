@@ -36,7 +36,6 @@ def hyena_forward(
     logits = self.lm_head(hidden_states)
     logits = logits.float()
 
-    # TODO (@Suhana) -- ignore pad tokens in loss calculation (see my old modules.py::CausalModel forward() for reference)
     loss = None
     if labels is not None:
         # Shift so that tokens < n predict n
