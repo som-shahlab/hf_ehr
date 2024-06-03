@@ -21,9 +21,9 @@ from hf_ehr.models.mamba import MambaLanguageModel
 
 '''
 python3 ehrshot.py \
-    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_database /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt2-base-lr-1e-4/ckpts/last.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
     --embed_strat last \
@@ -32,9 +32,9 @@ python3 ehrshot.py \
     
     
 python3 ehrshot.py \
-    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_database /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/suhana/hf_ehr/cache/runs/mamba_tiny_16_1e6/ckpts/last-v1.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
     --embed_strat last \
@@ -51,6 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_tokenizer", type=str, help="Path to tokenizer code_2_detail.json")
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
@@ -65,6 +66,7 @@ if __name__ == "__main__":
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_MODEL = args.path_to_model
     PATH_TO_TOKENIZER_CODE_2_DETAIL = args.path_to_tokenizer
+    batch_size: int = args.batch_size
     MODEL: str = args.path_to_model.split("/")[-3] # /share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt2-base-lr-1e-4/ckpts/last.ckpt => gpt2-base-lr-1e-4
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
     
@@ -87,6 +89,7 @@ if __name__ == "__main__":
 
     # Load tokenizer
     tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL)
+    vocab = tokenizer.get_vocab()
     
     # Load model
     checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
@@ -103,7 +106,6 @@ if __name__ == "__main__":
     model.load_state_dict(checkpoint['state_dict'])
     model.to(device)
     
-
     # Setup patient features
     timeline_starts: Dict[int, List[datetime.datetime]] = {}  # [key] = patient id, [value] = List of event.starts where [idx] is same as [idx] of corresponding code in `timeline_tokens`
     timeline_tokens: Dict[int, List[int]] =  {}  # [key] = patient id, [value] = List of event.codes where [idx] is same as [idx] of corresponding start in `timeline_starts`
@@ -111,7 +113,7 @@ if __name__ == "__main__":
         # NOTE: Takes ~2 mins to load all patients
         # Create timeline for each label, where we only consider events that occurred BEFORE label.time
         full_timeline: List[Tuple[datetime.datetime, str]] = [ (x.start, x.code) for x in database[patient_id].events ]
-        timeline_with_valid_tokens: List[Tuple[datetime.datetime, str]] = [ x for x in full_timeline if x[1] in tokenizer.vocab ]
+        timeline_with_valid_tokens: List[Tuple[datetime.datetime, str]] = [ x for x in full_timeline if x[1] in vocab ]
         timeline_starts[patient_id] = [ x[0] for x in timeline_with_valid_tokens ]
         timeline_tokens[patient_id] = tokenizer([ x[1] for x in timeline_with_valid_tokens ])['input_ids'][0]
         assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
@@ -120,45 +122,69 @@ if __name__ == "__main__":
             patient_ids.append(patient_id)
             label_values.append(label.value)
             label_times.append(label.time)
-
+    
     # Generate patient representations
     max_length: int = model.config.data.dataloader.max_length
     with torch.no_grad():
         # NOTE: Takes ~5 hrs
-        for (patient_id, label_value, label_time) in tqdm(zip(patient_ids, label_values, label_times), desc='Generating patient representations', total=len(patient_ids)):
-            # Get timeline
-            timeline_starts_for_patient: List[datetime.datetime] = timeline_starts[patient_id]
-            timeline_tokens_for_patient: List[int] = timeline_tokens[patient_id]
-            
-            # Truncate timeline to only events <= label.time
-            timeline: List[int] = []
-            for token_idx, token in enumerate(timeline_tokens_for_patient):
-                if timeline_starts_for_patient[token_idx] <= label_time:
-                    timeline.append(token)
-                else:
-                    break
+        for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
+            pids = patient_ids[batch_start:batch_start + batch_size]
+            values = label_values[batch_start:batch_start + batch_size]
+            times = label_times[batch_start:batch_start + batch_size]
+            timelines: List[List[int]] = []
 
+            # Truncate timeline to only events <= label.time
+            for (pid, l_value, l_time) in zip(pids, values, times):
+                timeline_starts_for_pid: List[datetime.datetime] = timeline_starts[pid]
+                timeline_tokens_for_pid: List[int] = timeline_tokens[pid]
+                timeline: List[int] = []
+                for token_idx, token in enumerate(timeline_tokens_for_pid):
+                    if timeline_starts_for_pid[token_idx] <= l_time:
+                        timeline.append(token)
+                    else:
+                        break
+                timelines.append(timeline)
+            
             # Chunking
             if CHUNK_STRAT == 'last':
-                timeline = timeline[-max_length:]
+                timelines = [ x[-max_length:] for x in timelines ]
             else:
                 raise ValueError(f"Chunk strategy `{CHUNK_STRAT}` not supported.")
 
+            max_timeline_length = max([ len(x) for x in timelines ])
+
+            # Left PAD timelines to max_timeline_length
+            pad_token_id: int = tokenizer.token_2_idx['[PAD]']
+            timelines_w_pad: List[List[int]] = [ [ pad_token_id ] * (max_timeline_length - len(x)) + x  for x in timelines ]
+            assert all([ len(x) == max_timeline_length for x in timelines_w_pad ])
+            
+            # Creates a tensor of size: batch_size x max_timeline_length
+            input_ids: torch.Tensor = torch.stack([ torch.tensor(x) for x in timelines_w_pad ])
+            batch = {
+                'input_ids' : input_ids.to(device),
+                'attention_mask' : (input_ids != pad_token_id).int().to(device),
+            }
+
             # Inference
-            # logits.shape = (batch_size = 1, sequence_length, vocab_size = 167k)
-            # hidden_states.shape = (batch_size = 1, sequence_length, hidden_size = 768)
-            logits, hidden_states = model({ 'input_ids': torch.tensor([ timeline ]).to(device) })
+            # logits.shape = (batch_size, sequence_length, vocab_size = 167k)
+            # hidden_states.shape = (batch_size, sequence_length, hidden_size = 768)
+            results = model.model(**batch, output_hidden_states=True)
+            hidden_states = results.hidden_states[-1].detach().cpu()
 
             # Aggregate embeddings
             if EMBED_STRAT == 'last':
-                patient_rep = hidden_states[:,-1,:].detach().cpu().numpy()
+                for idx in range(0, len(pids)):
+                    patient_rep = hidden_states[idx,-1,:].numpy()
+                    feature_matrix.append(patient_rep)
             elif EMBED_STRAT == 'avg':
-                patient_rep = hidden_states.mean(dim=1).detach().cpu().numpy()
+                for idx in range(0, len(pids)):
+                    # NOTE: Need to account for attention_mask when averaging over tokens to ignore [PAD]
+                    patient_rep = hidden_states[idx, input_ids[idx] != pad_token_id].mean(dim=1).numpy()
+                    feature_matrix.append(patient_rep)
             else:
                 raise ValueError(f"Embedding strategy `{EMBED_STRAT}` not supported.")
-            feature_matrix.append(patient_rep)
     
-    feature_matrix = np.concatenate(feature_matrix)
+    feature_matrix = np.stack(feature_matrix)
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)
     label_times = np.array(label_times)
