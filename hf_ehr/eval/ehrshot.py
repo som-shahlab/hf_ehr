@@ -52,6 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+    parser.add_argument("--device", type=str, default="cuda:0", help="Device to run inference on")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
@@ -85,7 +86,7 @@ if __name__ == "__main__":
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
 
     # Device
-    device: str = 'cuda:0'
+    device: str = args.device
 
     # Load tokenizer
     tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL)
