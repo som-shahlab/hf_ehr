@@ -2,12 +2,10 @@ import argparse
 import datetime
 import os
 import pickle
-import json
 
 from typing import List, Dict, Tuple, Union, Optional
 from tqdm import tqdm
 import numpy as np
-from omegaconf import DictConfig, OmegaConf
 
 import torch
 from loguru import logger
@@ -21,9 +19,9 @@ from hf_ehr.models.mamba import MambaLanguageModel
 
 '''
 python3 ehrshot.py \
-    --path_to_database /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt2-base-lr-1e-4/ckpts/last.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
     --embed_strat last \
@@ -32,9 +30,9 @@ python3 ehrshot.py \
     
     
 python3 ehrshot.py \
-    --path_to_database /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/suhana/hf_ehr/cache/runs/mamba_tiny_16_1e6/ckpts/last-v1.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
     --embed_strat last \
@@ -55,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
     EMBED_STRAT: str = args.embed_strat
     CHUNK_STRAT: str = args.chunk_strat
@@ -122,7 +120,9 @@ if __name__ == "__main__":
             patient_ids.append(patient_id)
             label_values.append(label.value)
             label_times.append(label.time)
-    
+    del database
+
+
     # Generate patient representations
     max_length: int = model.config.data.dataloader.max_length
     with torch.no_grad():
@@ -174,16 +174,16 @@ if __name__ == "__main__":
             # Aggregate embeddings
             if EMBED_STRAT == 'last':
                 for idx in range(0, len(pids)):
-                    patient_rep = hidden_states[idx,-1,:].numpy()
+                    patient_rep = hidden_states[idx,-1,:].clone().numpy()
                     feature_matrix.append(patient_rep)
             elif EMBED_STRAT == 'avg':
                 for idx in range(0, len(pids)):
                     # NOTE: Need to account for attention_mask when averaging over tokens to ignore [PAD]
-                    patient_rep = hidden_states[idx, input_ids[idx] != pad_token_id].mean(dim=1).numpy()
+                    patient_rep = hidden_states[idx, input_ids[idx] != pad_token_id].mean(dim=1).clone().numpy()
                     feature_matrix.append(patient_rep)
             else:
                 raise ValueError(f"Embedding strategy `{EMBED_STRAT}` not supported.")
-    
+
     feature_matrix = np.stack(feature_matrix)
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)
@@ -205,3 +205,6 @@ if __name__ == "__main__":
     logger.info(f"Shapes: feature_matrix={feature_matrix.shape}, patient_ids={patient_ids.shape}, label_values={label_values.shape}, label_times={label_times.shape}")
 
     logger.success("Done!")
+
+if __name__ == "__main__":
+    main()
