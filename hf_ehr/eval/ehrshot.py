@@ -16,27 +16,31 @@ from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
+from hf_ehr.models.t5 import T5LanguageModel
 
 '''
 python3 ehrshot.py \
-    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_database /share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt2-base-lr-1e-4/ckpts/last.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
     --embed_strat last \
     --chunk_strat last \
+    --batch_size 32 \
     --is_force_refresh
     
     
 python3 ehrshot.py \
-    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
-    --path_to_model /share/pi/nigam/suhana/hf_ehr/cache/runs/mamba_tiny_16_1e6/ckpts/last-v1.ckpt \
+    --path_to_database /share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_model /share/pi/nigam/suhana/hf_ehr/cache/runs/mamba_tiny_1_1e4/ckpts/last.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json \
     --embed_strat last \
     --chunk_strat last \
+    --batch_size 32 \
+    --device cuda:1 \
     --is_force_refresh
 '''
 
@@ -100,6 +104,8 @@ def main():
         model = HyenaLanguageModel(**checkpoint['hyper_parameters'], tokenizer=tokenizer)
     elif 'mamba' in MODEL:
         model = MambaLanguageModel(**checkpoint['hyper_parameters'], tokenizer=tokenizer)
+    elif 't5' in MODEL:
+        model = T5LanguageModel(**checkpoint['hyper_parameters'], tokenizer=tokenizer)
     else:
         raise ValueError(f"Model `{MODEL}` not supported.")
     model.load_state_dict(checkpoint['state_dict'])
@@ -165,6 +171,8 @@ def main():
                 'input_ids' : input_ids.to(device),
                 'attention_mask' : (input_ids != pad_token_id).int().to(device),
             }
+            if "hyena" in MODEL:
+                batch.pop("attention_mask")
 
             # Inference
             # logits.shape = (batch_size, sequence_length, vocab_size = 167k)
