@@ -33,30 +33,37 @@ def copy_resources_to_local(base_dir: str) -> None:
     copy_if_not_exists('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_count.json', base_dir)
     copy_if_not_exists('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_detail.json', base_dir)
     copy_if_not_exists('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_count.json', base_dir)
+    copy_if_not_exists('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir)
+    copy_if_not_exists('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json', base_dir)
+    copy_if_not_exists('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_count.json', base_dir)
 
 def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
     """Rewrite paths for Carina partitions to use local-scratch directories."""
     if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
         copy_resources_to_local(V100_BASE_DIR)
         config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', V100_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/', V100_BASE_DIR)
         # config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', V100_BASE_DIR)
         config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', V100_BASE_DIR)
         print(f"Loading data from local-scratch: `{V100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-a100':
         copy_resources_to_local(A100_BASE_DIR)
         config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/', A100_BASE_DIR)
         # config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', A100_BASE_DIR)
         config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
         print(f"Loading data from local-scratch: `{A100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-h100':
         copy_resources_to_local(H100_BASE_DIR)
         config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', H100_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/', H100_BASE_DIR)
         # config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', H100_BASE_DIR)
         config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', H100_BASE_DIR)
         print(f"Loading data from local-scratch: `{H100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
         copy_resources_to_local(GPU_BASE_DIR)
         config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
+        config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/', GPU_BASE_DIR)
         # config.data.tokenizer.path_to_code_2_count = config.data.tokenizer.path_to_code_2_count.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', GPU_BASE_DIR)
         config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
         print(f"Loading data from local-scratch: `{GPU_BASE_DIR}`.")
