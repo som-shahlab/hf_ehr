@@ -109,6 +109,8 @@ logging:
   wandb:
     # If true, then turn ON wandb logging
     is_wandb: True
+    # If true, it will recreate the wandb run up to the last step in the model checkpoint
+    recreate: True
     # Run name
     name: null
   mlflow:
