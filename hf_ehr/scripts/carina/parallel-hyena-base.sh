@@ -40,6 +40,7 @@ python3 ../run.py \
     model.config_kwargs.d_model=128 \
     model.config_kwargs.n_layer=4 \
     model.config_kwargs.max_seq_len=1024 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp1/ \
     logging.wandb.name=$exp1 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp1}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp1}_${SLURM_JOB_ID}.err &
 child_pids+=($!)
@@ -58,6 +59,7 @@ python3 ../run.py \
     model.config_kwargs.n_layer=4 \
     model.config_kwargs.max_seq_len=1024 \
     data.dataloader.max_length=1024 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp2/ \
     logging.wandb.name=$exp2 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp2}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp2}_${SLURM_JOB_ID}.err &
 child_pids+=($!)
@@ -77,6 +79,7 @@ python3 ../run.py \
     model.config_kwargs.n_layer=8 \
     model.config_kwargs.max_seq_len=1024 \
     data.dataloader.max_length=1024 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp3/ \
     logging.wandb.name=$exp3 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp3}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp3}_${SLURM_JOB_ID}.err &
 child_pids+=($!)

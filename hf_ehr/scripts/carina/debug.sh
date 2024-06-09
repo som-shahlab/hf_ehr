@@ -26,4 +26,5 @@ python3 ../run.py \
     trainer.max_epochs=2 \
     data.dataset.is_debug=True \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/test/ \
-    logging.wandb.name=test
+    logging.wandb.name=test \
+    logging.wandb.recreate=True

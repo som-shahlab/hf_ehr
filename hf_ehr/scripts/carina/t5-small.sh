@@ -26,4 +26,5 @@ python3 ../run.py \
     model.config_kwargs.d_ff=2048 \
     model.config_kwargs.n_positions=1024 \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/t5-small/ \
-    logging.wandb.name=t5-small
+    logging.wandb.name=t5-small \
+    logging.wandb.recreate=True

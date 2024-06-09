@@ -39,6 +39,7 @@ python3 ../run.py \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
     model.config_kwargs.n_embd=768 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp1/ \
     logging.wandb.name=$exp1 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp1}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp1}_${SLURM_JOB_ID}.err &
 child_pids+=($!)
@@ -56,6 +57,7 @@ python3 ../run.py \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
     model.config_kwargs.n_embd=768 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp2/ \
     logging.wandb.name=$exp2 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp2}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp2}_${SLURM_JOB_ID}.err &
 child_pids+=($!)
@@ -73,6 +75,7 @@ python3 ../run.py \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
     model.config_kwargs.n_embd=768 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp3/ \
     logging.wandb.name=$exp3 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp3}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp3}_${SLURM_JOB_ID}.err &
 child_pids+=($!)
@@ -90,6 +93,7 @@ python3 ../run.py \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
     model.config_kwargs.n_embd=768 \
+    logging.wandb.recreate=True \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/$exp4/ \
     logging.wandb.name=$exp4 > /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp4}_${SLURM_JOB_ID}.out 2> /share/pi/nigam/$USER/hf_ehr/slurm_logs/${exp4}_${SLURM_JOB_ID}.err &
 child_pids+=($!)
