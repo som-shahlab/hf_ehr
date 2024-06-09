@@ -3,10 +3,10 @@
 #SBATCH --output=/share/pi/nigam/migufuen/hf_ehr/slurm_logs/gpt2-base_%A.out
 #SBATCH --error=/share/pi/nigam/migufuen/hf_ehr/slurm_logs/gpt2-base_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-h100
-#SBATCH --mem=400G
-#SBATCH --cpus-per-task=40
-#SBATCH --gres=gpu:4
+#SBATCH --partition=gpu
+#SBATCH --mem=200G
+#SBATCH --cpus-per-task=20
+#SBATCH --gres=gpu:1
 
 source base.sh
 
