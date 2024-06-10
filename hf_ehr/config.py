@@ -21,7 +21,8 @@ def copy_if_not_exists(src: str, dest: str) -> None:
     """Copy a file or directory if it does not exist."""
     if not os.path.exists(os.path.join(dest, os.path.basename(src))):
         if os.path.isdir(src):
-            shutil.copytree(src, dest)
+            print("Copying directory to destination.", src, dest)
+            shutil.copytree(src, dest, dirs_exist_ok=True)
         else:
             shutil.copy2(src, dest)
 
