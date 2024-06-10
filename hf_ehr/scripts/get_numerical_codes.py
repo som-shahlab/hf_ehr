@@ -37,6 +37,7 @@ def apply_to_femr_db(path_to_femr_db: str, func: Callable, merge_func: Optional[
     # Spawn procs
     ctx = multiprocessing.get_context("forkserver")
     path_to_output_dir: str = f'./temp-{random.randint(0, 999999)}/'
+    path_to_output_dir: str = f'./temp-296237' # TODO - remove
     os.makedirs(path_to_output_dir, exist_ok=True)
     tasks = [
         (path_to_femr_db, start_idx, min(n_patients, start_idx + batch_size), path_to_output_dir)
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     codes = []
     units = []
     values = []
-    for code, info in tqdm(code_2_numerical_info.items(), total=len(code_2_numerical_info)):
+    for code, info in tqdm(code_2_numerical_info.items(), total=len(code_2_numerical_info), desc='Looping thru code_2_numerical_info'):
         for (u, v) in zip(info['units'], info['values']):
             codes.append(code)
             units.append(u)
