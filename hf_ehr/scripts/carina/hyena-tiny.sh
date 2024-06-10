@@ -33,7 +33,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         model.config_kwargs.n_layer=2 \
         model.config_kwargs.max_seq_len=1024 \
         main.path_to_output_dir=/share/pi/nigam/suhana/hf_ehr/cache/runs/hyena-1k-v8/ \
-        logging.wandb.name=hyena-tiny
+        logging.wandb.name=hyena-tiny \
+        logging.wandb.recreate=True
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1

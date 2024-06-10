@@ -34,7 +34,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         trainer.is_use_bf16=True \
         #scheduler.num_warmup_steps=50000 \
         main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-large/ \
-        logging.wandb.name=gpt2-large
+        logging.wandb.name=gpt2-large \
+        logging.wandb.recreate=True
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1

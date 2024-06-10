@@ -23,4 +23,5 @@ python3 ../run.py \
     model.config_kwargs.n_embd=768 \
     model.config_kwargs.n_positions=4096 \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base-4096/ \
-    logging.wandb.name=gpt2-base-4096
+    logging.wandb.name=gpt2-base-4096 \
+    logging.wandb.recreate=True

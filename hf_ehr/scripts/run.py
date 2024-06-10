@@ -20,6 +20,7 @@ from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
+from hf_ehr.logger.reloggers import WandbRelogger
 
 class GradNormCallback(Callback):
     """
@@ -133,11 +134,26 @@ def main(config: DictConfig) -> None:
 
     ## Wandb
     # NOTE: There's a lot of `init()` calls below. Idk why they are all necessary, but they seem to be. Don't any!
+    run = None
     if is_wandb:
         if is_resume_from_ckpt:
             # Load existing wandb run ID
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
                 wandb_run_id: str = f.read()
+                
+            if rank_zero_only.rank == 0:
+                if config.logging.wandb.recreate:
+                    logger.info(f"Recreating wandb run from run id {wandb_run_id}...")
+                    wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
+                    run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
+                    wandb_run_id = run.id
+                else:
+                    run = wandb.init(project='hf_ehr', 
+                            dir=path_to_log_dir, 
+                            name=config.logging.wandb.name,
+                            resume='allow', 
+                            id=wandb_run_id)
+            
             logger.info(f"Found existing wandb run: `{wandb_run_id}`")
             loggers += [ 
                         WandbLogger(project='hf_ehr',
@@ -146,15 +162,9 @@ def main(config: DictConfig) -> None:
                                     resume='allow',
                                     id=wandb_run_id)
             ]
-            if rank_zero_only.rank == 0:
-                wandb.init(project='hf_ehr', 
-                            dir=path_to_log_dir, 
-                            name=config.logging.wandb.name,
-                            resume='allow', 
-                            id=wandb_run_id)
         else:
             if rank_zero_only.rank == 0:
-                wandb.init(project='hf_ehr', 
+                run = wandb.init(project='hf_ehr', 
                         dir=path_to_log_dir, 
                         name=config.logging.wandb.name)
             loggers += [ 
@@ -165,16 +175,16 @@ def main(config: DictConfig) -> None:
             ]
             if rank_zero_only.rank == 0:
                 # Save wandb run ID
-                wandb_run_id: str = wandb.run.id
+                wandb_run_id: str = run.id
                 with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'w') as f:
                     f.write(wandb_run_id)
         if rank_zero_only.rank == 0:
             if not is_resume_from_ckpt:
                 wandb_config = OmegaConf.to_container(config, resolve=True)
                 # wandb_config.pop('config', None)
-                wandb.config.update(wandb_config)
-            wandb.define_metric('train/loss', summary='min')
-            wandb.define_metric('val/loss', summary='min')
+                run.config.update(wandb_config)
+            run.define_metric('train/loss', summary='min')
+            run.define_metric('val/loss', summary='min')
 
     logger.info("========================== Starting main ==========================")
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")

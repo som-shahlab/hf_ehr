@@ -27,7 +27,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         data.dataloader.batch_size=2 \
         data.dataloader.approx_batch_sampler.max_tokens=2048 \
         trainer.accumulate_grad_batches=8 \
-        trainer.optimizer.lr=2e-4
+        trainer.optimizer.lr=2e-4 \
+        logging.wandb.recreate=True
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1

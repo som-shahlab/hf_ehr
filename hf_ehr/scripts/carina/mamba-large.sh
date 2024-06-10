@@ -33,7 +33,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         model.config_kwargs.num_hidden_layers=48 \
         callbacks.model_checkpointing.every_n_train_steps=100 \
         main.path_to_output_dir=/share/pi/nigam/suhana/hf_ehr/cache/runs/mamba-test/ \
-        logging.wandb.name=mamba-large
+        logging.wandb.name=mamba-large \
+        logging.wandb.recreate=True
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1
