@@ -117,7 +117,7 @@ def get_numerical_codes(path_to_femr_db: str, start_idx: int = 0, end_idx: int =
     json.dump(dict(code_2_numerical_info), open(path_to_output_file, 'w'))
 
 if __name__ == '__main__':
-    n_procs: int = 30
+    n_procs: int = 4
     batch_size: int = 10_000
     path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v8_DIR
     path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8

@@ -11,7 +11,7 @@ model:
   hf_name: gpt2
   # Kwargs for ModelConfig
   config_kwargs:
-    n_positions: ${model.dataloader.max_length}
+    n_positions: ${data.dataloader.max_length}
     n_layer: 12
     n_head: 12
     n_embd: 768

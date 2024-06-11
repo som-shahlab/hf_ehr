@@ -3,6 +3,8 @@ main:
   seed: 1
   # Where outputs will be saved; If folder exists, then run will be resumed from this directory's `../ckpts/last.ckpt` file
   path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
+  # If TRUE, then delete existing checkpoint and restart from scratch
+  is_force_restart: False
 
 hydra:
   run:
@@ -25,7 +27,7 @@ callbacks:
     # Save model every N global steps; persists permanently
     every_n_train_steps: 30_000
     # Save model every N nonPAD training tokens seen; persists permanently
-    every_n_train_nonPAD_tokens: 100_000
+    every_n_train_nonPAD_tokens: 1_000
 
 data:
   # Sampling strategy for dataset: "random", "stratified", "skillit"

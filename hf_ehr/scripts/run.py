@@ -1,4 +1,5 @@
 import os
+import shutil
 import hydra
 import wandb
 import torch
@@ -9,7 +10,7 @@ from lightning.pytorch.utilities import rank_zero_only
 
 from loguru import logger
 from torch.utils.data import DataLoader
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
@@ -40,22 +41,51 @@ class GradNormCallback(Callback):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
-    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, filename: str):
+    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
+        """
+            is_valid_metric_func: Callable
+                Inputs: 
+                    current metric value: Any
+                    metric vale at last ckpt: Any
+                Returns:
+                    is_ckpt: boolean -- True if create ckpt at this step
+                    val: Any -- cleaned version of current metric to associate with ckpt
+        """
         super().__init__()
         self.metric_name: str = metric_name
         self.is_valid_metric_func: Callable = is_valid_metric_func
         self.dirpath: str = dirpath
-        self.filename: str = filename
+        self.last_ckpt_metric_value: Optional[Any] = None
 
-    def on_validation_end(self, trainer, pl_module):
+    def on_train_batch_end(self, trainer, *args, **kwargs):
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
+        
+        is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+        
+        logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
 
-        if metric_value is not None and is_valid_metric_func(metric_value):
-            filepath = f"{self.dirpath}/{self.metric_name}={metric_value}-persist.ckpt"
+        if metric_value is not None and is_ckpt:
+            filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
             trainer.save_checkpoint(filepath)
-            print(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
+            logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
+            self.last_ckpt_metric_value = metric_value
+    
+    @property
+    def state_key(self) -> str:
+        kwargs = { 
+            'metric_name' : self.metric_name,
+        }
+        return f"{self.__class__.__qualname__}{repr(kwargs)}"
 
+def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
+    interval = config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens
+    current: int = int(val // interval)
+    if last_val is None:
+        return True, val, current * interval
+    else:
+        last: int = int(last_val // interval)
+        return last < current, val, current * interval
 
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
@@ -72,6 +102,7 @@ def main(config: DictConfig) -> None:
     path_to_tokenizer_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     seed: int = config.main.seed
+    is_force_restart: bool = config.main.is_force_restart
 
     # Random seed
     pl.seed_everything(seed, workers=True)
@@ -79,6 +110,11 @@ def main(config: DictConfig) -> None:
     # Check if resuming from checkpoint
     is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
     path_to_resume_ckpt: Optional[str] = os.path.join(path_to_output_dir, 'ckpts/last.ckpt') if is_resume_from_ckpt else None
+    if is_force_restart:
+        print("!!!! Force restart !!!!")
+        is_resume_from_ckpt = False
+        path_to_resume_ckpt = None
+        shutil.rmtree(path_to_output_dir)
 
     # Paths
     path_to_log_dir: str = os.path.join(path_to_output_dir, 'logs/')
@@ -133,7 +169,7 @@ def main(config: DictConfig) -> None:
                 loggers[-1].log_hyperparams(mlflow_config)
 
     ## Wandb
-    # NOTE: There's a lot of `init()` calls below. Idk why they are all necessary, but they seem to be. Don't any!
+    # NOTE: There's a lot of `init()` calls below. Idk why they are all necessary, but they seem to be. Don't remove any!
     run = None
     if is_wandb:
         if is_resume_from_ckpt:
@@ -246,16 +282,9 @@ def main(config: DictConfig) -> None:
         ),
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
         MetricBasedCheckpoint(
-            metric_name="train/tokens/total_nonPAD",
-            is_valid_metric_func=lambda x: x % config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens == 0,
-            dirpath="checkpoints",
-        ),
-        ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
-            save_top_k=-1,
-            every_n_train_steps=config.callbacks.model_checkpointing.every_n_train_steps,
-            save_weights_only=False, # If False, then save optimizer + scheduler states as well
-            verbose=True,
+            metric_name="train/tokens/total_nonPAD",
+            is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
         ),
         # Save checkpoint every `every_n_train_steps` steps; persists all models
         ModelCheckpoint(

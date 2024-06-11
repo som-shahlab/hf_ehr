@@ -8,7 +8,7 @@
 #SBATCH --cpus-per-task=20
 #SBATCH --gres=gpu:4
 
-source base.sh
+# source base.sh
 
 python3 ../run.py \
     +models=gpt2 \
@@ -23,8 +23,10 @@ python3 ../run.py \
     model.config_kwargs.n_embd=128 \
     trainer.limit_train_batches=100 \
     trainer.limit_val_batches=0 \
-    trainer.max_epochs=2 \
-    data.dataset.is_debug=True \
+    trainer.max_epochs=1 \
+    data.dataset.is_debug=False \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/test/ \
-    logging.wandb.name=test \
-    logging.wandb.recreate=True
+    callbacks.model_checkpointing.every_n_train_nonPAD_tokens=10000 \
+    logging.wandb.name=test_2 \
+    main.is_force_restart=True \
+    logging.wandb.recreate=False
