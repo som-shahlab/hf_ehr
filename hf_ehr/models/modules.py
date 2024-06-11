@@ -6,7 +6,6 @@ import torch.distributed as dist
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
 from hf_ehr.utils import lr_warmup_with_constant_plateau
-from hf_ehr.data.datasets import FEMRTokenizer
 from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union, Tuple
 
@@ -22,13 +21,13 @@ class BaseModel(L.LightningModule):
     vocab_size: int
     pad_token_id: int
 
-    def __init__(self, config: DictConfig, tokenizer: FEMRTokenizer) -> None:
+    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
         super().__init__()
         self.save_hyperparameters('config') #NOTE: Need to exclude `tokenizer` otherwise internal PTL .hparam call later will hang
         self.model_name: str = config.model.name
         self.config = config
-        self.vocab_size: int = tokenizer.vocab_size
-        self.pad_token_id: int = tokenizer.pad_token_id
+        self.vocab_size: int = vocab_size
+        self.pad_token_id: int = pad_token_id
         
         # Metrics
         self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
