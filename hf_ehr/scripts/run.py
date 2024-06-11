@@ -1,4 +1,5 @@
 import os
+import shutil
 import hydra
 import wandb
 import torch
@@ -9,10 +10,10 @@ from lightning.pytorch.utilities import rank_zero_only
 
 from loguru import logger
 from torch.utils.data import DataLoader
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
-from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
+from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
@@ -39,6 +40,53 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
+class MetricBasedCheckpoint(pl.callbacks.Callback):
+    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
+        """
+            is_valid_metric_func: Callable
+                Inputs: 
+                    current metric value: Any
+                    metric vale at last ckpt: Any
+                Returns:
+                    is_ckpt: boolean -- True if create ckpt at this step
+                    val: Any -- cleaned version of current metric to associate with ckpt
+        """
+        super().__init__()
+        self.metric_name: str = metric_name
+        self.is_valid_metric_func: Callable = is_valid_metric_func
+        self.dirpath: str = dirpath
+        self.last_ckpt_metric_value: Optional[Any] = None
+
+    def on_train_batch_end(self, trainer, *args, **kwargs):
+        metrics = trainer.callback_metrics
+        metric_value = metrics.get(self.metric_name)
+        
+        is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+        
+        logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
+
+        if metric_value is not None and is_ckpt:
+            filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
+            trainer.save_checkpoint(filepath)
+            logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
+            self.last_ckpt_metric_value = metric_value
+    
+    @property
+    def state_key(self) -> str:
+        kwargs = { 
+            'metric_name' : self.metric_name,
+        }
+        return f"{self.__class__.__qualname__}{repr(kwargs)}"
+
+def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
+    interval = config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens
+    current: int = int(val // interval)
+    if last_val is None:
+        return True, int(val), current * interval
+    else:
+        last: int = int(last_val // interval)
+        return last < current, int(val), current * interval
+
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
@@ -54,6 +102,7 @@ def main(config: DictConfig) -> None:
     path_to_tokenizer_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     seed: int = config.main.seed
+    is_force_restart: bool = config.main.is_force_restart
 
     # Random seed
     pl.seed_everything(seed, workers=True)
@@ -61,6 +110,11 @@ def main(config: DictConfig) -> None:
     # Check if resuming from checkpoint
     is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
     path_to_resume_ckpt: Optional[str] = os.path.join(path_to_output_dir, 'ckpts/last.ckpt') if is_resume_from_ckpt else None
+    if is_force_restart:
+        print("!!!! Force restart !!!!")
+        is_resume_from_ckpt = False
+        path_to_resume_ckpt = None
+        shutil.rmtree(path_to_output_dir)
 
     # Paths
     path_to_log_dir: str = os.path.join(path_to_output_dir, 'logs/')
@@ -115,7 +169,7 @@ def main(config: DictConfig) -> None:
                 loggers[-1].log_hyperparams(mlflow_config)
 
     ## Wandb
-    # NOTE: There's a lot of `init()` calls below. Idk why they are all necessary, but they seem to be. Don't any!
+    # NOTE: There's a lot of `init()` calls below. Idk why they are all necessary, but they seem to be. Don't remove any!
     run = None
     if is_wandb:
         if is_resume_from_ckpt:
@@ -172,22 +226,26 @@ def main(config: DictConfig) -> None:
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
 
     # Tokenizer
-    logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_detail}`")
-    tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
+    if config.data.tokenizer.is_remap_codes_to_desc:
+        logger.info(f"Loading DescTokenizer: `{config.data.tokenizer.desc_emb_tokenizer}`")
+        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(config.data.tokenizer.desc_emb_tokenizer))
+    else:
+        logger.info(f"Loading FEMRTokenizer: `{path_to_tokenizer_code_2_detail}`")
+        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, tokenizer)
+        model = GPTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, tokenizer)
+        model = BERTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, tokenizer)
+        model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, tokenizer)
+        model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer)
+        model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
@@ -248,6 +306,15 @@ def main(config: DictConfig) -> None:
             verbose=True,
         )
     ]
+    if hasattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens') and config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens is not None:
+        # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
+        callbacks += [ 
+            MetricBasedCheckpoint(
+                dirpath=path_to_ckpt_dir,
+                metric_name="train/tokens/total_nonPAD",
+                is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
+            ),
+        ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
 

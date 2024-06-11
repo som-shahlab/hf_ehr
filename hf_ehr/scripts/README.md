@@ -1,4 +1,6 @@
-# To generate vocab
+# Tokenizer
+
+To generate a vocab, run the following scripts in sequence:
 
 ```bash
 python3 get_numerical_codes.py

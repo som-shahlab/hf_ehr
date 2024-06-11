@@ -12,7 +12,7 @@ from typing import List, Dict, Callable, Union, Optional
 import os
 from tqdm import tqdm
 import multiprocessing
-from hf_ehr.config import PATH_TO_TOKENIZER_v9_DIR, PATH_TO_FEMR_EXTRACT_v9
+from hf_ehr.config import PATH_TO_TOKENIZER_v8_DIR, PATH_TO_FEMR_EXTRACT_v8
 
 def apply_to_femr_db(path_to_femr_db: str, func: Callable, merge_func: Optional[Callable], batch_size: int, n_procs: int) -> Union[List, Dict]:
     """Apply `func` to femr DB at `path_to_femr_db` across `n_procs` processes, with 
@@ -36,7 +36,8 @@ def apply_to_femr_db(path_to_femr_db: str, func: Callable, merge_func: Optional[
 
     # Spawn procs
     ctx = multiprocessing.get_context("forkserver")
-    path_to_output_dir: str = f'./temp-{random.randint(0, 999999)}/'
+    #path_to_output_dir: str = f'./temp-{random.randint(0, 999999)}/'
+    path_to_output_dir: str = './temp-0/'
     os.makedirs(path_to_output_dir, exist_ok=True)
     tasks = [
         (path_to_femr_db, start_idx, min(n_patients, start_idx + batch_size), path_to_output_dir)
@@ -116,10 +117,10 @@ def get_numerical_codes(path_to_femr_db: str, start_idx: int = 0, end_idx: int =
     json.dump(dict(code_2_numerical_info), open(path_to_output_file, 'w'))
 
 if __name__ == '__main__':
-    n_procs: int = 30
-    batch_size: int = 2_000
-    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v9_DIR
-    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v9
+    n_procs: int = 4
+    batch_size: int = 10_000
+    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v8_DIR
+    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8
     os.makedirs(path_to_tokenizer_dir, exist_ok=True)
 
     # Map codes to values and units
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     codes = []
     units = []
     values = []
-    for code, info in tqdm(code_2_numerical_info.items(), total=len(code_2_numerical_info)):
+    for code, info in tqdm(code_2_numerical_info.items(), total=len(code_2_numerical_info), desc='Looping thru code_2_numerical_info'):
         for (u, v) in zip(info['units'], info['values']):
             codes.append(code)
             units.append(u)

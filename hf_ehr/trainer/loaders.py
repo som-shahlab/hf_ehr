@@ -1,12 +1,12 @@
 from torch.utils.data import DataLoader
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 from hf_ehr.trainer.samplers import ApproxBatchSampler, SortishSampler
 from omegaconf import DictConfig 
-from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, collate_femr_timelines
+from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer, collate_femr_timelines
 from loguru import logger
 import numpy as np
 
-def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], tokenizer: FEMRTokenizer) -> Dict[str, DataLoader]:
+def load_dataloaders(config: DictConfig, datasets: Dict[str, FEMRDataset], tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> Dict[str, DataLoader]:
     batch_size: Optional[int] = getattr(config.data.dataloader, 'batch_size', None)
     approx_batch_sampler: Optional[Any] = getattr(config.data.dataloader, 'approx_batch_sampler', None)
     dataloader_mode: str = getattr(config.data.dataloader, 'mode', 'batch')

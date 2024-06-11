@@ -1,7 +1,6 @@
 import femr.datasets
 import json
 import collections
-from typing import List, Dict
 import os
 from tqdm import tqdm
 from hf_ehr.utils import get_lab_value_token_name
