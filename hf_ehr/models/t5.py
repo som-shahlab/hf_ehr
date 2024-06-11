@@ -1,23 +1,24 @@
 import torch
-import torch.nn as nn
+
 from transformers import AutoModelForSeq2SeqLM, AutoConfig
 from omegaconf import DictConfig
-# from hf_ehr.models.modules import CausalModel
-from hf_ehr.models.modules import BaseModel
-from typing import Union, Tuple, Dict, List, Any, Optional
+from typing import Union, Dict, Any, Optional
 from jaxtyping import Float
+
+from hf_ehr.models.modules import BaseModel
+from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
 class T5LanguageModel(BaseModel):
     """
     T5 with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
-        super(T5LanguageModel, self).__init__(config, vocab_size, pad_token_id)
+    def __init__(self, config: DictConfig, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> None:
+        super(T5LanguageModel, self).__init__(config, tokenizer)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 't5-base')
-        model_config.vocab_size = vocab_size
+        model_config.vocab_size = tokenizer.vocab_size
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {self.model_name} does not have attribute {key}"
             setattr(model_config, key, val)
@@ -25,11 +26,11 @@ class T5LanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForSeq2SeqLM.from_config(model_config)
+        self.flops_per_token: Optional[int] = self.calculate_flops_per_token(tokenizer)
         
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
-        # TODO (@Miguel) -- adapt for T5
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         del tokens['token_type_ids']
         B: int = tokens['input_ids'].shape[0]

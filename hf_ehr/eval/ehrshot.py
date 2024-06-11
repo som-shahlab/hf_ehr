@@ -70,7 +70,7 @@ def main():
     model_class = next((m for k, m in model_map.items() if k in MODEL), None)
     if not model_class:
         raise ValueError(f"Model `{MODEL}` not supported.")
-    model = model_class(**checkpoint['hyper_parameters'], vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id)
+    model = model_class(**checkpoint['hyper_parameters'], tokenizer=tokenizer)
     model.load_state_dict(checkpoint['state_dict'])
     model.to(device)
     model.eval()  # Set the model to evaluation mode

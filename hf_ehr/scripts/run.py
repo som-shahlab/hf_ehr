@@ -23,7 +23,6 @@ from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
-from calflops import calculate_flops
 
 class GradNormCallback(Callback):
     """
@@ -42,18 +41,6 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
-# Calculate flops
-def calculate_flops_for_model(model, config, tokenizer):
-    input_shape = (config.data.dataloader.batch_size, config.data.dataloader.max_length)  # (batch_size, sequence_length)
-    model.model.eval()  # Ensure model is in evaluation mode
-    flops, macs, params = calculate_flops(model=model.model, input_shape=input_shape, output_as_string=False, output_precision=4, transformer_tokenizer=tokenizer)
-    return flops
-
-# FLOPs GPT-2
-def calculate_flops_per_token(model, config, tokenizer) -> int:
-    total_flops = calculate_flops_for_model(model, config, tokenizer)
-    num_tokens = config.data.dataloader.batch_size * config.data.dataloader.max_length
-    return total_flops / num_tokens
 
 class FlopsLoggingCallback(Callback):
     def __init__(self, model, run):
@@ -90,8 +77,7 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
 
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
-        
-            logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
+            # logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
                 trainer.save_checkpoint(filepath)
@@ -264,29 +250,19 @@ def main(config: DictConfig) -> None:
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
-        flops_per_token = calculate_flops_per_token(model, config, tokenizer)
-        model.flops_per_token = flops_per_token
-        logger.info(f"FLOPs per token of model = {flops_per_token}")
+        model = GPTLanguageModel(config, tokenizer)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
-        flops_per_token = calculate_flops_per_token(model, config, tokenizer)
-        model.flops_per_token = flops_per_token
-        logger.info(f"FLOPs per token of model = {flops_per_token}")
+        model = BERTLanguageModel(config, tokenizer)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
-        flops_per_token = calculate_flops_per_token(model, config, tokenizer)
-        model.flops_per_token = flops_per_token
-        logger.info(f"FLOPs per token of model = {flops_per_token}")
+        model = HyenaLanguageModel(config, tokenizer)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
-        flops_per_token = calculate_flops_per_token(model, config, tokenizer)
-        model.flops_per_token = flops_per_token
-        logger.info(f"FLOPs per token of model = {flops_per_token}")
+        model = MambaLanguageModel(config, tokenizer)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
+    
+    logger.info(f"FLOPs per token of model = {model.flops_per_token}")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
     
     # Datasets

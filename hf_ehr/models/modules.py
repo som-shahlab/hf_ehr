@@ -1,13 +1,16 @@
 import torch
 from torch import optim
 import lightning as L
-import torch.nn.functional as F
 import torch.distributed as dist
+
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
-from hf_ehr.utils import lr_warmup_with_constant_plateau
 from jaxtyping import Float
-from typing import Dict, List, Any, Optional, Union, Tuple
+from typing import Dict, List, Any, Optional, Union
+from calflops import calculate_flops
+
+from hf_ehr.utils import lr_warmup_with_constant_plateau
+from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
 class BaseModel(L.LightningModule):
     """
@@ -22,14 +25,13 @@ class BaseModel(L.LightningModule):
     pad_token_id: int
     flops_per_token: Optional[int] = None
 
-    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int, flops_per_token: Optional[int] = None) -> None:
+    def __init__(self, config: DictConfig, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> None:
         super().__init__()
         self.save_hyperparameters('config') #NOTE: Need to exclude `tokenizer` otherwise internal PTL .hparam call later will hang
         self.model_name: str = config.model.name
         self.config = config
-        self.vocab_size: int = vocab_size
-        self.pad_token_id: int = pad_token_id
-        self.flops_per_token = flops_per_token
+        self.vocab_size: int = tokenizer.vocab_size
+        self.pad_token_id: int = tokenizer.pad_token_id
         
         # Metrics
         self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
@@ -38,6 +40,22 @@ class BaseModel(L.LightningModule):
             'train_total_tokens_nonPAD': SumMetric(),
         })
 
+    # Calculate flops
+    def calculate_flops_for_model(self, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> int:
+        input_shape = (self.config.data.dataloader.batch_size, self.config.data.dataloader.max_length)  # (batch_size, sequence_length)
+        was_training: bool = self.model.training
+        self.model.eval()  # Ensure model is in evaluation mode
+        flops, macs, params = calculate_flops(model=self.model, input_shape=input_shape, output_as_string=False, output_precision=4, transformer_tokenizer=tokenizer)
+        if was_training:
+            self.model.train()
+        return flops
+
+    # FLOPs GPT-2
+    def calculate_flops_per_token(self, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> int:
+        total_flops = self.calculate_flops_for_model(tokenizer)
+        num_tokens = self.config.data.dataloader.batch_size * self.config.data.dataloader.max_length
+        return total_flops / num_tokens
+    
     def parameters(self) -> List:
         params = []
         if hasattr(self, 'model'):
