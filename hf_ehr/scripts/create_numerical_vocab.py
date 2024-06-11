@@ -1,14 +1,9 @@
 import pandas as pd
 import time
 import json
-import multiprocessing
-import random
 from typing import Callable, List, Dict, Union
 import os
-import numpy as np
-from hf_ehr.config import PATH_TO_TOKENIZER_v9_DIR
-from tqdm import tqdm
-import collections
+from hf_ehr.config import PATH_TO_TOKENIZER_v8_DIR
 
 def apply_in_parallel(path_to_code_2_numerical_info_parquet: str) -> Union[List, Dict]:
     path_to_intermediate_parquet: str = os.path.join(os.path.dirname(path_to_code_2_numerical_info_parquet), 'code_2_numerical_vocab.parquet')
@@ -70,13 +65,11 @@ def apply_in_parallel(path_to_code_2_numerical_info_parquet: str) -> Union[List,
     return code_2_numerical_vocab
 
 if __name__ == '__main__':
-    path_to_code_2_numerical_info_parquet = os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_numerical_info.parquet')
-    path_to_output: str = os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_numerical_vocab.json')
+    path_to_code_2_numerical_info_parquet = os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_numerical_info.parquet')
+    path_to_output: str = os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_numerical_vocab.json')
 
     code_2_numerical_vocab = apply_in_parallel(path_to_code_2_numerical_info_parquet)
     
     # Save outputs
     with open(path_to_output, 'w') as fd:
         json.dump(code_2_numerical_vocab, fd, indent=2)
-        
-        
