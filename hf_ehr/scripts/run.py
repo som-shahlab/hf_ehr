@@ -82,10 +82,10 @@ def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int,
     interval = config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens
     current: int = int(val // interval)
     if last_val is None:
-        return True, val, current * interval
+        return True, int(val), current * interval
     else:
         last: int = int(last_val // interval)
-        return last < current, val, current * interval
+        return last < current, int(val), current * interval
 
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
@@ -280,12 +280,6 @@ def main(config: DictConfig) -> None:
             save_weights_only=False, # If False, then save optimizer + scheduler states as well
             verbose=True,
         ),
-        # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
-        MetricBasedCheckpoint(
-            dirpath=path_to_ckpt_dir,
-            metric_name="train/tokens/total_nonPAD",
-            is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
-        ),
         # Save checkpoint every `every_n_train_steps` steps; persists all models
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
@@ -308,6 +302,15 @@ def main(config: DictConfig) -> None:
             verbose=True,
         )
     ]
+    if hasattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens') and config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens is not None:
+        # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
+        callbacks += [ 
+            MetricBasedCheckpoint(
+                dirpath=path_to_ckpt_dir,
+                metric_name="train/tokens/total_nonPAD",
+                is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
+            ),
+        ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
 
