@@ -3,6 +3,7 @@
 data:
   dataloader:
     max_length: 1024
+    batch_size: 2
 
 model:
   # Name of HF model to load

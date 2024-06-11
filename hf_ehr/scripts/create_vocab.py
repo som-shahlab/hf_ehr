@@ -4,13 +4,13 @@ import collections
 import os
 from tqdm import tqdm
 from hf_ehr.utils import get_lab_value_token_name
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_v9_DIR
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_v8_DIR
 
 if __name__ == '__main__':
-    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v9_DIR
-    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v9
+    path_to_tokenizer_dir: str = PATH_TO_TOKENIZER_v8_DIR
+    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8
     path_to_code_2_detail_json: str = os.path.join(path_to_tokenizer_dir, 'code_2_detail.json')
-    path_to_code_2_numerical_vocab_json: str = os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_numerical_vocab.json')
+    path_to_code_2_numerical_vocab_json: str = os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_numerical_vocab.json')
 
     os.makedirs(path_to_tokenizer_dir, exist_ok=True)
     femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)

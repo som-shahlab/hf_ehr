@@ -26,8 +26,10 @@ callbacks:
     most_recent_every_n_train_steps: 5_000
     # Save model every N global steps; persists permanently
     every_n_train_steps: 30_000
-    # Save model every N nonPAD training tokens seen; persists permanently
-    every_n_train_nonPAD_tokens: 1_000
+    # Save model every N nonPAD training tokens seen; persists permanently; defaults to 2 billion
+    every_n_train_nonPAD_tokens: 2_000_000_000
+    tokens_per_step: 1000
+    flops_per_step: 1000
 
 data:
   # Sampling strategy for dataset: "random", "stratified", "skillit"

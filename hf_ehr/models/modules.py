@@ -20,14 +20,16 @@ class BaseModel(L.LightningModule):
     config: DictConfig
     vocab_size: int
     pad_token_id: int
+    flops_per_token: Optional[int] = None
 
-    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
+    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int, flops_per_token: Optional[int] = None) -> None:
         super().__init__()
         self.save_hyperparameters('config') #NOTE: Need to exclude `tokenizer` otherwise internal PTL .hparam call later will hang
         self.model_name: str = config.model.name
         self.config = config
         self.vocab_size: int = vocab_size
         self.pad_token_id: int = pad_token_id
+        self.flops_per_token = flops_per_token
         
         # Metrics
         self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
@@ -113,6 +115,10 @@ class BaseModel(L.LightningModule):
         # Needed for ApproxBatchSampler to reset random seed after every epoch
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
     
+    def on_train_start(self):
+        if self.flops_per_token is not None:
+            self.log("flops_per_token", self.flops_per_token)
+    
     def log_validation_step(self, loss: torch.Tensor):
         ppl: torch.Tensor = torch.exp(loss)
 
@@ -154,6 +160,8 @@ class BaseModel(L.LightningModule):
             self.log('train/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32))
             self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
             self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
-            
+            if self.flops_per_token is not None:
+                self.log('train/flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)
+                    
             
             

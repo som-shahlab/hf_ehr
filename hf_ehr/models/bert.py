@@ -13,8 +13,8 @@ class BERTLanguageModel(BaseModel):
     BERT with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
-        super(BERTLanguageModel, self).__init__(config, vocab_size, pad_token_id)
+    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int, flops_per_token: Optional[int]=None) -> None:
+        super(BERTLanguageModel, self).__init__(config, vocab_size, pad_token_id, flops_per_token)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'bert-base-uncased')

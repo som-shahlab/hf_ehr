@@ -26,6 +26,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         data.dataloader.mode=batch \
         data.dataloader.batch_size=4 \
         data.dataloader.approx_batch_sampler.max_tokens=4096 \
+        data.dataloader.max_length=1024 \
         trainer.accumulate_grad_batches=4 \
         trainer.max_epochs=10 \
         model.config_kwargs.n_positions=1024 \
