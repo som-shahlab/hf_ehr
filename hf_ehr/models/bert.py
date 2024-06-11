@@ -13,12 +13,12 @@ class BERTLanguageModel(BaseModel):
     BERT with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, tokenizer) -> None:
-        super(BERTLanguageModel, self).__init__(config, tokenizer)
+    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
+        super(BERTLanguageModel, self).__init__(config, vocab_size, pad_token_id)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'bert-base-uncased')
-        model_config.vocab_size = tokenizer.vocab_size
+        model_config.vocab_size = vocab_size
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"

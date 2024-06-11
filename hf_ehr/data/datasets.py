@@ -388,7 +388,7 @@ class FEMRDataset(Dataset):
         tokens: List[str] = []
         for e in self.femr_db[pid].events:
             # Default the token to just being the literal code
-            token: str = e.code
+            token: str = e.code # "LOINC/10230-1"
             
             # First, if remap codes to textual descs => change `token` to textual definition of code
             if self.is_remap_codes_to_desc:
@@ -592,7 +592,7 @@ class AllTokensDataset(Dataset):
 
     
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
-                             tokenizer: FEMRTokenizer, 
+                             tokenizer: Union[FEMRTokenizer, DescTokenizer], 
                              max_length: int,
                              is_truncation_random: bool = False,
                              is_mlm: bool = False,

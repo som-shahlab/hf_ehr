@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
-from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
+from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
@@ -226,22 +226,26 @@ def main(config: DictConfig) -> None:
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
 
     # Tokenizer
-    logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_detail}`")
-    tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
+    if config.data.tokenizer.is_remap_codes_to_desc:
+        logger.info(f"Loading DescTokenizer: `{config.data.tokenizer.desc_emb_tokenizer}`")
+        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(config.data.tokenizer.desc_emb_tokenizer))
+    else:
+        logger.info(f"Loading FEMRTokenizer: `{path_to_tokenizer_code_2_detail}`")
+        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, tokenizer)
+        model = GPTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, tokenizer)
+        model = BERTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, tokenizer)
+        model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, tokenizer)
+        model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer)
+        model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
