@@ -11,7 +11,7 @@ from transformers import PreTrainedTokenizer, AutoTokenizer
 from tqdm import tqdm
 import datetime
 from omegaconf import OmegaConf
-from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
+from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR, H100_BASE_DIR
 from hf_ehr.utils import convert_lab_value_to_token
 
 class Detail(TypedDict):
@@ -141,6 +141,15 @@ class DescTokenizer(PreTrainedTokenizer):
     def __init__(self, tokenizer: AutoTokenizer) -> None:
         self.tokenizer = tokenizer
         self.code_separator: str = ' ' # separate descriptions with a space by default
+        
+        super().__init__(
+            bos_token=tokenizer.bos_token,
+            eos_token=tokenizer.eos_token,
+            unk_token=tokenizer.unk_token,
+            sep_token=self.code_separator,
+            pad_token=tokenizer.pad_token,
+            cls_token=tokenizer.cls_token
+        )
 
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
@@ -592,7 +601,7 @@ class AllTokensDataset(Dataset):
 
     
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
-                             tokenizer: FEMRTokenizer, 
+                             tokenizer: FEMRTokenizer|DescTokenizer, 
                              max_length: int,
                              is_truncation_random: bool = False,
                              is_mlm: bool = False,
@@ -633,7 +642,10 @@ if __name__ == '__main__':
     # Tokenizer
     tokenizer = FEMRTokenizer(path_to_code_2_detail)
     desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
-    
+    biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
+    pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
+    # llama_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf"))
+    breakpoint()
     # Dataset
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
     val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
@@ -651,10 +663,22 @@ if __name__ == '__main__':
     
     # Check numerical codes
     breakpoint()
-    print(train_dataset[-1])
-    print(tokenizer(train_dataset[-1:][1])['input_ids'])
-    print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
-
+    print("bert tokenizer")
+    print(train_dataset_desc[-1])
+    print(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    print(desc_tokenizer.batch_decode(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    breakpoint()
+    print("pubmed tokenizer")
+    print(train_dataset_desc[-1])
+    print(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    print(pubmed_tokenizer.batch_decode(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    breakpoint()
+    print("biogpt tokenizer")
+    print(train_dataset_desc[-1])
+    print(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    print(biogpt_tokenizer.batch_decode(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    breakpoint()
+    
     exit()    
     train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
     val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
