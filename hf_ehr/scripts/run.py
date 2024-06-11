@@ -183,15 +183,15 @@ def main(config: DictConfig) -> None:
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, tokenizer)
+        model = GPTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, tokenizer)
+        model = BERTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, tokenizer)
+        model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, tokenizer)
+        model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer)
+        model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
