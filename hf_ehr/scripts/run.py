@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
+from transformers import  AutoTokenizer
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
@@ -60,16 +61,16 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
     def on_train_batch_end(self, trainer, *args, **kwargs):
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
-        
-        is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
-        
-        logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
 
-        if metric_value is not None and is_ckpt:
-            filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
-            trainer.save_checkpoint(filepath)
-            logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
-            self.last_ckpt_metric_value = metric_value
+        if metric_value is not None:
+            is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+        
+            logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
+            if is_ckpt:
+                filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
+                trainer.save_checkpoint(filepath)
+                logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
+                self.last_ckpt_metric_value = metric_value
     
     @property
     def state_key(self) -> str:
