@@ -388,7 +388,7 @@ class FEMRDataset(Dataset):
         tokens: List[str] = []
         for e in self.femr_db[pid].events:
             # Default the token to just being the literal code
-            token: str = e.code
+            token: str = e.code # "LOINC/10230-1"
             
             # First, if remap codes to textual descs => change `token` to textual definition of code
             if self.is_remap_codes_to_desc:
