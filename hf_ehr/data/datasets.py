@@ -592,7 +592,7 @@ class AllTokensDataset(Dataset):
 
     
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
-                             tokenizer: FEMRTokenizer, 
+                             tokenizer: Union[FEMRTokenizer, DescTokenizer], 
                              max_length: int,
                              is_truncation_random: bool = False,
                              is_mlm: bool = False,
