@@ -74,8 +74,8 @@ class HyenaLanguageModel(BaseModel):
     Hyena with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
-        super(HyenaLanguageModel, self).__init__(config, vocab_size, pad_token_id)
+    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int, flops_per_token: Optional[int]=None) -> None:
+        super(HyenaLanguageModel, self).__init__(config, vocab_size, pad_token_id, flops_per_token)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)

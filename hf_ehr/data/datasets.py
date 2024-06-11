@@ -635,15 +635,22 @@ if __name__ == '__main__':
     desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
     
     # Dataset
-    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
-    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
-    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
+    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
+    #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
+    #test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
 
     # Stats
     print('train', len(train_dataset))
-    print('val', len(val_dataset))
-    print('test', len(test_dataset))
+    #print('val', len(val_dataset))
+    #print('test', len(test_dataset))
+    for idx in range(len(train_dataset)):
+        pid, _ = train_dataset[idx]
+        print(f'Patient ID: {pid}')
+        for e in train_dataset.femr_db[pid].events:
+            print(e)
+        break
     
+    """
     # Dataset with numerical lab remapping
     train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
     # Dataset with textual desc code remapping
@@ -676,3 +683,4 @@ if __name__ == '__main__':
     assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
     assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
     assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
+    """

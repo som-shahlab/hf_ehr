@@ -25,9 +25,11 @@ callbacks:
     # useful for resuming training after a crash
     most_recent_every_n_train_steps: 5_000
     # Save model every N global steps; persists permanently
-    every_n_train_steps: 50_000
+    every_n_train_steps: 30_000
     # Save model every N nonPAD training tokens seen; persists permanently; defaults to 2 billion
     every_n_train_nonPAD_tokens: 2_000_000_000
+    tokens_per_step: 1000
+    flops_per_step: 1000
 
 data:
   # Sampling strategy for dataset: "random", "stratified", "skillit"
@@ -66,6 +68,7 @@ data:
     # path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
     # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines
     min_code_count: null
+    is_remap_codes_to_desc: False
 
 trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
