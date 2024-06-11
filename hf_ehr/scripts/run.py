@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from typing import Dict, List, Optional, Tuple
 from omegaconf import DictConfig, OmegaConf
 
-from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer
+from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
@@ -172,8 +172,12 @@ def main(config: DictConfig) -> None:
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
 
     # Tokenizer
-    logger.info(f"Loading tokenizer: `{path_to_tokenizer_code_2_detail}`")
-    tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
+    if config.data.tokenizer.is_remap_codes_to_desc:
+        logger.info(f"Loading DescTokenizer: `{config.data.tokenizer.desc_emb_tokenizer}`")
+        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(config.data.tokenizer.desc_emb_tokenizer))
+    else:
+        logger.info(f"Loading FEMRTokenizer: `{path_to_tokenizer_code_2_detail}`")
+        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
