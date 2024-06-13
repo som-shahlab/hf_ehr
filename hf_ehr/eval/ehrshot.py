@@ -120,6 +120,9 @@ def main():
                 'input_ids': input_ids,
                 'attention_mask': attention_mask if "hyena" not in MODEL else None
             }
+            
+            if 'hyena' in MODEL:
+                batch.pop('attention_mask')
 
             results = model.model(**batch, output_hidden_states=True)
             hidden_states = results.hidden_states[-1]

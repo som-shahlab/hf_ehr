@@ -61,6 +61,8 @@ data:
     # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
     is_truncation_random: True
   tokenizer:
+    version: v8
+    
     # Path to tokenizer
     # v9:
     path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json
