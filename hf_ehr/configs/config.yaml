@@ -39,7 +39,7 @@ data:
   min_token_count: 
   dataset:
     # Path to FEMR extract
-    path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite
+    path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes
     is_debug: False
   dataloader:
     # To avoid changing the config file for each run, specify the mode and keep both batch_size and 
@@ -61,11 +61,9 @@ data:
     # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
     is_truncation_random: True
   tokenizer:
-    version: v8
-    
     # Path to tokenizer
     # v9:
-    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/code_2_detail.json
+    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
     # v8:
     # path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
     # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines

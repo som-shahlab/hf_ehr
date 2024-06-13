@@ -45,11 +45,11 @@ def copy_resources_to_local(base_dir: str) -> None:
 def get_path_to_code_2_details(config: DictConfig, base_dir: str) -> str:
     """Get the path to code_2_detail.json."""
     path_to_code_2_detail: str = ''
-    if config.data.tokenizer.version == "v9_lite":
+    if "tokenizer_v9_lite" in config.data.tokenizer.path_to_code_2_detail:
         path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', f"{os.path.join(base_dir, 'tokenizer_v9_lite')}/")
-    elif config.data.tokenizer.version == "v9":
+    elif "tokenizer_v9" in config.data.tokenizer.path_to_code_2_detail:
         path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/', f"{os.path.join(base_dir, 'tokenizer_v9')}/")
-    elif config.data.tokenizer.version == "v8":
+    elif "tokenizer_v8" in config.data.tokenizer.path_to_code_2_detail:
         path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/', f"{os.path.join(base_dir, 'tokenizer_v8')}/")
     else:
         raise ValueError("Invalid tokenizer version.")
