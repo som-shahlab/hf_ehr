@@ -45,7 +45,15 @@ class BaseModel(L.LightningModule):
         input_shape = (self.config.data.dataloader.batch_size, self.config.data.dataloader.max_length)  # (batch_size, sequence_length)
         was_training: bool = self.model.training
         self.model.eval()  # Ensure model is in evaluation mode
-        flops, macs, params = calculate_flops(model=self.model, input_shape=input_shape, output_as_string=False, output_precision=4, transformer_tokenizer=tokenizer)
+        # inputs that match the shape and type of expected inputs
+        dummy_inputs = {
+        "input_ids": torch.randint(0, self.vocab_size, input_shape).to(self.device),
+        "labels": torch.randint(0, self.vocab_size, input_shape).to(self.device)
+    }
+
+        flops, macs, params = calculate_flops(model=self.model, kwargs=dummy_inputs, output_as_string=False, output_precision=4)
+        
+        
         if was_training:
             self.model.train()
         return flops
