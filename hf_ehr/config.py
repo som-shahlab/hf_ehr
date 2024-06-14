@@ -36,11 +36,12 @@ def copy_resources_to_local(base_dir: str) -> None:
     copy_if_not_exists('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9', base_dir)
     copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v9_LITE_DIR, 'code_2_detail.json'), tokenizer_v9_lite_dir)
     copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v9_LITE_DIR, 'code_2_count.json'), tokenizer_v9_lite_dir)
-    copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_detail.json'), tokenizer_v9_dir)
-    copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_count.json'), tokenizer_v9_dir)
     copy_if_not_exists('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir)
     copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_detail.json'), tokenizer_v8_dir)
     copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_count.json'), tokenizer_v8_dir)
+
+    #copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_detail.json'), tokenizer_v8_dir)
+    #copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_count.json'), tokenizer_v8_dir)
 
 def get_path_to_code_2_details(config: DictConfig, base_dir: str) -> str:
     """Get the path to code_2_detail.json."""
