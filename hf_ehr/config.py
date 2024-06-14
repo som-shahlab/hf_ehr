@@ -40,8 +40,8 @@ def copy_resources_to_local(base_dir: str) -> None:
     copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_detail.json'), tokenizer_v8_dir)
     copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_count.json'), tokenizer_v8_dir)
 
-    #copy_if_not_exists(os.path.join(PATH_TO_FEMR_EXTRACT_v8, 'code_2_detail.json'), tokenizer_v8_dir)
-    #copy_if_not_exists(os.path.join(PATH_TO_FEMR_EXTRACT_v8, 'code_2_count.json'), tokenizer_v8_dir)
+    #copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_detail.json'), tokenizer_v8_dir)
+    #copy_if_not_exists(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_count.json'), tokenizer_v8_dir)
 
 def get_path_to_code_2_details(config: DictConfig, base_dir: str) -> str:
     """Get the path to code_2_detail.json."""
