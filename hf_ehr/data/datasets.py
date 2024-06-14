@@ -41,11 +41,15 @@ class FEMRTokenizer(PreTrainedTokenizer):
         else:
             # Just use the raw FEMR codes as is
             codes: List[str] = sorted(list(self.code_2_detail.keys()))
-            
+        
+        
         # Only keep codes with >= `min_code_count` occurrences in our dataset
         if min_code_count is not None:
+            codes = [x for x in codes if self.is_valid_code(x, min_code_count)]
+        """    
+        if min_code_count is not None:
             codes = [ x for x in codes if self.code_2_detail[x]['token_2_count'] >= min_code_count ] # TODO loop through `token_2_count` values
-
+        """    
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
         self.non_special_tokens = codes
@@ -66,7 +70,17 @@ class FEMRTokenizer(PreTrainedTokenizer):
             mask_token='[MASK]',
         )
         self.add_tokens(self.non_special_tokens)
-
+        
+    def is_valid_code(self, code, min_code_count):
+        token_2_count = self.code_2_detail[code]['token_2_count']
+        
+        # If token_2_count is a dictionary, ensure all its values meet the minimum count
+        if isinstance(token_2_count, dict):
+            return all(count >= min_code_count for count in token_2_count.values())
+        
+        # If token_2_count is not a dictionary, assume it should be an integer
+        return token_2_count >= min_code_count
+    
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
                  is_truncation_random: bool = False,
@@ -636,8 +650,9 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 
 if __name__ == '__main__':
-    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
-    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
+    path_to_femr_extract: str = 'som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
+    #path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
     
     # Tokenizer
     tokenizer = FEMRTokenizer(path_to_code_2_detail)
