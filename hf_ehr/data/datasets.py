@@ -1,4 +1,5 @@
 import random
+import time
 from typing import Dict, List, Optional, Tuple, Union, Any, TypedDict
 import torch
 from torch.utils.data import Dataset
@@ -644,8 +645,7 @@ if __name__ == '__main__':
     desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
     biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
     pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
-    # llama_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf"))
-    breakpoint()
+    # breakpoint()
     # Dataset
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
     #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
@@ -655,12 +655,34 @@ if __name__ == '__main__':
     print('train', len(train_dataset))
     #print('val', len(val_dataset))
     #print('test', len(test_dataset))
-    for idx in range(len(train_dataset)):
-        pid, _ = train_dataset[idx]
-        print(f'Patient ID: {pid}')
-        for e in train_dataset.femr_db[pid].events:
-            print(e)
-        break
+
+    # t1 = time.time()
+    # event_count = 0
+    # for pid in tqdm(train_dataset.get_pids()[:100000]):
+    #     for e in train_dataset.femr_db[pid].events:
+    #         event_count += 1
+    #         train_dataset.femr_db.get_ontology().get_text_description(e.code)
+    # t2 = time.time()
+    # print("Time to loop through all events in train_dataset: ", t2 - t1)
+    # # Print average time per event
+    # print("Average time per patient: ", (t2 - t1) / 100000)
+    # print("Average time per event: ", (t2 - t1) / event_count)
+    
+    t1 = time.time()
+    for patient in train_dataset:
+        pass
+    t2 = time.time()
+    print("Time to loop through all patients in train_dataset: ", t2 - t1)
+    
+    train_dataset.is_remap_codes_to_desc = True
+    t1 = time.time()
+    for patient in train_dataset:
+        pass
+    t2 = time.time()
+    print("Time to loop through all patients in train_dataset (remap codes to desc): ", t2 - t1)
+    breakpoint()
+    # for i in range(10000000):
+    #     femr_db.get_ontology().get_text_description(e.code)
     
     """
     # Dataset with numerical lab remapping
