@@ -443,7 +443,8 @@ class FEMRDataset(Dataset):
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        uuid = f'starr_omop_v9-{self.split}'
+        extract: str = path_to_femr_extract.split("/")[-1]
+        uuid = f'{extract}-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
             if self.sampling_strat == 'random':
@@ -602,7 +603,8 @@ class AllTokensDataset(Dataset):
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        uuid = f'starr_omop_v9-{self.split}'
+        extract: str = path_to_femr_extract.split("/")[-1]
+        uuid = f'{extract}-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
         if self.is_debug:
