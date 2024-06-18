@@ -1,0 +1,5 @@
+# @package _global_
+
+data:
+  tokenizer:
+    is_clmbr: True

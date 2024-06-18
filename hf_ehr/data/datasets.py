@@ -1,6 +1,6 @@
 import random
 import time
-from typing import Dict, List, Optional, Tuple, Union, Any, TypedDict
+from typing import Dict, List, Optional, Set, Tuple, Union, Any, TypedDict
 import torch
 from torch.utils.data import Dataset
 import femr.datasets
@@ -32,25 +32,29 @@ class FEMRTokenizer(PreTrainedTokenizer):
     def __init__(self, 
                  path_to_code_2_detail: str, 
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
+                 excluded_vocabs: Optional[List[str]] = None,
                  min_code_count: Optional[int] = None) -> None:
         self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
         
         # Get vocabulary
+        codes: List[str] = []
         if is_remap_numerical_codes:
             # Use the lab-value quantiled version of the FEMR codes
-            codes: List[str] = sorted(list(self.code_2_detail.keys())) # TODO -- get list of codes by looping through `token_2_count` keys()
+            for detail in self.code_2_detail.values():
+                codes += list(detail['token_2_count'].keys())
         else:
             # Just use the raw FEMR codes as is
             codes: List[str] = sorted(list(self.code_2_detail.keys()))
         
-        
+        # Filter out excluded vocabs (if applicable)
+        if excluded_vocabs is not None:
+            excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } # type: ignore
+            codes = [ x for x in codes if x.split("/")[0].lower() not in excluded_vocabs ]
+
         # Only keep codes with >= `min_code_count` occurrences in our dataset
         if min_code_count is not None:
-            codes = [x for x in codes if self.is_valid_code(x, min_code_count)]
-        """    
-        if min_code_count is not None:
-            codes = [ x for x in codes if self.code_2_detail[x]['token_2_count'] >= min_code_count ] # TODO loop through `token_2_count` values
-        """    
+            codes = [x for x in codes if self.is_code_above_min_count(x, min_code_count)]
+
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
         self.non_special_tokens = codes
@@ -72,15 +76,13 @@ class FEMRTokenizer(PreTrainedTokenizer):
         )
         self.add_tokens(self.non_special_tokens)
         
-    def is_valid_code(self, code, min_code_count):
+    def is_code_above_min_count(self, token: str, min_code_count: int):
+        if token in self.code_2_detail:
+            code: str = token
+        else:
+            code: str = token.split(" || ")[0]
         token_2_count = self.code_2_detail[code]['token_2_count']
-        
-        # If token_2_count is a dictionary, ensure all its values meet the minimum count
-        if isinstance(token_2_count, dict):
-            return all(count >= min_code_count for count in token_2_count.values())
-        
-        # If token_2_count is not a dictionary, assume it should be an integer
-        return token_2_count >= min_code_count
+        return token_2_count[token] >= min_code_count
     
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
@@ -439,7 +441,7 @@ class FEMRDataset(Dataset):
             # First, if remap codes to textual descs => change `token` to textual definition of code
             if self.is_remap_codes_to_desc:
                 # "LOINC/10230-1" => "Left ventricular Ejection fraction"
-                token = self.femr_db.get_ontology().get_text_description(e.code)
+                token = self.code_2_detail[e.code]['desc']
 
             # Second, if remap numerical codes => change numerical codes to bucketed quantiles based on `value`...
             if self.is_remap_numerical_codes:
