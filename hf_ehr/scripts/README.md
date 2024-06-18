@@ -7,3 +7,8 @@ python3 get_numerical_codes.py
 python3 create_numerical_vocab.py
 python3 create_vocab.py
 ```
+
+To convert the old CLMBR dictionary to hf_ehr format, run
+```
+python3 transform_clmbr_tokenizer.py
+```

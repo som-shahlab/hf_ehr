@@ -12,7 +12,7 @@ from tqdm import tqdm
 import datetime
 from omegaconf import OmegaConf
 from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
-from hf_ehr.utils import convert_lab_value_to_token
+from hf_ehr.utils import convert_lab_value_to_token_from_quantiles, convert_lab_value_to_token_from_ranges
 
 class Detail(TypedDict):
     token_2_count: Dict[str, int] # mapping [key] = token, [val] = count of that token
@@ -224,6 +224,7 @@ class FEMRDataset(Dataset):
                  sampling_kwargs: Optional[Dict] = None,
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  is_remap_codes_to_desc: bool = False, # if TRUE, then remap all codes to their textual descriptions
+                 is_clmbr: bool = False, # if TRUE, then use CLMBR-style vocab
                  is_debug: bool = False,
                  seed: int = 1):
         assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
@@ -243,6 +244,9 @@ class FEMRDataset(Dataset):
         # Augmentations
         self.is_remap_numerical_codes: bool = is_remap_numerical_codes
         self.is_remap_codes_to_desc: bool = is_remap_codes_to_desc
+        self.is_clmbr: bool = is_clmbr
+        if self.is_clmbr:
+            assert not (self.is_remap_codes_to_desc or self.is_remap_numerical_codes), f"ERROR - Cannot have `is_clmbr=True` and any other augmentation"
         
         # Sanity check
         if self.is_remap_numerical_codes:
@@ -390,6 +394,24 @@ class FEMRDataset(Dataset):
             # Default the token to just being the literal code
             token: str = e.code # "LOINC/10230-1"
             
+            # If CLMBR then do special mapping and continue
+            if self.is_clmbr:
+                if (
+                    hasattr(e, 'value') # `e` has a `value`
+                    and e.value is not None # `value` is not None
+                    and ( # `value` is numeric
+                        isinstance(e.value, float)
+                        or isinstance(e.value, int)
+                    )
+                ):
+                    # if we hit a numerical code, then try to remap it based on the given range
+                    # NOTE: CLMBR ignores units, so hardcode all to "None"
+                    unit: str = "None"
+                    ranges: List[Tuple[float]] = self.code_2_detail[e.code]['unit_2_ranges'][unit]
+
+                    # Determine range for (code, unit, value)
+                    token = convert_lab_value_to_token_from_ranges(token, unit, e.value, ranges)
+            
             # First, if remap codes to textual descs => change `token` to textual definition of code
             if self.is_remap_codes_to_desc:
                 # "LOINC/10230-1" => "Left ventricular Ejection fraction"
@@ -412,7 +434,7 @@ class FEMRDataset(Dataset):
                     quantiles: List[float] = self.code_2_detail[e.code]['unit_2_quartiles'][unit]
 
                     # Determine quantile for (code, unit, value)
-                    token = convert_lab_value_to_token(token, unit, e.value, quantiles)
+                    token = convert_lab_value_to_token_from_quantiles(token, unit, e.value, quantiles)
 
             tokens.append(token)
         return (pid, tokens)

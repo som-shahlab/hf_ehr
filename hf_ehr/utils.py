@@ -1,8 +1,17 @@
 from functools import partial
-from typing import List
+from typing import List, Tuple
 import torch
 
-def convert_lab_value_to_token(code: str, unit: str, value: float, quantiles: List[float]) -> str:
+def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float]]) -> str:
+    # Given a list of ranges (i.e. tuples of [start, end] values), remaps the code to the index in the `ranges` array corresponds
+    # to this code's value, i.e. "code" => "{code} || {idx}"
+    # If the value doesn't fit in any of the ranges, returns the code itself, i.e. "{code}"
+    for idx, (start_val, end_val) in enumerate(ranges):
+        if start_val <= value <= end_val:
+            return f"{code} || {unit} || R{idx + 1}" # "STANFORD_OBS/123 | mmol | R3"
+    return f"{code} || {unit}"
+
+def convert_lab_value_to_token_from_quantiles(code: str, unit: str, value: float, quantiles: List[float]) -> str:
     # Note: If we have Q1, Q2, Q3, Q4, then `len(quantiles) == 3` b/c have [0.25, 0.5, 0.75]
     for q_idx, q in enumerate(quantiles):
         if value <= q: 
