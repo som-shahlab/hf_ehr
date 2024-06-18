@@ -115,6 +115,7 @@ def main(config: DictConfig) -> None:
     model_name: str = config.model.name
     path_to_tokenizer_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
+    tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
     seed: int = config.main.seed
     is_force_restart: bool = config.main.is_force_restart
 
@@ -245,7 +246,7 @@ def main(config: DictConfig) -> None:
         tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(config.data.tokenizer.desc_emb_tokenizer))
     else:
         logger.info(f"Loading FEMRTokenizer: `{path_to_tokenizer_code_2_detail}`")
-        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, min_code_count=tokenizer_min_code_count)
+        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, excluded_vocabs=tokenizer_excluded_vocabs, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
