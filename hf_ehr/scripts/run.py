@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
+from transformers import  AutoTokenizer
 from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
@@ -22,6 +23,7 @@ from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
+from calflops import calculate_flops
 
 class GradNormCallback(Callback):
     """
@@ -40,6 +42,19 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
+
+class FlopsLoggingCallback(Callback):
+    def __init__(self, model, run):
+        self.model = model
+        self.run = run
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        total_tokens_nonPAD = pl_module.sum_metrics['train_total_tokens_nonPAD'].compute().item()
+        total_flops = self.model.flops_per_token * total_tokens_nonPAD
+        
+        if self.run:
+            self.run.log({'total_flops': total_flops})
+            
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
         """
@@ -60,16 +75,15 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
     def on_train_batch_end(self, trainer, *args, **kwargs):
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
-        
-        is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
-        
-        logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
 
-        if metric_value is not None and is_ckpt:
-            filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
-            trainer.save_checkpoint(filepath)
-            logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
-            self.last_ckpt_metric_value = metric_value
+        if metric_value is not None:
+            is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+            # logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
+            if is_ckpt:
+                filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
+                trainer.save_checkpoint(filepath)
+                logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
+                self.last_ckpt_metric_value = metric_value
     
     @property
     def state_key(self) -> str:
@@ -237,17 +251,19 @@ def main(config: DictConfig) -> None:
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = GPTLanguageModel(config, tokenizer)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = BERTLanguageModel(config, tokenizer)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = HyenaLanguageModel(config, tokenizer)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = MambaLanguageModel(config, tokenizer)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
+    
+    logger.info(f"FLOPs per token of model = {model.flops_per_token}")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
     
     # Datasets

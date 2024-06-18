@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
-from torch import optim
-from transformers import AutoModel, AutoConfig, AutoModelForCausalLM
+
+from transformers import AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutput
 from omegaconf import DictConfig
 from typing import Dict, Any, Optional, Tuple, Union
 from jaxtyping import Float
+
 from hf_ehr.models.modules import BaseModel
-from hf_ehr.utils import lr_warmup_with_constant_plateau
+from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
 def hyena_forward(
     self: AutoModelForCausalLM,
@@ -74,12 +75,12 @@ class HyenaLanguageModel(BaseModel):
     Hyena with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, vocab_size: int, pad_token_id: int) -> None:
-        super(HyenaLanguageModel, self).__init__(config, vocab_size, pad_token_id)
+    def __init__(self, config: DictConfig, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> None:
+        super(HyenaLanguageModel, self).__init__(config, tokenizer)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
-        model_config.vocab_size = vocab_size
+        model_config.vocab_size = tokenizer.vocab_size
         #self.lm_head = nn.Linear(model_config.d_model, model_config.vocab_size, bias=False)
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
@@ -90,6 +91,19 @@ class HyenaLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config, trust_remote_code=True)
+        self.flops_per_token: Optional[int] = self.calculate_flops_per_token(tokenizer)
+        #self.flops_per_token: Optional[int] = 100000 # Placeholder
+    
+    def forward(self, input_ids=None, inputs_embeds=None, labels=None, output_hidden_states=None, return_dict=None):
+        return hyena_forward(
+            self.model,
+            input_ids=input_ids,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            pad_token_id=self.pad_token_id
+        )
     
     def training_step(self, 
                       batch: Dict[str, Any],

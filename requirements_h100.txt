@@ -16,3 +16,4 @@ deepspeed==0.11.1
 omegaconf==2.3.0
 jaxtyping==0.2.22
 mlflow==2.11.1
+calflops==0.3.2

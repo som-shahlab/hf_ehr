@@ -1,4 +1,5 @@
 import random
+import time
 from typing import Dict, List, Optional, Tuple, Union, Any, TypedDict
 import torch
 from torch.utils.data import Dataset
@@ -11,8 +12,8 @@ from transformers import PreTrainedTokenizer, AutoTokenizer
 from tqdm import tqdm
 import datetime
 from omegaconf import OmegaConf
-from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR
 from hf_ehr.utils import convert_lab_value_to_token_from_quantiles, convert_lab_value_to_token_from_ranges
+from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR, H100_BASE_DIR
 
 class Detail(TypedDict):
     token_2_count: Dict[str, int] # mapping [key] = token, [val] = count of that token
@@ -41,11 +42,15 @@ class FEMRTokenizer(PreTrainedTokenizer):
         else:
             # Just use the raw FEMR codes as is
             codes: List[str] = sorted(list(self.code_2_detail.keys()))
-            
+        
+        
         # Only keep codes with >= `min_code_count` occurrences in our dataset
         if min_code_count is not None:
+            codes = [x for x in codes if self.is_valid_code(x, min_code_count)]
+        """    
+        if min_code_count is not None:
             codes = [ x for x in codes if self.code_2_detail[x]['token_2_count'] >= min_code_count ] # TODO loop through `token_2_count` values
-
+        """    
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
         self.non_special_tokens = codes
@@ -66,7 +71,17 @@ class FEMRTokenizer(PreTrainedTokenizer):
             mask_token='[MASK]',
         )
         self.add_tokens(self.non_special_tokens)
-
+        
+    def is_valid_code(self, code, min_code_count):
+        token_2_count = self.code_2_detail[code]['token_2_count']
+        
+        # If token_2_count is a dictionary, ensure all its values meet the minimum count
+        if isinstance(token_2_count, dict):
+            return all(count >= min_code_count for count in token_2_count.values())
+        
+        # If token_2_count is not a dictionary, assume it should be an integer
+        return token_2_count >= min_code_count
+    
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
                  is_truncation_random: bool = False,
@@ -141,6 +156,15 @@ class DescTokenizer(PreTrainedTokenizer):
     def __init__(self, tokenizer: AutoTokenizer) -> None:
         self.tokenizer = tokenizer
         self.code_separator: str = ' ' # separate descriptions with a space by default
+        
+        super().__init__(
+            bos_token=tokenizer.bos_token,
+            eos_token=tokenizer.eos_token,
+            unk_token=tokenizer.unk_token,
+            sep_token=self.code_separator,
+            pad_token=tokenizer.pad_token,
+            cls_token=tokenizer.cls_token
+        )
 
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
@@ -441,7 +465,8 @@ class FEMRDataset(Dataset):
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        uuid = f'starr_omop_v9-{self.split}'
+        extract: str = path_to_femr_extract.split("/")[-1]
+        uuid = f'{extract}-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
             if self.sampling_strat == 'random':
@@ -600,7 +625,8 @@ class AllTokensDataset(Dataset):
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        uuid = f'starr_omop_v9-{self.split}'
+        extract: str = path_to_femr_extract.split("/")[-1]
+        uuid = f'{extract}-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
         if self.is_debug:
@@ -649,23 +675,55 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 
 if __name__ == '__main__':
-    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9_lite'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
-    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
+    path_to_femr_extract: str = 'som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
+    #path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
     
     # Tokenizer
     tokenizer = FEMRTokenizer(path_to_code_2_detail)
     desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
-    
+    biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
+    pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
+    # breakpoint()
     # Dataset
-    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
-    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
-    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
+    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
+    #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
+    #test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
 
     # Stats
     print('train', len(train_dataset))
-    print('val', len(val_dataset))
-    print('test', len(test_dataset))
+    #print('val', len(val_dataset))
+    #print('test', len(test_dataset))
+
+    # t1 = time.time()
+    # event_count = 0
+    # for pid in tqdm(train_dataset.get_pids()[:100000]):
+    #     for e in train_dataset.femr_db[pid].events:
+    #         event_count += 1
+    #         train_dataset.femr_db.get_ontology().get_text_description(e.code)
+    # t2 = time.time()
+    # print("Time to loop through all events in train_dataset: ", t2 - t1)
+    # # Print average time per event
+    # print("Average time per patient: ", (t2 - t1) / 100000)
+    # print("Average time per event: ", (t2 - t1) / event_count)
     
+    t1 = time.time()
+    for patient in train_dataset:
+        pass
+    t2 = time.time()
+    print("Time to loop through all patients in train_dataset: ", t2 - t1)
+    
+    train_dataset.is_remap_codes_to_desc = True
+    t1 = time.time()
+    for patient in train_dataset:
+        pass
+    t2 = time.time()
+    print("Time to loop through all patients in train_dataset (remap codes to desc): ", t2 - t1)
+    breakpoint()
+    # for i in range(10000000):
+    #     femr_db.get_ontology().get_text_description(e.code)
+    
+    """
     # Dataset with numerical lab remapping
     train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
     # Dataset with textual desc code remapping
@@ -673,10 +731,22 @@ if __name__ == '__main__':
     
     # Check numerical codes
     breakpoint()
-    print(train_dataset[-1])
-    print(tokenizer(train_dataset[-1:][1])['input_ids'])
-    print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
-
+    print("bert tokenizer")
+    print(train_dataset_desc[-1])
+    print(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    print(desc_tokenizer.batch_decode(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    breakpoint()
+    print("pubmed tokenizer")
+    print(train_dataset_desc[-1])
+    print(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    print(pubmed_tokenizer.batch_decode(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    breakpoint()
+    print("biogpt tokenizer")
+    print(train_dataset_desc[-1])
+    print(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    print(biogpt_tokenizer.batch_decode(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    breakpoint()
+    
     exit()    
     train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
     val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
@@ -698,3 +768,4 @@ if __name__ == '__main__':
     assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
     assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
     assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
+    """

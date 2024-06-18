@@ -44,7 +44,6 @@ class WandbRelogger:
     def get_last_step(self, ckpt_path: str) -> int:
         """Gets the last step from the model checkpoint."""
         checkpoint = torch.load(ckpt_path, map_location='cpu')
-        logger.info("Keys found in checkpoint: ", checkpoint.keys())
         return checkpoint["global_step"]
     
     def relog_metrics(self, ckpt_path: str, run_log_dir: str):
