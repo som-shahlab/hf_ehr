@@ -467,7 +467,7 @@ class FEMRDataset(Dataset):
 
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        extract: str = path_to_femr_extract.split("/")[-1]
+        extract: str = self.path_to_femr_extract.split("/")[-1]
         uuid = f'{extract}-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
@@ -677,7 +677,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 
 if __name__ == '__main__':
-    path_to_femr_extract: str = 'som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
     path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
     #path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
     
@@ -708,23 +708,6 @@ if __name__ == '__main__':
     # # Print average time per event
     # print("Average time per patient: ", (t2 - t1) / 100000)
     # print("Average time per event: ", (t2 - t1) / event_count)
-    
-    t1 = time.time()
-    for patient in train_dataset:
-        pass
-    t2 = time.time()
-    print("Time to loop through all patients in train_dataset: ", t2 - t1)
-    
-    train_dataset.is_remap_codes_to_desc = True
-    t1 = time.time()
-    for patient in train_dataset:
-        pass
-    t2 = time.time()
-    print("Time to loop through all patients in train_dataset (remap codes to desc): ", t2 - t1)
-    breakpoint()
-    # for i in range(10000000):
-    #     femr_db.get_ontology().get_text_description(e.code)
-    
     """
     # Dataset with numerical lab remapping
     train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
