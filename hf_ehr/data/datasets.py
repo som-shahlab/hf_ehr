@@ -143,7 +143,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
 
     def _tokenize(self, text: str, **kwargs) -> int:
         """Here, `text` will be a single code (e.g. "LOINC/13"), so directly map it to an id in our vocab"""
-        return self._convert_token_to_id(self, text)
+        return self._convert_token_to_id(text)
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.token_2_idx[token]
