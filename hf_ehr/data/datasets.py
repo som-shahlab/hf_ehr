@@ -230,7 +230,7 @@ class DescTokenizer(PreTrainedTokenizer):
 
     def _tokenize(self, text: str, **kwargs):
         """Default to splitting by ' ' since the tokenizer will join together tokens using a space"""
-        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+        return self.tokenizer._tokenize(text)
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.tokenizer._convert_token_to_id(token)
