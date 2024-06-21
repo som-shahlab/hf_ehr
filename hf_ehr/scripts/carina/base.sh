@@ -21,8 +21,7 @@ elif [[ "$USER" == "suhana" ]]; then
 elif [[ "$USER" == "migufuen" ]]; then
     ENV_NAME="hf_env_miguel_1"
 else
-    echo "Unknown user: $USER"
-    exit 1
+    ENV_NAME="hf_env_miguel_1"
 fi
 
 REQUIREMENTS="../../../requirements.txt"

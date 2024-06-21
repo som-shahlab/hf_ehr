@@ -87,6 +87,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     
     sampling_strat: Optional[str] = config.data.sampling_strat
     sampling_kwargs: Optional[Dict] = config.data.sampling_kwargs
+    excluded_vocabs = getattr(config.data.dataset, 'excluded_vocabs', None)
     is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
     is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
@@ -96,6 +97,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', 
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
+                                excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
                                 is_debug=is_debug, 
@@ -103,6 +105,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', 
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
+                                excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
                                 is_debug=is_debug, 
@@ -110,6 +113,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', 
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
+                                excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
                                 is_debug=is_debug, 

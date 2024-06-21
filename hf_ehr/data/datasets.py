@@ -229,8 +229,7 @@ class DescTokenizer(PreTrainedTokenizer):
         return self.tokenizer.get_vocab()
 
     def _tokenize(self, text: str, **kwargs):
-        """Default to splitting by ' ' since the tokenizer will join together tokens using a space"""
-        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+        return self.tokenizer._tokenize(text)
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.tokenizer._convert_token_to_id(token)
@@ -248,6 +247,7 @@ class FEMRDataset(Dataset):
                  split: str = 'train',
                  sampling_strat: Optional[str] = None,
                  sampling_kwargs: Optional[Dict] = None,
+                 excluded_vocabs: Optional[List[str]] = None,
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  is_remap_codes_to_desc: bool = False, # if TRUE, then remap all codes to their textual descriptions
                  is_clmbr: bool = False, # if TRUE, then use CLMBR-style vocab
@@ -261,6 +261,7 @@ class FEMRDataset(Dataset):
         self.split: str = split
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
+        self.excluded_vocabs = excluded_vocabs
         self.is_debug: bool = is_debug
         self.seed: int = seed
     
@@ -419,6 +420,10 @@ class FEMRDataset(Dataset):
         for e in self.femr_db[pid].events:
             # Default the token to just being the literal code
             token: str = e.code # "LOINC/10230-1"
+
+            # If exclude certain vocabs, then ignore this token if it belongs to one of those vocabs (e.g. "STANFORD_OBS/")            
+            if self.excluded_vocabs and token.split("/")[0].lower() in self.excluded_vocabs:
+                continue
             
             # If CLMBR then do special mapping and continue
             if self.is_clmbr:
