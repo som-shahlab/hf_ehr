@@ -141,9 +141,9 @@ class FEMRTokenizer(PreTrainedTokenizer):
     def get_vocab(self) -> Dict[str, int]:
         return self.token_2_idx
 
-    def _tokenize(self, text: str, **kwargs):
-        """Default to splitting by ' ' since the tokenizer will join together tokens using a space"""
-        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+    def _tokenize(self, text: str, **kwargs) -> int:
+        """Here, `text` will be a single code (e.g. "LOINC/13"), so directly map it to an id in our vocab"""
+        return self._convert_token_to_id(self, text)
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.token_2_idx[token]
