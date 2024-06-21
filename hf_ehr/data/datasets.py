@@ -141,8 +141,9 @@ class FEMRTokenizer(PreTrainedTokenizer):
     def get_vocab(self) -> Dict[str, int]:
         return self.token_2_idx
 
-    def _tokenize(self, text: str, **kwargs):
-        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+    def _tokenize(self, text: str, **kwargs) -> int:
+        """Here, `text` will be a single code (e.g. "LOINC/13"), so directly map it to an id in our vocab"""
+        return self._convert_token_to_id(text)
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.token_2_idx[token]
@@ -228,7 +229,7 @@ class DescTokenizer(PreTrainedTokenizer):
         return self.tokenizer.get_vocab()
 
     def _tokenize(self, text: str, **kwargs):
-        raise Exception("We shouldn't ever get here (FEMRTokenizer._tokenize()")
+        return self.tokenizer._tokenize(text)
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.tokenizer._convert_token_to_id(token)
