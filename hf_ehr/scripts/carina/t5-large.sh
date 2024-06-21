@@ -12,12 +12,13 @@ source base.sh
 
 python3 ../run.py \
     +models=t5 \
+    +trainer=single_gpu \
+    +data=v8 \
+    +tokenizer=femr \
     data.dataloader.mode=approx \
     data.dataloader.batch_size=3 \
     data.dataloader.approx_batch_sampler.max_tokens=3072 \
     trainer.accumulate_grad_batches=16 \
-    data.dataloader.n_workers=10 \
-    trainer.devices=[0,1,2,3] \
     model.config_kwargs.num_layers=24 \
     model.config_kwargs.num_heads=16 \
     model.config_kwargs.d_model=1024 \

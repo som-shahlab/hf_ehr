@@ -12,7 +12,9 @@
 
 python3 ../run.py \
     +models=gpt2 \
+    +trainer=single_gpu \
     +data=v8 \
+    +tokenizer=femr \
     data.dataloader.mode=approx \
     data.dataloader.approx_batch_sampler.max_tokens=4000 \
     data.dataloader.approx_batch_sampler.bucket_size=10 \

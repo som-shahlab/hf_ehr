@@ -3,3 +3,5 @@
 data:
   tokenizer:
     is_clmbr: True
+    excluded_vocabs:
+      - STANFORD_OBS

@@ -22,15 +22,17 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     python3 ../run.py \
         +models=gpt2 \
         +sizes=gpt2-base \
-        +trainer=multi_gpu \
-        data.dataloader.mode=batch \
+        +trainer=single_gpu \
+        +data=v8 \
+        +tokenizer=femr \
+        data.dataloader.mode=approx \
         data.dataloader.batch_size=4 \
         data.dataloader.approx_batch_sampler.max_tokens=4096 \
         data.dataloader.max_length=1024 \
         trainer.accumulate_grad_batches=4 \
         trainer.max_epochs=10 \
         model.config_kwargs.n_positions=1024 \
-        main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base/ \
+        main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base2/ \
         logging.wandb.name=gpt2-base \
         logging.wandb.recreate=True 
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
@@ -39,8 +41,10 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     python3 ../run.py \
         +models=gpt2 \
         +sizes=gpt2-base \
-        +trainer=multi_gpu \
-        data.dataloader.mode=approx \
+        +trainer=single_gpu \
+        +data=v8 \
+        +tokenizer=femr \
+        data.dataloader.mode=batch \
         data.dataloader.batch_size=9 \
         data.dataloader.approx_batch_sampler.max_tokens=9216 \
         trainer.accumulate_grad_batches=4 \

@@ -2,5 +2,7 @@
 
 data:
   tokenizer:
-    is_remap_numerical_codes: True
+    is_remap_numerical_codes: False
     is_remap_codes_to_desc: False
+    excluded_vocabs:
+      - STANFORD_OBS

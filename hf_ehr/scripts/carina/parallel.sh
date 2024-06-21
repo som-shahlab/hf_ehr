@@ -29,12 +29,13 @@ exp4=exp4
 # First experiment
 python3 ../run.py \
     +models=gpt2 \
+    +trainer=single_gpu \
+    +data=v8 \
+    +tokenizer=femr \
     data.dataloader.mode=approx \
     data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=10 \
-    trainer.devices=[0] \
     trainer.max_epochs=20 \
     model.config_kwargs.n_layer=12 \
     model.config_kwargs.n_head=12 \
@@ -47,11 +48,13 @@ child_pids+=($!)
 # Second experiment
 python3 ../run.py \
     +models=gpt2 \
+    +trainer=single_gpu \
+    +data=v8 \
+    +tokenizer=femr \
     data.dataloader.mode=approx \
     data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=10 \
     trainer.devices=[1] \
     trainer.max_epochs=20 \
     model.config_kwargs.n_layer=12 \
@@ -65,11 +68,13 @@ child_pids+=($!)
 # Third experiment
 python3 ../run.py \
     +models=gpt2 \
+    +trainer=single_gpu \
+    +data=v8 \
+    +tokenizer=femr \
     data.dataloader.mode=approx \
     data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=10 \
     trainer.devices=[2] \
     trainer.max_epochs=20 \
     model.config_kwargs.n_layer=12 \
@@ -83,11 +88,13 @@ child_pids+=($!)
 # Fourth experiment
 python3 ../run.py \
     +models=gpt2 \
+    +trainer=single_gpu \
+    +data=v8 \
+    +tokenizer=femr \
     data.dataloader.mode=approx \
     data.dataloader.batch_size=4 \
     data.dataloader.approx_batch_sampler.max_tokens=4_096 \
     trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=10 \
     trainer.devices=[3] \
     trainer.max_epochs=20 \
     model.config_kwargs.n_layer=12 \
