@@ -82,7 +82,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
         else:
             code: str = token.split(" || ")[0]
         token_2_count = self.code_2_detail[code]['token_2_count']
-        return token_2_count[token] >= min_code_count
+        return sum(token_2_count.values()) >= min_code_count
     
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
@@ -250,6 +250,7 @@ class FEMRDataset(Dataset):
                  excluded_vocabs: Optional[List[str]] = None,
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  is_remap_codes_to_desc: bool = False, # if TRUE, then remap all codes to their textual descriptions
+                 min_code_count: Optional[int] = None, 
                  is_clmbr: bool = False, # if TRUE, then use CLMBR-style vocab
                  is_debug: bool = False,
                  seed: int = 1):
@@ -262,6 +263,7 @@ class FEMRDataset(Dataset):
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
         self.excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
+        self.min_code_count: Optional[str] = min_code_count
         self.is_debug: bool = is_debug
         self.seed: int = seed
     
@@ -425,6 +427,10 @@ class FEMRDataset(Dataset):
             if self.excluded_vocabs and token.split("/")[0].lower() in self.excluded_vocabs:
                 continue
             
+            if self.min_code_count:
+                if not self.is_code_above_min_count(token):
+                    continue
+            
             # If CLMBR then do special mapping and continue
             if self.is_clmbr:
                 if (
@@ -470,6 +476,14 @@ class FEMRDataset(Dataset):
             tokens.append(token)
         return (pid, tokens)
 
+    def is_code_above_min_count(self, token: str):
+        if token in self.code_2_detail:
+            code: str = token
+        else:
+            code: str = token.split(" || ")[0]
+        token_2_count = self.code_2_detail[code]['token_2_count']
+        return sum(token_2_count.values()) >= self.min_code_count
+    
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
         extract: str = self.path_to_femr_extract.split("/")[-1]
