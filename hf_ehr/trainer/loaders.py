@@ -90,6 +90,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     excluded_vocabs = getattr(config.data.dataset, 'excluded_vocabs', None)
     is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
     is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
+    min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
     seed: int = config.main.seed
     
@@ -100,6 +101,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
                                 excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
+                                min_code_count=min_code_count,
                                 is_debug=is_debug, 
                                 seed=seed)
     val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', 
@@ -108,6 +110,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
                                 excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
+                                min_code_count=min_code_count,
                                 is_debug=is_debug, 
                                 seed=seed)
     test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', 
@@ -116,6 +119,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
                                 excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
+                                min_code_count=min_code_count,
                                 is_debug=is_debug, 
                                 seed=seed)
     
