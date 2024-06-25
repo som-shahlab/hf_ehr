@@ -12,6 +12,21 @@ from calflops import calculate_flops
 from hf_ehr.utils import lr_warmup_with_constant_plateau
 from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
+def calculate_flops_per_token(model, vocab_size: int) -> float:
+    """Returns GFLOPs per token for model."""
+    was_training: bool = model.training
+    model.eval()  # Ensure model is in evaluation mode
+    # inputs that match the shape and type of expected inputs
+    dummy_inputs = {
+        "input_ids": torch.randint(0, vocab_size, (1,1)).to(model.device),
+        "labels": torch.randint(0, vocab_size, (1,1)).to(model.device)
+    }
+    flops, macs, params = calculate_flops(model=model, kwargs=dummy_inputs, output_as_string=False, output_precision=4)
+
+    if was_training:
+        model.train()
+    return flops
+
 class BaseModel(L.LightningModule):
     """
     Base PyTorchLightning model with some common methods.
@@ -40,29 +55,8 @@ class BaseModel(L.LightningModule):
             'train_total_tokens_nonPAD': SumMetric(),
         })
 
-    # Calculate flops
-    def calculate_flops_for_model(self, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> int:
-        input_shape = (self.config.data.dataloader.batch_size, self.config.data.dataloader.max_length)  # (batch_size, sequence_length)
-        was_training: bool = self.model.training
-        self.model.eval()  # Ensure model is in evaluation mode
-        # inputs that match the shape and type of expected inputs
-        dummy_inputs = {
-        "input_ids": torch.randint(0, self.vocab_size, input_shape).to(self.device),
-        "labels": torch.randint(0, self.vocab_size, input_shape).to(self.device)
-    }
-
-        flops, macs, params = calculate_flops(model=self.model, kwargs=dummy_inputs, output_as_string=False, output_precision=4)
-        
-        
-        if was_training:
-            self.model.train()
-        return flops
-
-    # FLOPs GPT-2
-    def calculate_flops_per_token(self, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> int:
-        total_flops = self.calculate_flops_for_model(tokenizer)
-        num_tokens = self.config.data.dataloader.batch_size * self.config.data.dataloader.max_length
-        return total_flops / num_tokens
+    def calculate_flops_per_token(self) -> float:
+        return calculate_flops_per_token(self.model, self.vocab_size)
     
     def parameters(self) -> List:
         params = []
@@ -142,8 +136,11 @@ class BaseModel(L.LightningModule):
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
     
     def on_train_start(self):
-        if self.flops_per_token is not None:
-            self.log("flops_per_token", self.flops_per_token)
+        if self.flops_per_token is None:
+            print(f"Start | Calculating FLOPs per token for model {self.model_name}...")
+            self.flops_per_token = self.calculate_flops_per_token()
+            print(f"End | Calculating FLOPs per token for model {self.model_name} | FLOPs/token={self.flops_per_token}")
+        self.log("flops_per_token", self.flops_per_token)
     
     def log_validation_step(self, loss: torch.Tensor):
         ppl: torch.Tensor = torch.exp(loss)
@@ -187,7 +184,7 @@ class BaseModel(L.LightningModule):
             self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
             self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
             if self.flops_per_token is not None:
-                self.log('train/flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)
+                self.log('train/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)
                     
             
             
