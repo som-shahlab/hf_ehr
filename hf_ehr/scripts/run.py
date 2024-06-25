@@ -65,7 +65,6 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
 
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
-            # logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
                 trainer.save_checkpoint(filepath)
