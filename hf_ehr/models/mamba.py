@@ -28,13 +28,10 @@ class MambaLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config)
-        self.flops_per_token: Optional[int] = self.calculate_flops_per_token(tokenizer)
-        
 
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
-        # TODO (@Suhana) -- adapt for Mamba
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
 

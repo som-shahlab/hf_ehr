@@ -22,7 +22,9 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     python3 ../run.py \
         +models=bert \
         +sizes=bert-base \
-        +trainer=multi_gpu \
+        +trainer=single_gpu \
+        +data=v8 \
+        +tokenizer=femr \
         data.dataloader.mode=batch \
         data.dataloader.batch_size=6 \
         data.dataloader.approx_batch_sampler.max_tokens=6144 \

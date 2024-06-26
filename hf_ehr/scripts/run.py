@@ -42,19 +42,6 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
-
-class FlopsLoggingCallback(Callback):
-    def __init__(self, model, run):
-        self.model = model
-        self.run = run
-
-    def on_train_epoch_end(self, trainer, pl_module):
-        total_tokens_nonPAD = pl_module.sum_metrics['train_total_tokens_nonPAD'].compute().item()
-        total_flops = self.model.flops_per_token * total_tokens_nonPAD
-        
-        if self.run:
-            self.run.log({'total_flops': total_flops})
-            
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
         """
@@ -78,7 +65,6 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
 
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
-            # logger.info(f"====> Metric: {self.metric_name} | {metric_value} | {is_ckpt, true_val, ckpt_val}")
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
                 trainer.save_checkpoint(filepath)
@@ -91,6 +77,15 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
             'metric_name' : self.metric_name,
         }
         return f"{self.__class__.__qualname__}{repr(kwargs)}"
+
+def train_flops_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
+    interval = config.callbacks.model_checkpointing.every_n_flops
+    current: int = int(val // interval)
+    if last_val is None:
+        return True, int(val), current * interval
+    else:
+        last: int = int(last_val // interval)
+        return last < current, int(val), current * interval
 
 def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
     interval = config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens
@@ -330,6 +325,14 @@ def main(config: DictConfig) -> None:
                 dirpath=path_to_ckpt_dir,
                 metric_name="train/tokens/total_nonPAD",
                 is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
+            ),
+        ]
+        # Save checkpoint every `every_n_flops` FLOPs; persists all models
+        callbacks += [ 
+            MetricBasedCheckpoint(
+                dirpath=path_to_ckpt_dir,
+                metric_name="train/tokens/total_flops",
+                is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
             ),
         ]
     if is_log_grad_norm:

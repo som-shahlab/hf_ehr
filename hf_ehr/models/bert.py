@@ -29,7 +29,6 @@ class BERTLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForMaskedLM.from_config(model_config)
-        self.flops_per_token: Optional[int] = self.calculate_flops_per_token(tokenizer)
 
     def training_step(self, 
                       batch: Dict[str, Any],

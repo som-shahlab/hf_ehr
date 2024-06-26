@@ -82,7 +82,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
         else:
             code: str = token.split(" || ")[0]
         token_2_count = self.code_2_detail[code]['token_2_count']
-        return token_2_count[token] >= min_code_count
+        return sum(token_2_count.values()) >= min_code_count
     
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
@@ -250,6 +250,7 @@ class FEMRDataset(Dataset):
                  excluded_vocabs: Optional[List[str]] = None,
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  is_remap_codes_to_desc: bool = False, # if TRUE, then remap all codes to their textual descriptions
+                 min_code_count: Optional[int] = None, 
                  is_clmbr: bool = False, # if TRUE, then use CLMBR-style vocab
                  is_debug: bool = False,
                  seed: int = 1):
@@ -262,6 +263,7 @@ class FEMRDataset(Dataset):
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
         self.excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
+        self.min_code_count: Optional[str] = min_code_count
         self.is_debug: bool = is_debug
         self.seed: int = seed
     
@@ -425,6 +427,10 @@ class FEMRDataset(Dataset):
             if self.excluded_vocabs and token.split("/")[0].lower() in self.excluded_vocabs:
                 continue
             
+            if self.min_code_count:
+                if not self.is_code_above_min_count(token):
+                    continue
+            
             # If CLMBR then do special mapping and continue
             if self.is_clmbr:
                 if (
@@ -470,9 +476,17 @@ class FEMRDataset(Dataset):
             tokens.append(token)
         return (pid, tokens)
 
+    def is_code_above_min_count(self, token: str):
+        if token in self.code_2_detail:
+            code: str = token
+        else:
+            code: str = token.split(" || ")[0]
+        token_2_count = self.code_2_detail[code]['token_2_count']
+        return sum(token_2_count.values()) >= self.min_code_count
+    
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        extract: str = path_to_femr_extract.split("/")[-1]
+        extract: str = self.path_to_femr_extract.split("/")[-1]
         uuid = f'{extract}-{self.split}'
         if self.sampling_strat is not None:
             uuid += f'-{self.sampling_strat}'
@@ -682,7 +696,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 
 
 if __name__ == '__main__':
-    path_to_femr_extract: str = 'som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
     path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
     #path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
     
@@ -713,23 +727,6 @@ if __name__ == '__main__':
     # # Print average time per event
     # print("Average time per patient: ", (t2 - t1) / 100000)
     # print("Average time per event: ", (t2 - t1) / event_count)
-    
-    t1 = time.time()
-    for patient in train_dataset:
-        pass
-    t2 = time.time()
-    print("Time to loop through all patients in train_dataset: ", t2 - t1)
-    
-    train_dataset.is_remap_codes_to_desc = True
-    t1 = time.time()
-    for patient in train_dataset:
-        pass
-    t2 = time.time()
-    print("Time to loop through all patients in train_dataset (remap codes to desc): ", t2 - t1)
-    breakpoint()
-    # for i in range(10000000):
-    #     femr_db.get_ontology().get_text_description(e.code)
-    
     """
     # Dataset with numerical lab remapping
     train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
