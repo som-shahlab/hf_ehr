@@ -78,8 +78,13 @@ def main():
     timeline_starts: Dict[int, List[datetime.datetime]] = {}
     timeline_tokens: Dict[int, List[int]] = {}
     for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
-        full_timeline = [(x.start, x.code) for x in database[patient_id].events]
+        full_timeline: List[Tuple[datetime.datetime, int]] = [(x.start, x.code) for x in database[patient_id].events]
+
+        # Drop tokens not in vocab
         timeline_with_valid_tokens = [x for x in full_timeline if x[1] in vocab]
+        timeline_with_invalid_tokens = [x for x in full_timeline if x[1] not in vocab] # for tracking dropped tokens
+
+        # Tokenize timeline and keep track of each token's start time
         timeline_starts[patient_id] = [x[0] for x in timeline_with_valid_tokens]
         timeline_tokens[patient_id] = tokenizer([x[1] for x in timeline_with_valid_tokens])['input_ids'][0]
         assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"

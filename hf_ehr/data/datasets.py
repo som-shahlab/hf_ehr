@@ -261,7 +261,7 @@ class FEMRDataset(Dataset):
         self.split: str = split
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
-        self.excluded_vocabs = excluded_vocabs
+        self.excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
         self.is_debug: bool = is_debug
         self.seed: int = seed
     
