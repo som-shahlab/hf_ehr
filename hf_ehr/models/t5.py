@@ -27,6 +27,9 @@ class T5LanguageModel(BaseModel):
         # Model
         self.model = AutoModelForSeq2SeqLM.from_config(model_config)
         
+        # Run any post-init handlers from super()
+        self.post_init()
+
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:

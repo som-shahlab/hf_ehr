@@ -23,7 +23,7 @@ callbacks:
     save_most_recent_k: 1
     # Save model every N global steps; if NULL, save after every epoch; overwrites previous model
     # useful for resuming training after a crash
-    most_recent_every_n_train_steps: 5_000
+    most_recent_every_n_train_steps: 10_000
     # Save model every N global steps; persists permanently
     every_n_train_steps: 30_000
     # Save model every N nonPAD training tokens seen; persists permanently; defaults to 2 billion

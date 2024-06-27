@@ -77,6 +77,7 @@ def main():
     
     timeline_starts: Dict[int, List[datetime.datetime]] = {}
     timeline_tokens: Dict[int, List[int]] = {}
+    timeline_n_dropped_tokens: Dict[int, List[int]] = {} # for tracking the count of dropped tokens at each `timeline_start`
     for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
         full_timeline: List[Tuple[datetime.datetime, int]] = [(x.start, x.code) for x in database[patient_id].events]
 
@@ -87,6 +88,7 @@ def main():
         # Tokenize timeline and keep track of each token's start time
         timeline_starts[patient_id] = [x[0] for x in timeline_with_valid_tokens]
         timeline_tokens[patient_id] = tokenizer([x[1] for x in timeline_with_valid_tokens])['input_ids'][0]
+        timeline_n_dropped_tokens[patient_id] = [ len([ y for y in timeline_with_invalid_tokens if y[0] <= x[0]]) for x in timeline_with_valid_tokens ]
         assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
 
         for label in labels:

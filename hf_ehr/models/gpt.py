@@ -29,6 +29,9 @@ class GPTLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config)
+        
+        # Run any post-init handlers from super()
+        self.post_init()
 
     def training_step(self, 
                       batch: Dict[str, Any],

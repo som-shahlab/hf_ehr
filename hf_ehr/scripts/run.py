@@ -258,7 +258,7 @@ def main(config: DictConfig) -> None:
         model = T5LanguageModel(config, tokenizer)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
-    
+
     logger.info(f"FLOPs per token of model = {model.flops_per_token}")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
     

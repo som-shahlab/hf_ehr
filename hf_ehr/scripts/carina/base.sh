@@ -49,8 +49,8 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     if [[ ! -e "/local-scratch/nigam/users/hf_ehr/hf_env" ]]; then
         cp -r /share/pi/nigam/envs/hf_env /local-scratch/nigam/users/hf_ehr/hf_env # one-time setup
     fi
-    REQUIREMENTS="../../../requirements_h100.txt"
-    conda activate /local-scratch/nigam/users/hf_ehr/hf_env
+    REQUIREMENTS="../../../requirements.txt"
+    conda activate /local-scratch/nigam/users/hf_ehr/$ENV_NAME
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     echo "Detected Normal Partition"
     if [[ ! -e "/home/hf_ehr/hf_env" ]]; then

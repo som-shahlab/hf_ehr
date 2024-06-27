@@ -47,6 +47,7 @@ class BaseModel(L.LightningModule):
         self.config = config
         self.vocab_size: int = tokenizer.vocab_size
         self.pad_token_id: int = tokenizer.pad_token_id
+        self.flops_per_token = None
         
         # Metrics
         self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
@@ -54,10 +55,14 @@ class BaseModel(L.LightningModule):
             'train_total_tokens_PAD': SumMetric(),
             'train_total_tokens_nonPAD': SumMetric(),
         })
-
-    def calculate_flops_per_token(self) -> float:
-        return calculate_flops_per_token(self.model, self.vocab_size)
     
+    def post_init(self):
+        """Post-initialization method to be called by subclass."""
+        # Calculate FLOPs per token
+        print("Start | Calculating FLOPs per token...")
+        self.flops_per_token = calculate_flops_per_token(self.model, self.vocab_size)
+        print("End | Calculating FLOPs per token...")
+
     def parameters(self) -> List:
         params = []
         if hasattr(self, 'model'):
@@ -136,10 +141,6 @@ class BaseModel(L.LightningModule):
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
     
     def on_train_start(self):
-        if self.flops_per_token is None:
-            print(f"Start | Calculating FLOPs per token for model {self.model_name}...")
-            self.flops_per_token = self.calculate_flops_per_token()
-            print(f"End | Calculating FLOPs per token for model {self.model_name} | FLOPs/token={self.flops_per_token}")
         self.log("flops_per_token", self.flops_per_token)
     
     def log_validation_step(self, loss: torch.Tensor):

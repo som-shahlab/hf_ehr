@@ -91,6 +91,9 @@ class HyenaLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config, trust_remote_code=True)
+        
+        # Run any post-init handlers from super()
+        self.post_init()
     
     def forward(self, input_ids=None, inputs_embeds=None, labels=None, output_hidden_states=None, return_dict=None):
         return hyena_forward(
