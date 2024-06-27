@@ -3,7 +3,6 @@ import os
 import json
 import multiprocessing
 import collections
-import functools
 from tqdm import tqdm
 import numpy as np
 from typing import Callable, List, Dict, Optional, Tuple
@@ -149,7 +148,10 @@ def run_code_2_count(path_to_femr_db: str, path_to_output_dir: str, pids: Option
 
     # Sanity checks
     ## Birth code == number of pids
-    assert results['all']['SNOMED/3950001'] == len(pids), f"Error - Birth code count ({results['all']['SNOMED/3950001']}) != number of pids ({len(pids)})"
+    assert (
+        results['all'].get('SNOMED/3950001') == len(pids) # v8
+        or results['all'].get('SNOMED/184099003') == len(pids) # v9
+    ), f"Error - Birth code count ({results['all'].get('SNOMED/3950001', results['all'].get('SNOMED/184099003'))}) != number of pids ({len(pids)})"
 
     os.makedirs(path_to_output_dir, exist_ok=True)
     with open(os.path.join(path_to_output_dir, f'code_2_count.json'), 'w') as f:
