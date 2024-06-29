@@ -56,7 +56,11 @@ def get_config(checkpoint) -> Dict[str, Any]:
                 recurse(v)
     recurse(config)
     return config            
-    
+
+def get_ckpt_name(path_to_ckpt: str) -> str:
+    base_name = os.path.basename(path_to_ckpt)
+    file_name, _ = os.path.splitext(base_name)
+    return file_name
     
 
 def main():
@@ -71,9 +75,10 @@ def main():
     PATH_TO_MODEL = args.path_to_model
     PATH_TO_TOKENIZER_CODE_2_DETAIL = args.path_to_tokenizer
     batch_size: int = args.batch_size
-    MODEL: str = args.path_to_model.split("/")[-3] 
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
-    
+    MODEL: str = args.path_to_model.split("/")[-3]
+    CKPT: str = get_ckpt_name(PATH_TO_MODEL) 
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
+
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
 
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELED_PATIENTS}`")
