@@ -187,7 +187,7 @@ class DescTokenizer(PreTrainedTokenizer):
             batch = [ batch ]
 
         # Concatenate all strings together for tokenization by traditional HF tokenizer
-        # List[List[str]] => List[str]
+        # List[List[str]] => List[str]git 
         batch = [ self.code_separator.join(x) for x in batch ]
 
         if is_truncation_random:
