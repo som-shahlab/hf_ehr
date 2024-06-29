@@ -2,12 +2,13 @@ import argparse
 import datetime
 import os
 import pickle
-from typing import List, Dict, Tuple
-from tqdm import tqdm
 import numpy as np
 import torch
-from loguru import logger
 import femr.datasets
+
+from typing import List, Dict, Tuple, Optional, Any
+from tqdm import tqdm
+from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
 from hf_ehr.data.datasets import FEMRTokenizer
 from hf_ehr.models.gpt import GPTLanguageModel
@@ -29,6 +30,34 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to run inference on")
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
+
+def get_valid_tokens(full_timeline: List[Tuple[Any, str]], tokenizer: FEMRTokenizer) -> List[Tuple[Any, str]]:
+    timeline_with_valid_tokens: List[Tuple[Any, str]] = []
+    vocab = tokenizer.get_vocab()
+    excluded_vocabs = tokenizer.excluded_vocabs
+    for x in full_timeline:
+        token = x[1]
+        if token not in vocab:
+            continue
+        if tokenizer.min_code_count and not tokenizer.is_code_above_min_count(token):
+            continue
+        if  excluded_vocabs and token.split("/")[0].lower() in excluded_vocabs:
+            continue
+        timeline_with_valid_tokens.append(x)
+    return timeline_with_valid_tokens
+
+def get_config(checkpoint) -> Dict[str, Any]:
+    config = checkpoint['hyper_parameters']['config']
+    def recurse(d: Dict[str, Any]) -> Dict[str, Any]:
+        for k, v in d.items():
+            if v == 'None':
+                d[k] = None
+            elif isinstance(v, dict):
+                recurse(v)
+    recurse(config)
+    return config            
+    
+    
 
 def main():
     args = parse_args()
@@ -55,11 +84,17 @@ def main():
  
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
     device: str = args.device
-
-    tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL)
-    vocab = tokenizer.get_vocab()
-    
     checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
+    config = get_config(checkpoint)
+    
+    tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
+    tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    print("Min code count", tokenizer_min_code_count)
+    print("Min excluded vocabs", tokenizer_excluded_vocabs)
+    tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, 
+                              excluded_vocabs=tokenizer_excluded_vocabs,
+                              min_code_count=tokenizer_min_code_count)
+    
     model_map = {
         'bert': BERTLanguageModel,
         'gpt2': GPTLanguageModel,
@@ -79,7 +114,7 @@ def main():
     timeline_tokens: Dict[int, List[int]] = {}
     for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
         full_timeline = [(x.start, x.code) for x in database[patient_id].events]
-        timeline_with_valid_tokens = [x for x in full_timeline if x[1] in vocab]
+        timeline_with_valid_tokens = get_valid_tokens(full_timeline, tokenizer)
         timeline_starts[patient_id] = [x[0] for x in timeline_with_valid_tokens]
         timeline_tokens[patient_id] = tokenizer([x[1] for x in timeline_with_valid_tokens])['input_ids'][0]
         assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"

@@ -47,13 +47,15 @@ class FEMRTokenizer(PreTrainedTokenizer):
             codes: List[str] = sorted(list(self.code_2_detail.keys()))
         
         # Filter out excluded vocabs (if applicable)
+        self.excluded_vocabs: Optional[List[str]] = excluded_vocabs
         if excluded_vocabs is not None:
             excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } # type: ignore
             codes = [ x for x in codes if x.split("/")[0].lower() not in excluded_vocabs ]
 
         # Only keep codes with >= `min_code_count` occurrences in our dataset
+        self.min_code_count: Optional[int] = min_code_count
         if min_code_count is not None:
-            codes = [x for x in codes if self.is_code_above_min_count(x, min_code_count)]
+            codes = [x for x in codes if self.is_code_above_min_count(x)]
 
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
@@ -76,13 +78,13 @@ class FEMRTokenizer(PreTrainedTokenizer):
         )
         self.add_tokens(self.non_special_tokens)
         
-    def is_code_above_min_count(self, token: str, min_code_count: int):
+    def is_code_above_min_count(self, token: str):
         if token in self.code_2_detail:
             code: str = token
         else:
             code: str = token.split(" || ")[0]
         token_2_count = self.code_2_detail[code]['token_2_count']
-        return sum(token_2_count.values()) >= min_code_count
+        return sum(token_2_count.values()) >= self.min_code_count
     
     def __call__(self, 
                  batch: Union[List[str], List[List[str]]],
