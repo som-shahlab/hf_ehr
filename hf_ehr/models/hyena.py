@@ -91,8 +91,9 @@ class HyenaLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config, trust_remote_code=True)
-        self.flops_per_token: Optional[int] = self.calculate_flops_per_token(tokenizer)
-        #self.flops_per_token: Optional[int] = 100000 # Placeholder
+        
+        # Run any post-init handlers from super()
+        self.post_init()
     
     def forward(self, input_ids=None, inputs_embeds=None, labels=None, output_hidden_states=None, return_dict=None):
         return hyena_forward(

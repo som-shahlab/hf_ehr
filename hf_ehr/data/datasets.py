@@ -34,8 +34,9 @@ class FEMRTokenizer(PreTrainedTokenizer):
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
                  excluded_vocabs: Optional[List[str]] = None,
                  min_code_count: Optional[int] = None) -> None:
+        self.path_to_code_2_detail: str = path_to_code_2_detail
         self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
-        
+
         # Get vocabulary
         codes: List[str] = []
         if is_remap_numerical_codes:
@@ -45,7 +46,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
         else:
             # Just use the raw FEMR codes as is
             codes: List[str] = sorted(list(self.code_2_detail.keys()))
-        
+
         # Filter out excluded vocabs (if applicable)
         self.excluded_vocabs: Optional[List[str]] = excluded_vocabs
         if excluded_vocabs is not None:
@@ -112,7 +113,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
             kwargs.pop('max_length')
             kwargs.pop('truncation')
             tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, truncation=None, is_split_into_words=True)
-            
+
             # Truncate at random positions
             random.seed(seed)
             for key in tokenized_batch.keys():
