@@ -32,7 +32,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         trainer.accumulate_grad_batches=4 \
         trainer.max_epochs=10 \
         model.config_kwargs.n_positions=1024 \
-        main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base2/ \
+        main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-base/ \
         logging.wandb.name=gpt2-base \
         logging.wandb.recreate=True 
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
@@ -45,7 +45,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
         +data=v8 \
         +tokenizer=femr \
         data.dataloader.mode=batch \
-        data.dataloader.batch_size=9 \
+        data.dataloader.batch_size=8 \
         data.dataloader.approx_batch_sampler.max_tokens=9216 \
         trainer.accumulate_grad_batches=4 \
         data.dataloader.n_workers=4 \

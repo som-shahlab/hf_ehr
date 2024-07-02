@@ -13,14 +13,14 @@ class WandbRelogger:
         self.project = project
         self.entity = entity
         self.api = wandb.Api()
-    
+
     def get_run_id(self, run_log_dir: str) -> str:
         """Gets the wandb run ID from the run_log_dir."""
         wandb_run_id: str = ''
         with open(os.path.join(run_log_dir, 'wandb_run_id.txt'), 'r') as f:
                 wandb_run_id = f.read()
         return wandb_run_id.strip()
-    
+
     def update_run_id(self, run_log_dir: str, run_id: str, prev_run_id: str):
         """Updates the wandb run ID in the run_log_dir."""
         def get_unique_filepath(base_dir, base_name):
@@ -30,7 +30,7 @@ class WandbRelogger:
                 new_name = f'{base_name.split(".")[0]}_{counter}.txt'
                 counter += 1
             return os.path.join(base_dir, new_name)
-        
+
         run_id_filepath = os.path.join(run_log_dir, 'wandb_run_id.txt')
         with open(run_id_filepath, 'w') as f:
             logger.info(f'Updating wandb run ID to {run_id} in {run_id_filepath}')
@@ -58,12 +58,13 @@ class WandbRelogger:
         new_run = wandb.init(project=self.project,
                              name=old_run.name, 
                              dir=run_log_dir,
-                            #  resume='allow',
+                             resume='never',
                              config=old_run.config)
         new_run.define_metric('train/loss', summary='min')
         new_run.define_metric('val/loss', summary='min')
         history = pd.DataFrame([row for row in old_run.scan_history()])
         filtered_history = history[history['_step'] <= last_step]
+        
         for _, row in filtered_history.iterrows():
             metrics = row.dropna().to_dict()
             if 'val/loss' in metrics:
@@ -75,8 +76,7 @@ class WandbRelogger:
 
 
 if __name__ == '__main__':
-    run_id = 'lxi5ls3a'
-    run_log_path = '/share/pi/nigam/migufuen/hf_ehr/cache/runs/hyena-medium-log-test/logs/'
+    # run_log_path = '/share/pi/nigam/migufuen/hf_ehr/cache/runs/hyena-medium-log-test/logs/'
     run_log_path = '/share/pi/nigam/migufuen/hf_ehr/cache/runs/hyena-medium-log-test2/logs'
     # run_log_path = '/share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt2-base-10-epochs/logs/'
     # run_log_path = '/share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt2-base-lr-1e-4/logs/'
@@ -84,6 +84,7 @@ if __name__ == '__main__':
     reloader = WandbRelogger('hf_ehr', 'ehr-fm')
     new_run = reloader.relog_metrics(ckpt_path, run_log_path)
     print(new_run.id)
+    breakpoint()
     new_run.finish()
     
     # This code loads the model checkpoint and "global_step" contains the int for the current step

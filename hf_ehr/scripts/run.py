@@ -79,7 +79,7 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         return f"{self.__class__.__qualname__}{repr(kwargs)}"
 
 def train_flops_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
-    interval = config.callbacks.model_checkpointing.every_n_flops
+    interval: int = int(config.callbacks.model_checkpointing.every_n_flops)
     current: int = int(val // interval)
     if last_val is None:
         return True, int(val), current * interval
@@ -88,7 +88,7 @@ def train_flops_metric_func(val: int, last_val: int, config) -> Tuple[bool, int,
         return last < current, int(val), current * interval
 
 def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
-    interval = config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens
+    interval: int = int(config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens)
     current: int = int(val // interval)
     if last_val is None:
         return True, int(val), current * interval
@@ -318,7 +318,7 @@ def main(config: DictConfig) -> None:
             verbose=True,
         )
     ]
-    if hasattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens') and config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens is not None:
+    if hasattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens') and config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens not in [None, "None"]:
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
         callbacks += [ 
             MetricBasedCheckpoint(
@@ -327,6 +327,7 @@ def main(config: DictConfig) -> None:
                 is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
             ),
         ]
+    if hasattr(config.callbacks.model_checkpointing, 'every_n_flops') and config.callbacks.model_checkpointing.every_n_flops not in [None, "None"]:
         # Save checkpoint every `every_n_flops` FLOPs; persists all models
         callbacks += [ 
             MetricBasedCheckpoint(

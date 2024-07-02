@@ -8,12 +8,13 @@ from torchmetrics.aggregation import SumMetric
 from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union
 from calflops import calculate_flops
+import wandb
 
 from hf_ehr.utils import lr_warmup_with_constant_plateau
 from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
-def calculate_flops_per_token(model, vocab_size: int) -> float:
-    """Returns GFLOPs per token for model."""
+def calculate_flops_per_token(model, vocab_size: int) -> int:
+    """Returns FLOPs per token for model."""
     was_training: bool = model.training
     model.eval()  # Ensure model is in evaluation mode
     # inputs that match the shape and type of expected inputs
@@ -101,15 +102,16 @@ class BaseModel(L.LightningModule):
 
     def on_load_checkpoint(self, checkpoint):
         """Load each metric's state in the checkpoint."""
-        for key in self.sum_metrics.keys():
-            if key in checkpoint:
-                self.sum_metrics[key] = SumMetric()
-                # Need to rescale SumMetric loaded from checkpoint since its saved value is summed across all GPUs,
-                # but this `on_load_checkpoint()` gets called per GPU. Need to do this quotient/remainder thing in
-                # case the SumMetric's value is not divisible by the # of GPUs
-                remainder: int = checkpoint[key] % (self.trainer.num_devices * self.trainer.num_nodes)
-                quotient: int = checkpoint[key] // (self.trainer.num_devices * self.trainer.num_nodes)
-                self.sum_metrics[key].update(quotient + (remainder if self.trainer.global_rank == 0 else 0))
+        pass
+        # for key in self.sum_metrics.keys():
+        #     if key in checkpoint:
+        #         self.sum_metrics[key] = SumMetric()
+        #         # Need to rescale SumMetric loaded from checkpoint since its saved value is summed across all GPUs,
+        #         # but this `on_load_checkpoint()` gets called per GPU. Need to do this quotient/remainder thing in
+        #         # case the SumMetric's value is not divisible by the # of GPUs
+        #         remainder: int = checkpoint[key] % (self.trainer.num_devices * self.trainer.num_nodes)
+        #         quotient: int = checkpoint[key] // (self.trainer.num_devices * self.trainer.num_nodes)
+        #         self.sum_metrics[key].update(quotient + (remainder if self.trainer.global_rank == 0 else 0))
 
     def validation_step(self, 
                         batch: Dict[str, Any],
@@ -141,7 +143,7 @@ class BaseModel(L.LightningModule):
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
     
     def on_train_start(self):
-        self.log("flops_per_token", self.flops_per_token)
+        wandb.run.summary["flops_per_token"] = self.flops_per_token
     
     def log_validation_step(self, loss: torch.Tensor):
         ppl: torch.Tensor = torch.exp(loss)
@@ -186,6 +188,3 @@ class BaseModel(L.LightningModule):
             self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
             if self.flops_per_token is not None:
                 self.log('train/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)
-                    
-            
-            
