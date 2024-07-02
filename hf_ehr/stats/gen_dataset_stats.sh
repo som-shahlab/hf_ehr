@@ -10,8 +10,8 @@
 
 source ../scripts/carina/base.sh
 
+python3 gen_dataset_stats.py
+
 #python3 gen_dataset_stats.py --version v8 --n_procs 32
 #python3 gen_dataset_stats.py --version v9 --n_procs 32
-
-
-python3 gen_dataset_stats.py --version v8 --n_procs 32 --path_to_output_dir '/share/pi/nigam/suhana/cache/dataset_stats'
+#python3 gen_dataset_stats.py --version v8 --n_procs 32 --path_to_output_dir '/share/pi/nigam/suhana/cache/dataset_stats'
