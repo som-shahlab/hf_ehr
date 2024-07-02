@@ -2,12 +2,13 @@ import argparse
 import datetime
 import os
 import pickle
-from typing import List, Dict, Tuple
-from tqdm import tqdm
 import numpy as np
 import torch
-from loguru import logger
 import femr.datasets
+
+from typing import List, Dict, Tuple, Optional, Any
+from tqdm import tqdm
+from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
 from hf_ehr.data.datasets import FEMRTokenizer
 from hf_ehr.models.gpt import GPTLanguageModel
@@ -30,6 +31,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
 
+def get_valid_tokens(full_timeline: List[Tuple[Any, str]], tokenizer: FEMRTokenizer) -> List[Tuple[Any, str]]:
+    timeline_with_valid_tokens: List[Tuple[Any, str]] = []
+    vocab = tokenizer.get_vocab()
+    excluded_vocabs = tokenizer.excluded_vocabs
+    for x in full_timeline:
+        token = x[1]
+        if token not in vocab:
+            continue
+        if tokenizer.min_code_count and not tokenizer.is_code_above_min_count(token):
+            continue
+        if  excluded_vocabs and token.split("/")[0].lower() in excluded_vocabs:
+            continue
+        timeline_with_valid_tokens.append(x)
+    return timeline_with_valid_tokens
+
+def get_config(checkpoint) -> Dict[str, Any]:
+    config = checkpoint['hyper_parameters']['config']
+    def recurse(d: Dict[str, Any]) -> Dict[str, Any]:
+        for k, v in d.items():
+            if v == 'None':
+                d[k] = None
+            elif isinstance(v, dict):
+                recurse(v)
+    recurse(config)
+    return config            
+
+def get_ckpt_name(path_to_ckpt: str) -> str:
+    base_name = os.path.basename(path_to_ckpt)
+    file_name, _ = os.path.splitext(base_name)
+    return file_name
+    
+
 def main():
     args = parse_args()
     EMBED_STRAT: str = args.embed_strat
@@ -42,9 +75,10 @@ def main():
     PATH_TO_MODEL = args.path_to_model
     PATH_TO_TOKENIZER_CODE_2_DETAIL = args.path_to_tokenizer
     batch_size: int = args.batch_size
-    MODEL: str = args.path_to_model.split("/")[-3] 
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
-    
+    MODEL: str = args.path_to_model.split("/")[-3]
+    CKPT: str = get_ckpt_name(PATH_TO_MODEL) 
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
+
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
 
     logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELED_PATIENTS}`")
@@ -55,11 +89,17 @@ def main():
  
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
     device: str = args.device
-
-    tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL)
-    vocab = tokenizer.get_vocab()
-    
     checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
+    config = get_config(checkpoint)
+    
+    tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
+    tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    print("Min code count", tokenizer_min_code_count)
+    print("Min excluded vocabs", tokenizer_excluded_vocabs)
+    tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, 
+                              excluded_vocabs=tokenizer_excluded_vocabs,
+                              min_code_count=tokenizer_min_code_count)
+    
     model_map = {
         'bert': BERTLanguageModel,
         'gpt2': GPTLanguageModel,

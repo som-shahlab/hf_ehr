@@ -42,6 +42,18 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
+
+class StartTrainingCheckpoint(ModelCheckpoint):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def on_train_start(self, trainer, pl_module):
+        checkpoint_file = os.path.join(self.dirpath, f"{self.filename}.ckpt")
+        if not os.path.exists(checkpoint_file):
+            # Save a checkpoint at the beginning of training
+            self._save_checkpoint(trainer, checkpoint_file)
+
+            
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
         """
@@ -309,6 +321,12 @@ def main(config: DictConfig) -> None:
             save_weights_only=False, # If False, then save optimizer + scheduler states as well
             monitor='step',
             mode='max',
+            verbose=True,
+        ),
+        StartTrainingCheckpoint(
+            dirpath=path_to_ckpt_dir,
+            filename='first',
+            save_top_k=1,
             verbose=True,
         )
     ]
