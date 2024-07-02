@@ -29,6 +29,5 @@ python3 ../run.py \
     trainer.max_epochs=2 \
     data.dataset.is_debug=False \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/test/ \
-    main.is_force_restart=True \
-    callbacks.model_checkpointing.most_recent_every_n_train_steps=1000 \
-    logging.wandb.recreate=True
+    main.is_force_restart=False \
+    callbacks.model_checkpointing.most_recent_every_n_train_steps=1000

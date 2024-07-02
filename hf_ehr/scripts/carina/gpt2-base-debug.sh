@@ -28,5 +28,4 @@ python3 ../run.py \
     callbacks.model_checkpointing.every_n_train_nonPAD_tokens=None \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-base-debug/ \
     logging.wandb.name=gpt2-base-debug \
-    logging.wandb.recreate=False \
     main.is_force_restart=True

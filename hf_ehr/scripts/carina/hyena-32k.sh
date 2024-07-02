@@ -24,5 +24,4 @@ python3 run.py \
     model.config_kwargs.d_inner=1024 \
     model.config_kwargs.max_seq_len=32768 \
     main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/hyena-32k-v8/ \
-    logging.wandb.name=hyena-32k-v8 \
-    logging.wandb.recreate=True
+    logging.wandb.name=hyena-32k-v8 

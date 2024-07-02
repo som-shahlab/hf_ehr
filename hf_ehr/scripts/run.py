@@ -187,20 +187,14 @@ def main(config: DictConfig) -> None:
             with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
                 wandb_run_id: str = f.read()
                 
-            if rank_zero_only.rank == 0:
-                if config.logging.wandb.recreate:
-                    logger.info(f"Recreating wandb run from run id {wandb_run_id}...")
-                    wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
-                    run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
-                    wandb_run_id = run.id
-                else:
-                    run = wandb.init(project='hf_ehr', 
-                            dir=path_to_log_dir, 
-                            name=config.logging.wandb.name,
-                            resume='allow', 
-                            id=wandb_run_id)
-            
             logger.info(f"Found existing wandb run: `{wandb_run_id}`")
+
+            if rank_zero_only.rank == 0:
+                logger.info(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
+                wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
+                run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
+                wandb_run_id = run.id
+            
             loggers += [ 
                         WandbLogger(project='hf_ehr',
                                     log_model=False,

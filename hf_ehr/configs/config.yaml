@@ -115,9 +115,8 @@ trainer:
 logging:
   wandb:
     # If true, then turn ON wandb logging
+    # If resuming from a checkpoint, it will restart the existing wandb run from the last step in that model's checkpoint
     is_wandb: True
-    # If true, it will recreate the wandb run up to the last step in the model checkpoint
-    recreate: True
     # Run name
     name: null
   mlflow:
