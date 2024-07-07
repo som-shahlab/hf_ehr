@@ -1,6 +1,8 @@
 from functools import partial
-from typing import List, Tuple
+from typing import List, Tuple, Any
 import torch
+import uuid
+import hashlib
 
 def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float]]) -> str:
     # Given a list of ranges (i.e. tuples of [start, end] values), remaps the code to the index in the `ranges` array corresponds
@@ -38,8 +40,8 @@ def _get_linear_schedule_with_warmup_lr_lambda(current_step: int,
     else:
         # Plateau at `final_lr`
         new_lr: float = final_lr
-    multipler: float = new_lr / peak_lr
-    return multipler
+    multiplier: float = new_lr / peak_lr
+    return multiplier
 
 def lr_warmup_with_constant_plateau(optimizer, 
                                     num_warmup_steps: int, 
@@ -82,3 +84,13 @@ def lr_warmup_with_constant_plateau(optimizer,
         final_lr=final_lr,
     )
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda, last_epoch)
+
+def hash_string_to_uuid(input: Any) -> str:
+    """Create a MD5 hash of the stringified input"""
+    input_string: str = str(input)
+    md5_hash = hashlib.md5(input_string.encode()).hexdigest()
+    
+    # Generate a UUID from the MD5 hash
+    generated_uuid = uuid.UUID(md5_hash)
+    
+    return str(generated_uuid)

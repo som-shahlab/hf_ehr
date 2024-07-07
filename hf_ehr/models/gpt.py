@@ -54,7 +54,6 @@ class GPTLanguageModel(BaseModel):
             print("NaN detected in loss, skipping this batch across all processes.")
             return  # Skip this batch on all processes
 
-        
         # Learning rate scheduler
         if self.trainer:
             lr: float = self.trainer.lr_scheduler_configs[0].scheduler.optimizer.param_groups[0]["lr"]

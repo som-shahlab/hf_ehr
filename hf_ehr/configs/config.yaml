@@ -4,6 +4,7 @@ main:
   # Where outputs will be saved; If folder exists, then run will be resumed from this directory's `../ckpts/last.ckpt` file
   path_to_output_dir: /share/pi/nigam/mwornow/hf_ehr/cache/runs/${now:%Y-%m-%d_%H-%M-%S}/
   # If TRUE, then delete existing checkpoint and restart from scratch
+  # If FALSE, then resume from the checkpoint in the file `last.ckpt` in `path_to_output_dir` (if exists)
   is_force_restart: False
 
 hydra:
@@ -115,10 +116,13 @@ trainer:
 logging:
   wandb:
     # If true, then turn ON wandb logging
-    # If resuming from a checkpoint, it will restart the existing wandb run from the last step in that model's checkpoint
     is_wandb: True
     # Run name
     name: null
+    # DEFAULT behavior (FALSE) is if resuming from a checkpoint, then resume the existing wandb run from the last step in that model's checkpoint
+    # If TRUE, then create a new wandb run from scratch (even if resuming from a checkpoint)
+    # Setting to TRUE is helpful for quick debugging b/c resuming logging from an existing run can be slow (wandb needs to re-upload all data from previous run)
+    is_force_create_wandb_run_from_scratch: False
   mlflow:
     # If true, then turn ON mlflow logging
     is_mlflow: False

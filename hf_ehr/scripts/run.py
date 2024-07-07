@@ -202,23 +202,35 @@ def main(config: DictConfig) -> None:
             logger.info(f"Found existing wandb run: `{wandb_run_id}`")
 
             if rank_zero_only.rank == 0:
-                logger.info(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
-                wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
-                run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
-                wandb_run_id = run.id
+                if config.logging.wandb.is_force_create_wandb_run_from_scratch:
+                    logger.info(f"Creating new wandb run from scratch")
+                    run = wandb.init(
+                        project='hf_ehr', 
+                        dir=path_to_log_dir, 
+                        name=config.logging.wandb.name,
+                        resume='never',
+                    )
+                    wandb_run_id = run.id
+                else:
+                    logger.info(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
+                    wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
+                    run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
+                    wandb_run_id = run.id
             
             loggers += [ 
-                        WandbLogger(project='hf_ehr',
-                                    log_model=False,
-                                    save_dir=path_to_log_dir,
-                                    resume='allow',
-                                    id=wandb_run_id)
+                WandbLogger(project='hf_ehr',
+                            log_model=False,
+                            save_dir=path_to_log_dir,
+                            resume='allow',
+                            id=wandb_run_id)
             ]
         else:
             if rank_zero_only.rank == 0:
-                run = wandb.init(project='hf_ehr', 
-                        dir=path_to_log_dir, 
-                        name=config.logging.wandb.name)
+                run = wandb.init(
+                    project='hf_ehr', 
+                    dir=path_to_log_dir, 
+                    name=config.logging.wandb.name
+                )
             loggers += [ 
                         WandbLogger(project='hf_ehr',
                                     log_model=False,

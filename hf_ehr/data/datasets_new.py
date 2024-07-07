@@ -260,24 +260,35 @@ class FEMRDataset(Dataset):
         token_2_count = self.code_2_detail[code]['token_2_count']
         return sum(token_2_count.values()) >= self.min_code_count
     
+    def _get_uuid_config(self) -> dict:
+        return {
+            'path_to_femr_extract': self.path_to_femr_extract,
+            'path_to_code_2_detail': self.path_to_code_2_detail,
+            'sampling_strat': self.sampling_strat,
+            'sampling_kwargs': self.sampling_kwargs,
+            'excluded_vocabs': self.excluded_vocabs,
+            'is_remap_numerical_codes': self.is_remap_numerical_codes,
+            'is_remap_codes_to_desc': self.is_remap_codes_to_desc,
+            'min_code_count': self.min_code_count,
+            'is_clmbr': self.is_clmbr,
+            'is_debug': self.is_debug,
+            'seed': self.seed,
+        }
+
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
-        extract: str = self.path_to_femr_extract.split("/")[-1]
-        uuid = f'{extract}-{self.split}'
-        if self.sampling_strat is not None:
-            uuid += f'-{self.sampling_strat}'
-            if self.sampling_strat == 'random':
-                uuid += f'-{str(self.sampling_kwargs.percent)}'
-            if self.sampling_strat == 'stratified':
-                uuid += f'-{self.sampling_kwargs.demographic}'
-        if self.is_debug:
-            uuid += f'-is_debug'
+        uuid: str = hash_string_to_uuid(self._get_uuid_config())
         return uuid
 
     def get_path_to_cache_folder(self) -> str:
-        """Returns path to cache folder for this dataset (e.g. storing things like sampling split, seq lengths, etc.)"""
-        path_to_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
-        return path_to_cache_dir
+        """Returns path to cache folder for this dataset + split (e.g. storing things like sampling split, seq lengths, etc.)"""
+        path_to_parent_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid())
+        if not os.path.exists(path_to_parent_cache_dir):
+            print(f"No cache file found at `{path_to_parent_cache_dir}` for uuid={self.get_uuid()}`. Generating now...")
+            os.makedirs(path_to_parent_cache_dir, exist_ok=True)
+            json.dump({ 'uuid' : self.get_uuid(), 'config' : self._get_uuid_config() }, open(os.path.join(path_to_parent_cache_dir, 'config.json'), 'w'))
+        path_to_split_cache_dir: str = os.path.join(path_to_parent_cache_dir, self.split)
+        return path_to_split_cache_dir
     
     def get_pids(self) -> np.ndarray:
         if self.split == 'train':

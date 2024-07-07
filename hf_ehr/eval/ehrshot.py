@@ -1,3 +1,16 @@
+"""Usage:
+
+python3 ehrshot.py
+    --path_to_database /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-debug-mike/ckpts/epoch=0-step=71000-persist.ckpt \
+    --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json \
+    --embed_strat last \
+    --chunk_strat last \
+    --is_force_refresh
+"""
+
 import argparse
 import datetime
 import os
@@ -94,15 +107,17 @@ def main():
     
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes
     print("Min code count", tokenizer_min_code_count)
     print("Min excluded vocabs", tokenizer_excluded_vocabs)
     tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, 
+                              is_remap_numerical_codes=is_remap_numerical_codes,
                               excluded_vocabs=tokenizer_excluded_vocabs,
                               min_code_count=tokenizer_min_code_count)
     
     model_map = {
         'bert': BERTLanguageModel,
-        'gpt2': GPTLanguageModel,
+        'gpt': GPTLanguageModel,
         'hyena': HyenaLanguageModel,
         'mamba': MambaLanguageModel,
         't5': T5LanguageModel

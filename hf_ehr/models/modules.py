@@ -2,7 +2,7 @@ import torch
 from torch import optim
 import lightning as L
 import torch.distributed as dist
-
+from tqdm import tqdm
 from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric
 from jaxtyping import Float
@@ -22,7 +22,7 @@ def calculate_flops_per_token(model, vocab_size: int) -> int:
         "input_ids": torch.randint(0, vocab_size, (1,1)).to(model.device),
         "labels": torch.randint(0, vocab_size, (1,1)).to(model.device)
     }
-    flops, macs, params = calculate_flops(model=model, kwargs=dummy_inputs, output_as_string=False, output_precision=4)
+    flops, macs, params = calculate_flops(model=model, kwargs=dummy_inputs, output_as_string=False, print_results=False, output_precision=4)
 
     if was_training:
         model.train()
@@ -100,19 +100,6 @@ class BaseModel(L.LightningModule):
         for key, metric in self.sum_metrics.items():
             checkpoint[key] = metric.compute()
 
-    def on_load_checkpoint(self, checkpoint):
-        """Load each metric's state in the checkpoint."""
-        pass
-        # for key in self.sum_metrics.keys():
-        #     if key in checkpoint:
-        #         self.sum_metrics[key] = SumMetric()
-        #         # Need to rescale SumMetric loaded from checkpoint since its saved value is summed across all GPUs,
-        #         # but this `on_load_checkpoint()` gets called per GPU. Need to do this quotient/remainder thing in
-        #         # case the SumMetric's value is not divisible by the # of GPUs
-        #         remainder: int = checkpoint[key] % (self.trainer.num_devices * self.trainer.num_nodes)
-        #         quotient: int = checkpoint[key] // (self.trainer.num_devices * self.trainer.num_nodes)
-        #         self.sum_metrics[key].update(quotient + (remainder if self.trainer.global_rank == 0 else 0))
-
     def validation_step(self, 
                         batch: Dict[str, Any],
                         batch_idx: int) -> Optional[torch.Tensor]:
@@ -142,9 +129,25 @@ class BaseModel(L.LightningModule):
         # Needed for ApproxBatchSampler to reset random seed after every epoch
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
     
+    def on_load_checkpoint(self, checkpoint):
+        super().on_load_checkpoint(checkpoint)
+
     def on_train_start(self):
         wandb.run.summary["flops_per_token"] = self.flops_per_token
-    
+
+        if self.trainer.global_step > 0:
+            # Make ApproxBatchSampler deterministic by looping through dataset until we hit
+            # the current step; otherwise, when Lightning restarts from a checkpoint it will
+            # reset np.random.seed(0) in ApproxBatchSampler. We need to "turn the crank" on this PRNG
+            # by repeatedly calling __iter__() until we hit our current step in order to recreate the
+            # last actual state of the PRNG corresponding to this checkpoint
+            if self.config.data.dataloader.mode == 'approx':
+                print(f"We are resuming from a checkpoint that used `ApproxBatchSampler`, so iterate through training dataloader until it matches the checkpoint's current step")
+                self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.trainer.current_epoch)
+                for idx, __ in tqdm(enumerate(self.trainer.train_dataloader), total=self.trainer.global_step, desc='Iterating thru train DataLoader to align `ApproxBatchSampler` with ckpt\'s current step...'):
+                    if idx >= self.trainer.global_step - 1:
+                        break
+
     def log_validation_step(self, loss: torch.Tensor):
         ppl: torch.Tensor = torch.exp(loss)
 

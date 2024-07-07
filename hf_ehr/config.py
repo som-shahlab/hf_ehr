@@ -1,6 +1,11 @@
 import os
+from typing import TypedDict, Dict, Optional, List
 from omegaconf import DictConfig, OmegaConf
 from loguru import logger
+
+SPLIT_SEED: int = 97
+SPLIT_TRAIN_CUTOFF: float = 70
+SPLIT_VAL_CUTOFF: float = 85
 
 H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
@@ -16,6 +21,15 @@ PATH_TO_DATASET_CACHE_DIR = os.path.join(PATH_TO_CACHE_DIR, 'dataset/')
 PATH_TO_FEMR_EXTRACT_v9 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9'
 PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
 
+class Detail(TypedDict):
+    token_2_count: Dict[str, int] # mapping [key] = token, [val] = count of that token
+    unit_2_quartiles: Optional[List[float]] # mapping [key] = unit, [val] = list of quartiles
+    is_numeric: Optional[bool] # if TRUE, then code is a lab value
+
+class Code2Detail(TypedDict):
+    """JSON file named `code_2_detail.json` which is a dict with [key] = code from FEMR, [val] = Detail dict"""
+    code: Detail
+    
 def copy_file(src: str, dest: str, is_overwrite_if_exists: bool = False) -> None:
     """Copy a file or directory if it does not exist."""
     if is_overwrite_if_exists or not os.path.exists(os.path.join(dest, os.path.basename(src))):
