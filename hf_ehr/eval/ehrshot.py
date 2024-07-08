@@ -200,11 +200,18 @@ def main():
                     raise ValueError(f"Embedding strategy `{EMBED_STRAT}` not supported.")
                 feature_matrix.append(patient_rep)
 
+    # Associate this featurization with its wandb run id + model path
+    wandb_run_id = None
+    path_to_wandb_txt: str = os.path.join(PATH_TO_MODEL, "../logs/wandb_run_id.txt")
+    if os.path.exists(path_to_wandb_txt):
+        with open(path_to_wandb_txt, 'r') as f:
+            wandb_run_id = int(f.read())
+
     feature_matrix = np.stack(feature_matrix)
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)
     label_times = np.array(label_times)
-    results = [feature_matrix, patient_ids, label_values, label_times]
+    results = [feature_matrix, patient_ids, label_values, label_times, { 'wandb_run_id' : wandb_run_id }, { 'path_to_ckpt' : PATH_TO_MODEL }]
 
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
     logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
