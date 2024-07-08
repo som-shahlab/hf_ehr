@@ -45,7 +45,7 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
         +tokenizer=femr \
         data.dataloader.mode=batch \
         data.dataloader.batch_size=8 \
-        data.dataloader.approx_batch_sampler.max_tokens=9216 \
+        data.dataloader.approx_batch_sampler.max_tokens=8192 \
         trainer.accumulate_grad_batches=4 \
         data.dataloader.n_workers=4 \
         trainer.devices=[0] \

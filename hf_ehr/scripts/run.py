@@ -132,7 +132,12 @@ def main(config: DictConfig) -> None:
     is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
     path_to_resume_ckpt: Optional[str] = os.path.join(path_to_output_dir, 'ckpts/last.ckpt') if is_resume_from_ckpt else None
     if is_force_restart:
+        print("====================================")
+        print("====================================")
         print("!!!! Force restart !!!!")
+        print(f"!!!! Deleting folder at `{path_to_output_dir}` !!!!")
+        print("====================================")
+        print("====================================")
         is_resume_from_ckpt = False
         path_to_resume_ckpt = None
         shutil.rmtree(path_to_output_dir)

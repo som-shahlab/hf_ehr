@@ -248,5 +248,3 @@ if __name__ == '__main__':
                        add_special_tokens=True,
                        return_tensors='pt')
     print(tokens)
-    breakpoint()
-    
