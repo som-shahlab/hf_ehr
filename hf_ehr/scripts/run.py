@@ -23,7 +23,6 @@ from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
-from calflops import calculate_flops
 
 class GradNormCallback(Callback):
     """

@@ -26,6 +26,8 @@ python3 ../run.py \
     model.config_kwargs.n_positions=1024 \
     callbacks.model_checkpointing.every_n_train_steps=1000 \
     callbacks.model_checkpointing.every_n_train_nonPAD_tokens=None \
-    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-base-debug/ \
-    logging.wandb.name=gpt2-base-debug \
-    main.is_force_restart=True
+    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-grad-norm-0.15/ \
+    logging.wandb.name=gpt2-grad-norm-0.15 \
+    logging.wandb.is_force_create_wandb_run_from_scratch=True \
+    trainer.gradient_clip_value=0.15 \
+    main.is_force_restart=False

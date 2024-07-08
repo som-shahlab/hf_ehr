@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional, Union
 from hf_ehr.trainer.samplers import ApproxBatchSampler, SortishSampler
 from omegaconf import DictConfig 
 from hf_ehr.data.datasets import FEMRDataset, collate_femr_timelines
-from hf_ehr.data.tokenizers import FEMRTokenizer, DescTokenizer
+from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
 from loguru import logger
 import numpy as np
 

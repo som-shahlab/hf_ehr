@@ -11,7 +11,7 @@ from tqdm import tqdm
 import datetime
 from hf_ehr.utils import convert_lab_value_to_token_from_quantiles, convert_lab_value_to_token_from_ranges, hash_string_to_uuid
 from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR, Code2Detail, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
-from hf_ehr.data.tokenizers import FEMRTokenizer, DescTokenizer
+from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
 
 class FEMRDataset(Dataset):
     '''Dataset that returns patients in a FEMR extract.
@@ -474,7 +474,6 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
 if __name__ == '__main__':
     path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
     path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
-    #path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
     
     # Tokenizer
     tokenizer = FEMRTokenizer(path_to_code_2_detail)

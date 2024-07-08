@@ -27,8 +27,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
         # Filter out excluded vocabs (if applicable)
         self.excluded_vocabs: Optional[List[str]] = excluded_vocabs
         if excluded_vocabs is not None:
-            excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } # type: ignore
-            codes = [ x for x in codes if x.split("/")[0].lower() not in excluded_vocabs ]
+            codes = [ x for x in codes if x.split("/")[0].lower() not in { x.lower() for x in excluded_vocabs } ]
 
         # Only keep codes with >= `min_code_count` occurrences in our dataset
         self.min_code_count: Optional[int] = min_code_count
@@ -56,7 +55,8 @@ class FEMRTokenizer(PreTrainedTokenizer):
         )
         self.add_tokens(self.non_special_tokens)
         
-    def is_code_above_min_count(self, token: str):
+    def is_code_above_min_count(self, token: str) -> bool:
+        assert self.min_code_count is not None, f"Can't call is_code_above_min_count() when self.min_code_count is None."
         if token in self.code_2_detail:
             code: str = token
         else:
@@ -65,7 +65,7 @@ class FEMRTokenizer(PreTrainedTokenizer):
         return sum(token_2_count.values()) >= self.min_code_count
     
     def __call__(self, 
-                 batch: Union[List[str], List[List[str]]],
+                 batch: Union[List[int], List[List[int]]],
                  is_truncation_random: bool = False,
                  seed: int = 1,
                  **kwargs) -> Dict[str, torch.Tensor]:
@@ -93,17 +93,22 @@ class FEMRTokenizer(PreTrainedTokenizer):
 
             # Truncate at random positions
             random.seed(seed)
+            start_idxs: List[int] = []
+            for timeline in tokenized_batch['input_ids']:
+                length: int = (timeline != self.pad_token_id).sum() # count of non-PAD tokens
+                if length > max_length:
+                    # Calculate a random start index
+                    start_index: int = random.randint(0, length - max_length)
+                    start_idxs.append(start_index)
+                else:
+                    start_idxs.append(0)
+                    
             for key in tokenized_batch.keys():
                 truncated_batch: List[List[int]] = []
-                for timeline in tokenized_batch[key]:
-                    if len(timeline) > max_length:
-                        # Calculate a random start index
-                        start_index: int = random.randint(0, len(timeline) - max_length)
-                        new_timeline = timeline[start_index:start_index + max_length]
-                        assert new_timeline.shape[0] == max_length, f"Error in truncating by random positions: new_timeline.shape = {new_timeline.shape[0]} != max_length={max_length}"
-                        truncated_batch.append(new_timeline)
-                    else:
-                        truncated_batch.append(timeline)
+                for idx, timeline in enumerate(tokenized_batch[key]):
+                    new_timeline = timeline[start_idxs[idx]:start_idxs[idx] + max_length]
+                    assert new_timeline.shape[0] <= max_length, f"Error in truncating by random positions: new_timeline.shape = {new_timeline.shape[0]} !<= max_length={max_length}"
+                    truncated_batch.append(new_timeline)
                 if kwargs.get('return_tensors') == 'pt':
                     tokenized_batch[key] = torch.stack(truncated_batch, dim=0)
                 else:
@@ -174,8 +179,10 @@ class DescTokenizer(PreTrainedTokenizer):
                 raise ValueError(f"If you specify `is_truncation_random`, then you must also provide a non-None value for `max_length`")
 
             # Tokenize without truncation
-            kwargs.pop('max_length')
-            kwargs.pop('truncation')
+            if 'max_length' in kwargs:
+                del kwargs['max_length']
+            if 'truncation' in kwargs:
+                del kwargs['truncation']
             tokenized_batch: Dict[str, torch.Tensor] = self.tokenizer.__call__(batch, **kwargs, truncation=None)
 
             # Truncate at random positions
@@ -216,3 +223,30 @@ class DescTokenizer(PreTrainedTokenizer):
 
     def _convert_id_to_token(self, index: int) -> str:
         return self.tokenizer._convert_id_to_token(index)
+
+if __name__ == '__main__':
+    from hf_ehr.data.datasets import FEMRDataset
+    
+    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'
+    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
+    
+    # Load dataset
+    print("Loading dataset...")
+    dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False, excluded_vocabs=['STANFORD_OBS'])
+    
+    # Load tokenizers
+    print("Loading tokenizers...")
+    tokenizer = FEMRTokenizer(path_to_code_2_detail, excluded_vocabs=['STANFORD_OBS'])
+    desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
+    
+    tokens = tokenizer([ dataset[288000][1], dataset[288001][1], dataset[288002][1], dataset[288003][1] ], 
+                       truncation=True,
+                       padding=True,
+                       is_truncation_random=True, 
+                       max_length=1024, 
+                       seed=0, 
+                       add_special_tokens=True,
+                       return_tensors='pt')
+    print(tokens)
+    breakpoint()
+    

@@ -1,9 +1,9 @@
 """Usage:
 
-python3 ehrshot.py
-    --path_to_database /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /local-scratch-nvme/nigam/ehrshot/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+python3 ehrshot.py \
+    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-debug-mike/ckpts/epoch=0-step=71000-persist.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json \
     --embed_strat last \
@@ -133,6 +133,7 @@ def main():
     timeline_starts: Dict[int, List[datetime.datetime]] = {}
     timeline_tokens: Dict[int, List[int]] = {}
     timeline_n_dropped_tokens: Dict[int, List[int]] = {} # for tracking the count of dropped tokens at each `timeline_start`
+    vocab = tokenizer.get_vocab()
     for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
         full_timeline: List[Tuple[datetime.datetime, int]] = [(x.start, x.code) for x in database[patient_id].events]
 
