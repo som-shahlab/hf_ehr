@@ -134,6 +134,7 @@ class BaseModel(L.LightningModule):
 
     def on_train_start(self):
         wandb.run.summary["flops_per_token"] = self.flops_per_token
+        wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
 
         if self.trainer.global_step > 0:
             # Make ApproxBatchSampler deterministic by looping through dataset until we hit
@@ -150,7 +151,6 @@ class BaseModel(L.LightningModule):
 
     def log_validation_step(self, loss: torch.Tensor):
         ppl: torch.Tensor = torch.exp(loss)
-
         self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
 

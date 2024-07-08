@@ -1,0 +1,15 @@
+# @package _global_
+
+model:
+  name: gpt2
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: gpt2
+
+# Default trainer
+trainer:
+  optimizer:
+    lr: 2e-4
+
+  scheduler:
+    num_warmup_steps: 40_000
+    num_decay_steps: 4_000_000

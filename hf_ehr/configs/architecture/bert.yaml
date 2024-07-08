@@ -1,0 +1,21 @@
+# @package _global_
+
+model:
+  name: bert
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: bert-base-uncased
+
+# Default trainer
+trainer:
+  # For models that use MLM training, this is the percent of tokens to randomly mask
+  mlm_mask_pct: 0.15
+
+  optimizer:
+    lr: 2e-4
+
+  scheduler:
+    num_warmup_steps: 40_000
+    num_decay_steps: 4_000_000
+
+data:
+  mlm_prob: 0.15

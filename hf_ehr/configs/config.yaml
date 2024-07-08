@@ -56,17 +56,14 @@ data:
       is_random_shuffle_across_buckets: True
       is_random_shuffle_within_buckets: True
     # Number of data loader workers to use.
-    n_workers: 10
+    n_workers: 4
     # Max number of codes to feed into model at once per patient.
     max_length: 1024
     # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
     is_truncation_random: True
   tokenizer:
     # Path to tokenizer
-    # v9:
     path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
-    # v8:
-    # path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
     # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines
     min_code_count: null
     is_remap_codes_to_desc: False

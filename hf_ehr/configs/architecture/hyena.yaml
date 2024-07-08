@@ -1,0 +1,16 @@
+# @package _global_
+
+model:
+  name: hyena
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: LongSafari/hyenadna-large-1m-seqlen-hf
+
+# Default trainer
+trainer:
+  optimizer:
+    lr: 2e-4
+    weight_decay: 0.1
+
+  scheduler:
+    num_warmup_steps: 40_000
+    num_decay_steps: 4_000_000

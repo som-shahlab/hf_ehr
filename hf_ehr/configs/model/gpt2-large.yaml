@@ -1,0 +1,16 @@
+# @package _global_
+
+defaults:
+  - ../architecture/gpt2
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    n_positions: ${model.dataloader.max_length}
+    n_layer: 36
+    n_head: 20
+    n_embd: 1280
+    d_head: 96

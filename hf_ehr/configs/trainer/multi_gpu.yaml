@@ -6,4 +6,4 @@ trainer:
 
 data:
   dataloader:
-    n_workers: 10
+    n_workers: 4

@@ -1,7 +1,0 @@
-# @package _global_
-
-model:
-  config_kwargs:
-    num_hidden_layers: 12
-    num_attention_heads: 12
-    hidden_size: 768

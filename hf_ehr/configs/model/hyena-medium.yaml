@@ -1,0 +1,14 @@
+# @package _global_
+
+defaults:
+  - ../architecture/hyena
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    max_seq_len: ${data.dataloader.max_length}
+    d_model: 256
+    n_layer: 8

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # For Carina to work (otherwise get a ton of Disk space out of memory errors b/c will write to /home/mwornow/.local/ which is space limited)
 export HF_DATASETS_CACHE="/share/pi/nigam/mwornow/hf_cache/"
 export TRANSFORMERS_CACHE="/share/pi/nigam/mwornow/hf_cache/"
@@ -26,7 +28,13 @@ fi
 
 REQUIREMENTS="../../../requirements.txt"
 
-if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
+if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
+    echo "Detected H100 Partition"
+    if [[ ! -e "/local-scratch/nigam/users/hf_ehr/hf_env" ]]; then
+        conda create --prefix=/local-scratch/nigam/users/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
+    fi
+    conda activate /local-scratch/nigam/users/hf_ehr/$ENV_NAME
+elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     echo "Detected A100 Partition"
     if [[ ! -e "/local-scratch/nigam/hf_ehr/hf_env" ]]; then
         conda create --prefix=/local-scratch/nigam/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
@@ -44,13 +52,6 @@ elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
         conda create --prefix=/home/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
     fi
     conda activate /home/hf_ehr/$ENV_NAME
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
-    echo "Detected H100 Partition"
-    if [[ ! -e "/local-scratch/nigam/users/hf_ehr/hf_env" ]]; then
-        conda create --prefix=/local-scratch/nigam/users/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
-    fi
-    REQUIREMENTS="../../../requirements.txt"
-    conda activate /local-scratch/nigam/users/hf_ehr/$ENV_NAME
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     echo "Detected Normal Partition"
     if [[ ! -e "/home/hf_ehr/hf_env" ]]; then

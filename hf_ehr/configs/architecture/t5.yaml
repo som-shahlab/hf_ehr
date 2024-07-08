@@ -1,0 +1,18 @@
+# @package _global_
+
+model:
+  name: t5
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: t5-base
+
+# Default trainer
+trainer:
+  optimizer:
+    lr: 2e-4
+    weight_decay: 0.1
+
+  scheduler:
+    # Number of local steps (i.e. non-global) from `initial_lr` -> `trainer.optimizer.lr`
+    num_warmup_steps: 40_000
+    # Number of local steps (i.e. non-global) from `trainer.optimizer.lr` -> `final_lr`
+    num_decay_steps: 4_000_000

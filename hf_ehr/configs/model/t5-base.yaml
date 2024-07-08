@@ -1,0 +1,18 @@
+# TODO
+
+# @package _global_
+
+defaults:
+  - ../architecture/t5
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    num_layers: 12
+    num_heads: 12
+    d_model: 768
+    d_ff: 2048
+    n_positions: ${data.dataloader.max_length}
