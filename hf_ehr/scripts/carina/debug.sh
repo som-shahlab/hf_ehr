@@ -19,7 +19,7 @@ python3 ../run.py \
     data.dataloader.approx_batch_sampler.max_tokens=4000 \
     data.dataloader.approx_batch_sampler.bucket_size=10 \
     trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=1 \
+    data.dataloader.n_workers=0 \
     trainer.devices=[0] \
     model.config_kwargs.n_layer=2 \
     model.config_kwargs.n_head=2 \

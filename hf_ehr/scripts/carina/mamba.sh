@@ -7,6 +7,7 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:1
+#SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 set -e
 source base.sh
