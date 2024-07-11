@@ -82,7 +82,7 @@ trainer:
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
-  max_epochs: 1_000
+  max_epochs: 2
   # Limits training to `N` batches if `int`, or `N%` of batches if `float`
   limit_train_batches: null
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`

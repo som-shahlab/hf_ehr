@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Set, Tuple, Union, Any, TypedDict
 import torch
 from torch.utils.data import Dataset
+from femr import Event
 import femr.datasets
 import os
 import numpy as np
@@ -12,6 +13,115 @@ import datetime
 from hf_ehr.utils import convert_lab_value_to_token_from_quantiles, convert_lab_value_to_token_from_ranges, hash_string_to_uuid
 from hf_ehr.config import GPU_BASE_DIR, PATH_TO_DATASET_CACHE_DIR, Code2Detail, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
 from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
+
+def convert_events_to_tokens(events: List[Event], code_2_detail: Code2Detail, **kwargs) -> List[str]:
+    tokens: List[str] = []
+    for e in events:
+        token: Optional[str] = convert_event_to_token(e, code_2_detail, **kwargs)
+        if token is not None:
+            tokens.append(token)
+    return tokens
+
+def convert_event_to_token(e: Event, code_2_detail: Code2Detail, **kwargs) -> Optional[str]:
+    """
+        Helper function used in FEMRDataset to convert a FEMR Event `e` to a string `token` based on the dataset's configuration.
+        If return `None`, then ignore this event (i.e. has no corresponding token).
+    """
+    # Parse kwargs
+    excluded_vocabs: Set[str] = kwargs.get('excluded_vocabs', {})
+    min_code_count: Optional[int] = kwargs.get('min_code_count', None)
+    is_remap_numerical_codes: bool = kwargs.get('is_remap_numerical_codes', False)
+    is_remap_codes_to_desc: bool = kwargs.get('is_remap_codes_to_desc', False)
+    is_clmbr: bool = kwargs.get('is_clmbr', False)
+
+    # Default the token to just being the literal code
+    token: str = e.code # e.g. "LOINC/10230-1"
+
+    # If exclude certain vocabs, then ignore this token if it belongs to one of those vocabs (e.g. "STANFORD_OBS/")            
+    if token.split("/")[0].lower() in { x.lower() for x in excluded_vocabs }:
+        return None
+    
+    # Check if code is above min count
+    def is_code_above_min_count(token: str, min_code_count: int) -> bool:
+        if token in code_2_detail:
+            code: str = token
+        else:
+            code: str = token.split(" || ")[0]
+        token_2_count = code_2_detail[code]['token_2_count']
+        return sum(token_2_count.values()) >= min_code_count
+
+    if min_code_count:
+        if not is_code_above_min_count(token, min_code_count):
+            return None
+    
+    # If CLMBR then do special mapping and continue
+    if is_clmbr:
+        # If code isn't in CLMBR vocab => ignore
+        if e.code not in code_2_detail:
+            return None
+
+        # If numerical code...
+        if code_2_detail[e.code].get('is_numeric', False) and (
+            hasattr(e, 'value') # `e` has a `value`
+            and e.value is not None # `value` is not None
+            and ( # `value` is numeric
+                isinstance(e.value, float)
+                or isinstance(e.value, int)
+            )
+        ):
+            # NOTE: CLMBR ignores units, so hardcode all to "None"
+            unit: str = "None"
+            assert 'unit_2_ranges' in code_2_detail[e.code], f"ERROR - Missing 'unit_2_ranges' for code={e.code} in code_2_detail: {code_2_detail[e.code]}"
+            assert unit in code_2_detail[e.code]['unit_2_ranges'], f"ERROR - Missing unit={unit} in 'unit_2_ranges' for code={e.code} in code_2_detail: {code_2_detail[e.code]['unit_2_ranges']}"
+            ranges: List[Tuple[float]] = code_2_detail[e.code]['unit_2_ranges'][unit]
+
+            # Determine range for (code, unit, value)
+            token = convert_lab_value_to_token_from_ranges(token, unit, e.value, ranges)
+        
+        # If textual code...
+        if code_2_detail[e.code].get('is_categorical', False) and (
+            hasattr(e, 'value') # `e` has a `value`
+            and e.value is not None # `value` is not None
+            and e.value != '' # `value` is not blank
+            and ( # `value` is textual
+                isinstance(e.value, str)
+            )
+        ):
+            assert 'categorical_values' in code_2_detail[e.code], f"ERROR - Missing 'categorical_values' for code={e.code} in code_2_detail: {code_2_detail[e.code]}"
+            if e.value in code_2_detail[e.code]['categorical_values']:
+                token = f"{e.code} || {e.value}"
+            else:
+                # If value not in categorical_values, then default to code
+                token = f"{e.code}"
+
+        return token
+
+    # First, if remap codes to textual descs => change `token` to textual definition of code
+    if is_remap_codes_to_desc:
+        # "LOINC/10230-1" => "Left ventricular Ejection fraction"
+        token = code_2_detail[e.code]['desc']
+
+    # Second, if remap numerical codes => change numerical codes to bucketed quantiles based on `value`...
+    if is_remap_numerical_codes:
+        # "LOINC/10230-1" => "LOINC/10230-1 || % (See scan or EMR data for detail) || Q1"
+        if (
+            hasattr(e, 'value') # `e` has a `value`
+            and e.value is not None # `value` is not None
+            and ( # `value` is numeric
+                isinstance(e.value, float)
+                or isinstance(e.value, int)
+            )
+        ):
+            # if we hit a numerical code and need to remap it, follow tokenizer template format
+            # to map (code, unit, value) => quantile for (code, unit)
+            unit: str = str(e.unit)
+            assert 'unit_2_quartiles' in code_2_detail[e.code], f"ERROR - Missing 'unit_2_quartiles' for code={e.code} in code_2_detail: {code_2_detail[e.code]}"
+            assert unit in code_2_detail[e.code]['unit_2_quartiles'], f"ERROR - Missing unit={unit} in 'unit_2_quartiles' for code={e.code} in code_2_detail: {code_2_detail[e.code]['unit_2_quartiles']}"
+            quantiles: List[float] = code_2_detail[e.code]['unit_2_quartiles'][unit]
+
+            # Determine quantile for (code, unit, value)
+            token = convert_lab_value_to_token_from_quantiles(token, unit, e.value, quantiles)
+    return token
 
 class FEMRDataset(Dataset):
     '''Dataset that returns patients in a FEMR extract.
@@ -38,7 +148,7 @@ class FEMRDataset(Dataset):
         self.split: str = split
         self.sampling_strat: Optional[str] = sampling_strat
         self.sampling_kwargs: Optional[Dict] = sampling_kwargs
-        self.excluded_vocabs: Set[str] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
+        self.excluded_vocabs: Set[str] = excluded_vocabs
         self.min_code_count: Optional[str] = min_code_count
         self.is_debug: bool = is_debug
         self.seed: int = seed
@@ -51,7 +161,8 @@ class FEMRDataset(Dataset):
         self.is_remap_codes_to_desc: bool = is_remap_codes_to_desc
         self.is_clmbr: bool = is_clmbr
         if self.is_clmbr:
-            assert not (self.is_remap_codes_to_desc or self.is_remap_numerical_codes), f"ERROR - Cannot have `is_clmbr=True` and any other augmentation"
+            assert self.is_remap_numerical_codes, f"ERROR - Cannot have `is_clmbr=True` and `is_remap_numerical_codes=False`"
+            assert not self.is_remap_codes_to_desc, f"ERROR - Cannot have `is_clmbr=True` and `is_remap_codes_to_desc=True`"
         
         # Sanity check
         if self.is_remap_numerical_codes:
@@ -192,73 +303,18 @@ class FEMRDataset(Dataset):
         # For negative `idx`, we need to unwrap `pid`
         if len(pid.shape) > 0:
             pid = pid[0]
-        
+
         # Get token for each clinical event in patient timeline
-        tokens: List[str] = []
-        for e in self.femr_db[pid].events:
-            # Default the token to just being the literal code
-            token: str = e.code # "LOINC/10230-1"
-
-            # If exclude certain vocabs, then ignore this token if it belongs to one of those vocabs (e.g. "STANFORD_OBS/")            
-            if self.excluded_vocabs and token.split("/")[0].lower() in self.excluded_vocabs:
-                continue
-            
-            if self.min_code_count:
-                if not self.is_code_above_min_count(token):
-                    continue
-            
-            # If CLMBR then do special mapping and continue
-            if self.is_clmbr:
-                if (
-                    hasattr(e, 'value') # `e` has a `value`
-                    and e.value is not None # `value` is not None
-                    and ( # `value` is numeric
-                        isinstance(e.value, float)
-                        or isinstance(e.value, int)
-                    )
-                ):
-                    # if we hit a numerical code, then try to remap it based on the given range
-                    # NOTE: CLMBR ignores units, so hardcode all to "None"
-                    unit: str = "None"
-                    ranges: List[Tuple[float]] = self.code_2_detail[e.code]['unit_2_ranges'][unit]
-
-                    # Determine range for (code, unit, value)
-                    token = convert_lab_value_to_token_from_ranges(token, unit, e.value, ranges)
-            
-            # First, if remap codes to textual descs => change `token` to textual definition of code
-            if self.is_remap_codes_to_desc:
-                # "LOINC/10230-1" => "Left ventricular Ejection fraction"
-                token = self.code_2_detail[e.code]['desc']
-
-            # Second, if remap numerical codes => change numerical codes to bucketed quantiles based on `value`...
-            if self.is_remap_numerical_codes:
-                # "LOINC/10230-1" => "LOINC/10230-1 || % (See scan or EMR data for detail) || Q1"
-                if (
-                    hasattr(e, 'value') # `e` has a `value`
-                    and e.value is not None # `value` is not None
-                    and ( # `value` is numeric
-                        isinstance(e.value, float)
-                        or isinstance(e.value, int)
-                    )
-                ):
-                    # if we hit a numerical code and need to remap it, follow tokenizer template format
-                    # to map (code, unit, value) => quantile for (code, unit)
-                    unit: str = str(e.unit)
-                    quantiles: List[float] = self.code_2_detail[e.code]['unit_2_quartiles'][unit]
-
-                    # Determine quantile for (code, unit, value)
-                    token = convert_lab_value_to_token_from_quantiles(token, unit, e.value, quantiles)
-
-            tokens.append(token)
+        tokens: List[str] = convert_events_to_tokens(
+            self.femr_db[pid].events, 
+            code_2_detail=self.code_2_detail, 
+            excluded_vocabs=self.excluded_vocabs,
+            min_code_count=self.min_code_count,
+            is_remap_numerical_codes=self.is_remap_numerical_codes,
+            is_remap_codes_to_desc=self.is_remap_codes_to_desc,
+            is_clmbr=self.is_clmbr,
+        )
         return (pid, tokens)
-
-    def is_code_above_min_count(self, token: str):
-        if token in self.code_2_detail:
-            code: str = token
-        else:
-            code: str = token.split(" || ")[0]
-        token_2_count = self.code_2_detail[code]['token_2_count']
-        return sum(token_2_count.values()) >= self.min_code_count
     
     def get_uuid(self) -> str:
         """Returns unique UUID for this dataset version. Useful for caching files"""
@@ -347,95 +403,6 @@ def torch_mask_tokens(tokenizer: FEMRTokenizer, inputs: Any, mlm_prob: float, sp
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
     return inputs, labels
 
-
-def _generate_dataset(args):
-    dataset: FEMRDataset = args[0]
-    tokenizer: FEMRTokenizer = args[1]
-    path_to_femr_extract: str = args[2]
-    n_tokens_per_file: str = args[3]
-    pids: np.ndarray = args[4]
-
-    tokens = tokenizer.encode([ e.code for e in self.femr_db[pid] ], truncate=False)
-    queue.extend(tokens)
-    if len(queue) > 10000:
-        np.save(np.array(queue))
-        queue = []
-
-    # # Tokenizer
-    # code_2_detail: Dict[str, int] = json.load(open(path_to_code_2_detail, 'r'))
-    # tokenizer = FEMRTokenizer(code_2_detail)
-    
-    # FEMR DB
-    femr_db = femr.datasets.PatientDatabase(path_to_femr_extract)
-    
-    for pid in pids.tolist():
-        events = [ e.code for e in femr_db[pid].events ]
-        tokens += tokenizer.encode(events)['input_ids']
-
-class AllTokensDataset(Dataset):
-    '''Dataset that merges all patients into one long sequence of tokens, with each patient sandwiched by a [BOS] and [EOS] token
-    '''
-    def __init__(self,
-                 path_to_femr_extract: str, 
-                 dataset: FEMRDataset,
-                 is_debug: bool = False):
-        assert os.path.exists(path_to_femr_extract), f"{path_to_femr_extract} is not a valid path"
-        self.path_to_femr_extract: str = path_to_femr_extract
-        self.dataset: FEMRDataset = dataset
-
-    def generate_dataset(self, tokenizer: FEMRTokenizer, n_tokens_per_file: int = 10_000_000, n_procs: int = 10):
-        """Default to 10M tokens => 10 * 4 => 40MB files"""
-        # Chunk pids
-        pids: np.ndarray = self.dataset.get_pids()
-        tasks: List[Tuple] = [
-            (self.dataset, tokenizer, self.path_to_femr_extract, n_tokens_per_file, pids[chunk_start:chunk_start + len(pids) // n_procs],)
-            for chunk_start in range(0, len(pids), len(pids) // n_procs)
-        ]
-        import multiprocessing
-        with multiprocessing.get_context("forkserver").Pool(n_procs) as pool:
-            pool.imap_unordered(_generate_dataset, tasks)
-
-    def __len__(self):
-        if self.split == 'train':
-            return len(self.train_pids)
-        elif self.split == 'val':
-            return len(self.val_pids)
-        elif self.split == 'test':
-            return len(self.test_pids)
-        else:
-            raise ValueError(f"Invalid split: {self.split}")
-    
-    def __getitem__(self, idx: int) -> Tuple[int, List[str]]:
-        '''Return all event codes for this patient at `idx` in `self.split`'''
-        if self.split == 'train':
-            pid = self.train_pids[idx]
-        elif self.split == 'val':
-            pid = self.val_pids[idx]
-        elif self.split == 'test':
-            pid = self.test_pids[idx]
-        else:
-            raise ValueError(f"Invalid split: {self.split}")
-        # For negative `idx`, we need to unwrap `pid`
-        if len(pid.shape) > 0:
-            pid = pid[0]
-        return (pid, [ e.code for e in self.femr_db[pid].events ])
-
-    def get_uuid(self) -> str:
-        """Returns unique UUID for this dataset version. Useful for caching files"""
-        extract: str = path_to_femr_extract.split("/")[-1]
-        uuid = f'{extract}-{self.split}'
-        if self.sampling_strat is not None:
-            uuid += f'-{self.sampling_strat}'
-        if self.is_debug:
-            uuid += f'-is_debug'
-        return uuid
-
-    def get_path_to_cache_folder(self) -> str:
-        """Returns path to cache folder for this dataset (e.g. storing things like sampling split, seq lengths, etc.)"""
-        path_to_cache_dir: str = os.path.join(PATH_TO_DATASET_CACHE_DIR, self.get_uuid(), self.split)
-        return path_to_cache_dir
-
-    
 def collate_femr_timelines(batch: List[Tuple[int, List[int]]], 
                              tokenizer: Union[FEMRTokenizer, DescTokenizer], 
                              max_length: int,
@@ -446,7 +413,6 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
     '''Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     '''
-
     # Otherwise, truncate on right hand side of sequence
     tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
                                                                         truncation=True, 
@@ -456,7 +422,6 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
                                                                         seed=seed, 
                                                                         add_special_tokens=True,
                                                                         return_tensors='pt')
-    
     # Set labels
     if is_mlm:
         # Masked LM
@@ -480,7 +445,6 @@ if __name__ == '__main__':
     desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
     biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
     pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
-    # breakpoint()
     # Dataset
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
     #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
@@ -509,22 +473,18 @@ if __name__ == '__main__':
     train_dataset_desc = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_codes_to_desc=True)
     
     # Check numerical codes
-    breakpoint()
     print("bert tokenizer")
     print(train_dataset_desc[-1])
     print(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
     print(desc_tokenizer.batch_decode(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    breakpoint()
     print("pubmed tokenizer")
     print(train_dataset_desc[-1])
     print(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
     print(pubmed_tokenizer.batch_decode(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    breakpoint()
     print("biogpt tokenizer")
     print(train_dataset_desc[-1])
     print(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
     print(biogpt_tokenizer.batch_decode(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    breakpoint()
     
     exit()    
     train_seq_lengths: List[int] = train_dataset.get_seq_lengths()

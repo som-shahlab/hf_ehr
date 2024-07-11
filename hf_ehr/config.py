@@ -9,11 +9,12 @@ SPLIT_VAL_CUTOFF: float = 85
 
 H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
-V100_BASE_DIR: str = '/local-scratch-nvme/nigam/hf_ehr/'
+V100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
 GPU_BASE_DIR: str = '/home/hf_ehr/'
 
 PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
 PATH_TO_TOKENIZER_v8_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v8/')
+PATH_TO_TOKENIZER_v8_CLMBR_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v8_clmbr/')
 PATH_TO_TOKENIZER_v9_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v9/')
 PATH_TO_TOKENIZER_v9_LITE_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v9_lite/')
 PATH_TO_RUNS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'runs/')
@@ -43,16 +44,19 @@ def copy_file(src: str, dest: str, is_overwrite_if_exists: bool = False) -> None
 def copy_resources_to_local(base_dir: str, is_overwrite_if_exists: bool = False) -> None:
     """Copy resources to local-scratch directories."""
     os.makedirs(base_dir, exist_ok=True)
-    tokenizer_v8_dir = os.path.join(base_dir, 'tokenizer_v8')
-    tokenizer_v9_dir = os.path.join(base_dir, 'tokenizer_v9')
     tokenizer_v9_lite_dir = os.path.join(base_dir, 'tokenizer_v9_lite')
-    os.makedirs(tokenizer_v8_dir, exist_ok=True)
+    tokenizer_v9_dir = os.path.join(base_dir, 'tokenizer_v9')
+    tokenizer_v8_clmbr_dir = os.path.join(base_dir, 'tokenizer_v8_clmbr')
+    tokenizer_v8_dir = os.path.join(base_dir, 'tokenizer_v8')
     os.makedirs(tokenizer_v9_dir, exist_ok=True)
     os.makedirs(tokenizer_v9_lite_dir, exist_ok=True)
+    os.makedirs(tokenizer_v8_clmbr_dir, exist_ok=True)
+    os.makedirs(tokenizer_v8_dir, exist_ok=True)
     copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9', base_dir, is_overwrite_if_exists=False)
+    copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir, is_overwrite_if_exists=False)
     copy_file(os.path.join(PATH_TO_TOKENIZER_v9_LITE_DIR, 'code_2_detail.json'), tokenizer_v9_lite_dir, is_overwrite_if_exists)
     copy_file(os.path.join(PATH_TO_TOKENIZER_v9_DIR, 'code_2_detail.json'), tokenizer_v9_dir, is_overwrite_if_exists)
-    copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir, is_overwrite_if_exists=False)
+    copy_file(os.path.join(PATH_TO_TOKENIZER_v8_CLMBR_DIR, 'code_2_detail.json'), tokenizer_v8_clmbr_dir, is_overwrite_if_exists)
     copy_file(os.path.join(PATH_TO_TOKENIZER_v8_DIR, 'code_2_detail.json'), tokenizer_v8_dir, is_overwrite_if_exists)
 
 def get_path_to_code_2_details(config: DictConfig, base_dir: str) -> str:
@@ -62,6 +66,8 @@ def get_path_to_code_2_details(config: DictConfig, base_dir: str) -> str:
         path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9_lite/', f"{os.path.join(base_dir, 'tokenizer_v9_lite')}/")
     elif "tokenizer_v9" in config.data.tokenizer.path_to_code_2_detail:
         path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v9/', f"{os.path.join(base_dir, 'tokenizer_v9')}/")
+    elif "tokenizer_v8_clmbr" in config.data.tokenizer.path_to_code_2_detail:
+        path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8_clmbr/', f"{os.path.join(base_dir, 'tokenizer_v8_clmbr')}/")
     elif "tokenizer_v8" in config.data.tokenizer.path_to_code_2_detail:
         path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace('/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/', f"{os.path.join(base_dir, 'tokenizer_v8')}/")
     else:

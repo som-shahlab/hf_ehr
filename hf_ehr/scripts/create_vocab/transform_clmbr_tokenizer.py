@@ -18,32 +18,35 @@ if __name__ == '__main__':
         val_start: float = token['val_start']
         val_end: float = token['val_end']
         type_ = token['type']
-        if code in code_2_detail:
-            # NOTE: Some codes have both `type = numeric` and `type = code`. 
-            # If so, overwrite the `code` version
-            if type_ != 'numeric' and code_2_detail[code].get('is_numeric'):
-                continue
-            if type_ == 'numeric' and 'unit_2_ranges' in code_2_detail[code]:
-                code_2_detail[code]['unit_2_ranges']['None'].append((val_start, val_end))
-                continue
+        text_string = token['text_string']
+        
+        # Skip ignored tokens
+        if type_ == 'unused':
+            continue
 
-        if type_ == 'numeric':
+        if code not in code_2_detail:
             code_2_detail[code] = {
                 'token_2_count' : {
                     code: None,
                 },
-                'is_numeric' : True,
+                'categorical_values' : [],
                 'unit_2_ranges' : {
                     "None" : [
-                        (val_start, val_end),
                     ],
                 },
             }
+        
+        if type_ == 'numeric':
+            code_2_detail[code]['unit_2_ranges']['None'].append((val_start, val_end))
+            code_2_detail[code]['token_2_count'][f"{code} || None || R{len(code_2_detail[code]['unit_2_ranges']['None'])}"] = None
+            code_2_detail[code]['is_numeric'] = True
+        elif type_ == 'text':
+            code_2_detail[code]['categorical_values'].append(text_string)
+            code_2_detail[code]['token_2_count'][f"{code} || {text_string}"] = None
+            code_2_detail[code]['is_categorical'] = True
+        elif type_ == 'code':
+            pass
         else:
-            code_2_detail[code] = {
-                'token_2_count' : {
-                    code: None,
-                },
-            }
+            raise ValueError(f"Code {code} has unknown type: {type_}")
 
     json.dump(code_2_detail, open(os.path.join(path_to_output_dir, 'code_2_detail.json'), 'w'), indent=2)

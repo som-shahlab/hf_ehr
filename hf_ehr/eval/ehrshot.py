@@ -4,16 +4,16 @@ python3 ehrshot.py \
     --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
     --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
     --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
-    --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-debug-mike/ckpts/epoch=0-step=71000-persist.ckpt \
+    --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-base-clmbr/ckpts/epoch=1-step=150000-recent.ckpt \
     --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json \
     --embed_strat last \
-    --chunk_strat last \
-    --is_force_refresh
+    --chunk_strat last
 """
 
 import argparse
 import datetime
 import os
+import json
 import pickle
 import numpy as np
 import torch
@@ -23,7 +23,8 @@ from typing import List, Dict, Tuple, Optional, Any
 from tqdm import tqdm
 from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
-from hf_ehr.data.datasets import FEMRTokenizer
+from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
+from hf_ehr.data.datasets import convert_event_to_token
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
@@ -41,23 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to run inference on")
-    parser.add_argument("--is_force_refresh", action='store_true', default=False, help="If set, then overwrite all outputs")
     return parser.parse_args()
-
-def get_valid_tokens(full_timeline: List[Tuple[Any, str]], tokenizer: FEMRTokenizer) -> List[Tuple[Any, str]]:
-    timeline_with_valid_tokens: List[Tuple[Any, str]] = []
-    vocab = tokenizer.get_vocab()
-    excluded_vocabs = tokenizer.excluded_vocabs
-    for x in full_timeline:
-        token = x[1]
-        if token not in vocab:
-            continue
-        if tokenizer.min_code_count and not tokenizer.is_code_above_min_count(token):
-            continue
-        if  excluded_vocabs and token.split("/")[0].lower() in excluded_vocabs:
-            continue
-        timeline_with_valid_tokens.append(x)
-    return timeline_with_valid_tokens
 
 def get_config(checkpoint) -> Dict[str, Any]:
     config = checkpoint['hyper_parameters']['config']
@@ -80,7 +65,6 @@ def main():
     args = parse_args()
     EMBED_STRAT: str = args.embed_strat
     CHUNK_STRAT: str = args.chunk_strat
-    IS_FORCE_REFRESH: bool = args.is_force_refresh
     PATH_TO_PATIENT_DATABASE = args.path_to_database
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
@@ -105,15 +89,30 @@ def main():
     checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
     config = get_config(checkpoint)
     
-    tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
-    tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
-    is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes
-    print("Min code count", tokenizer_min_code_count)
-    print("Min excluded vocabs", tokenizer_excluded_vocabs)
-    tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, 
-                              is_remap_numerical_codes=is_remap_numerical_codes,
-                              excluded_vocabs=tokenizer_excluded_vocabs,
-                              min_code_count=tokenizer_min_code_count)
+    # Get proper tokenizer
+    tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    tokenizer__min_code_count: Optional[int] = config.data.tokenizer.min_code_count if hasattr(config.data.tokenizer, 'min_code_count') else None
+    tokenizer__is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes if hasattr(config.data.tokenizer, 'is_remap_numerical_codes') else False
+    tokenizer__is_clmbr: bool = config.data.tokenizer.is_clmbr if hasattr(config.data.tokenizer, 'is_clmbr') else False
+    tokenizer__is_remap_codes_to_desc: bool = config.data.tokenizer.is_remap_codes_to_desc if hasattr(config.data.tokenizer, 'is_remap_codes_to_desc') else False
+    tokenizer__desc_emb_tokenizer: bool = config.data.tokenizer.desc_emb_tokenizer if hasattr(config.data.tokenizer, 'desc_emb_tokenizer') else False
+    tokenizer__code_2_detail = json.load(open(PATH_TO_TOKENIZER_CODE_2_DETAIL, 'r'))
+
+    if tokenizer__is_clmbr:
+        # CLMBR
+        # Fix path to tokenizer
+        PATH_TO_TOKENIZER_CODE_2_DETAIL = PATH_TO_TOKENIZER_CODE_2_DETAIL.replace("tokenizer_v8", "tokenizer_v8_clmbr")
+        tokenizer__code_2_detail = json.load(open(PATH_TO_TOKENIZER_CODE_2_DETAIL, 'r'))
+        tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, excluded_vocabs=tokenizer__excluded_vocabs)
+    elif tokenizer__is_remap_codes_to_desc:
+        # DescTokenizer
+        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
+    else:
+        # FEMRTokenizer
+        tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, 
+                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                                    excluded_vocabs=tokenizer__excluded_vocabs,
+                                    min_code_count=tokenizer__min_code_count)
     
     model_map = {
         'bert': BERTLanguageModel,
@@ -135,7 +134,19 @@ def main():
     timeline_n_dropped_tokens: Dict[int, List[int]] = {} # for tracking the count of dropped tokens at each `timeline_start`
     vocab = tokenizer.get_vocab()
     for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
-        full_timeline: List[Tuple[datetime.datetime, int]] = [(x.start, x.code) for x in database[patient_id].events]
+        full_timeline: List[Tuple[datetime.datetime, int]] = [
+            (
+                e.start, 
+                convert_event_to_token(e,
+                    tokenizer__code_2_detail, 
+                    excluded_vocabs=tokenizer__excluded_vocabs,
+                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                    is_remap_codes_to_desc=tokenizer__is_remap_codes_to_desc,
+                    min_code_count=tokenizer__min_code_count,
+                    is_clmbr=tokenizer__is_clmbr,
+                )
+            ) for e in database[patient_id].events
+        ]
 
         # Drop tokens not in vocab
         timeline_with_valid_tokens = [x for x in full_timeline if x[1] in vocab]
@@ -178,7 +189,7 @@ def main():
             timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines]
             input_ids = torch.stack([torch.tensor(x, device=device) for x in timelines_w_pad])
             attention_mask = (input_ids != pad_token_id).int()
-
+            
             batch = {
                 'input_ids': input_ids,
                 'attention_mask': attention_mask if "hyena" not in MODEL else None

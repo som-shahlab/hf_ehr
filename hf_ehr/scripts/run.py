@@ -111,6 +111,9 @@ def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int,
 def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
     config = rewrite_paths_for_carina_from_config(config)
+    
+    if 'v9' in config.data.dataset.path_to_femr_extract:
+        config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace("v8", "v9")
 
     # Load config
     print(config)
@@ -120,6 +123,7 @@ def main(config: DictConfig) -> None:
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
     path_to_tokenizer_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail
+    tokenizer_is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes
     tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
     seed: int = config.main.seed
@@ -263,7 +267,7 @@ def main(config: DictConfig) -> None:
         tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(config.data.tokenizer.desc_emb_tokenizer))
     else:
         logger.info(f"Loading FEMRTokenizer: `{path_to_tokenizer_code_2_detail}`")
-        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, excluded_vocabs=tokenizer_excluded_vocabs, min_code_count=tokenizer_min_code_count)
+        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, is_remap_numerical_codes=tokenizer_is_remap_numerical_codes, excluded_vocabs=tokenizer_excluded_vocabs, min_code_count=tokenizer_min_code_count)
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
@@ -287,7 +291,7 @@ def main(config: DictConfig) -> None:
     # Datasets
     logger.info(f"Loading FEMR datasets...")
     datasets: Dict[str, FEMRDataset] = load_datasets(config)
-        
+
     for key, val in datasets.items():
         logger.info(f"{key} dataset size: {len(val)}")
     
@@ -346,7 +350,7 @@ def main(config: DictConfig) -> None:
             verbose=True,
         )
     ]
-    if hasattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens') and config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens not in [None, "None"]:
+    if getattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens', None) not in [None, "None"]:
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
         callbacks += [ 
             MetricBasedCheckpoint(
@@ -355,7 +359,7 @@ def main(config: DictConfig) -> None:
                 is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
             ),
         ]
-    if hasattr(config.callbacks.model_checkpointing, 'every_n_flops') and config.callbacks.model_checkpointing.every_n_flops not in [None, "None"]:
+    if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
         # Save checkpoint every `every_n_flops` FLOPs; persists all models
         callbacks += [ 
             MetricBasedCheckpoint(

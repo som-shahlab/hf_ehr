@@ -2,6 +2,7 @@
 
 data:
   tokenizer:
+    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
     is_remap_numerical_codes: True
     is_remap_codes_to_desc: True
     desc_emb_tokenizer: 'bert-base-uncased'

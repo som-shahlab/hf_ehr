@@ -13,6 +13,9 @@ class FEMRTokenizer(PreTrainedTokenizer):
                  min_code_count: Optional[int] = None) -> None:
         self.path_to_code_2_detail: str = path_to_code_2_detail
         self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
+        self.is_remap_numerical_codes: bool = is_remap_numerical_codes
+        self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
+        self.min_code_count: Optional[int] = min_code_count
 
         # Get vocabulary
         codes: List[str] = []
@@ -25,12 +28,10 @@ class FEMRTokenizer(PreTrainedTokenizer):
             codes: List[str] = sorted(list(self.code_2_detail.keys()))
 
         # Filter out excluded vocabs (if applicable)
-        self.excluded_vocabs: Optional[List[str]] = excluded_vocabs
         if excluded_vocabs is not None:
-            codes = [ x for x in codes if x.split("/")[0].lower() not in { x.lower() for x in excluded_vocabs } ]
+            codes = [ x for x in codes if x.split("/")[0].lower() not in self.excluded_vocabs ]
 
         # Only keep codes with >= `min_code_count` occurrences in our dataset
-        self.min_code_count: Optional[int] = min_code_count
         if min_code_count is not None:
             codes = [x for x in codes if self.is_code_above_min_count(x)]
 
@@ -125,10 +126,14 @@ class FEMRTokenizer(PreTrainedTokenizer):
 
     def get_vocab(self) -> Dict[str, int]:
         return self.token_2_idx
+    
+    def tokenize(self, text: str, **kwargs) -> int:
+        """Here, `text` will be a single code (e.g. "LOINC/13"), so just map it back to itself"""
+        return [ text ]
 
     def _tokenize(self, text: str, **kwargs) -> int:
-        """Here, `text` will be a single code (e.g. "LOINC/13"), so directly map it to an id in our vocab"""
-        return self._convert_token_to_id(text)
+        """Here, `text` will be a single code (e.g. "LOINC/13"), so just map it back to itself"""
+        return [ text ]
 
     def _convert_token_to_id(self, token: str) -> int:
         return self.token_2_idx[token]
@@ -187,17 +192,22 @@ class DescTokenizer(PreTrainedTokenizer):
 
             # Truncate at random positions
             random.seed(seed)
+            start_idxs: List[int] = []
+            for timeline in tokenized_batch['input_ids']:
+                length: int = (timeline != self.pad_token_id).sum() # count of non-PAD tokens
+                if length > max_length:
+                    # Calculate a random start index
+                    start_index: int = random.randint(0, length - max_length)
+                    start_idxs.append(start_index)
+                else:
+                    start_idxs.append(0)
+                    
             for key in tokenized_batch.keys():
                 truncated_batch: List[List[int]] = []
-                for timeline in tokenized_batch[key]:
-                    if len(timeline) > max_length:
-                        # Calculate a random start index
-                        start_index: int = random.randint(0, len(timeline) - max_length)
-                        new_timeline = timeline[start_index:start_index + max_length]
-                        assert new_timeline.shape[0] == max_length, f"Error in truncating by random positions: new_timeline.shape = {new_timeline.shape[0]} != max_length={max_length}"
-                        truncated_batch.append(new_timeline)
-                    else:
-                        truncated_batch.append(timeline)
+                for idx, timeline in enumerate(tokenized_batch[key]):
+                    new_timeline = timeline[start_idxs[idx]:start_idxs[idx] + max_length]
+                    assert new_timeline.shape[0] <= max_length, f"Error in truncating by random positions: new_timeline.shape = {new_timeline.shape[0]} !<= max_length={max_length}"
+                    truncated_batch.append(new_timeline)
                 if kwargs.get('return_tensors') == 'pt':
                     tokenized_batch[key] = torch.stack(truncated_batch, dim=0)
                 else:

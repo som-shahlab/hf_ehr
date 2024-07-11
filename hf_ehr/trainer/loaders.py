@@ -88,20 +88,22 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     
     sampling_strat: Optional[str] = config.data.sampling_strat
     sampling_kwargs: Optional[Dict] = config.data.sampling_kwargs
-    excluded_vocabs = getattr(config.data.dataset, 'excluded_vocabs', None)
+    excluded_vocabs = getattr(config.data.tokenizer, 'excluded_vocabs', None)
     is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
     is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
+    is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
     min_code_count: Optional[int] = config.data.tokenizer.min_code_count
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
     seed: int = config.main.seed
     
-    # Load datasetes
+    # Load datasets
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', 
                                 sampling_strat=sampling_strat, 
                                 sampling_kwargs=sampling_kwargs, 
                                 excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
+                                is_clmbr=is_clmbr,
                                 min_code_count=min_code_count,
                                 is_debug=is_debug, 
                                 seed=seed)
@@ -111,6 +113,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
                                 excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
+                                is_clmbr=is_clmbr,
                                 min_code_count=min_code_count,
                                 is_debug=is_debug, 
                                 seed=seed)
@@ -120,6 +123,7 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
                                 excluded_vocabs=excluded_vocabs,
                                 is_remap_numerical_codes=is_remap_numerical_codes,
                                 is_remap_codes_to_desc=is_remap_codes_to_desc,
+                                is_clmbr=is_clmbr,
                                 min_code_count=min_code_count,
                                 is_debug=is_debug, 
                                 seed=seed)
