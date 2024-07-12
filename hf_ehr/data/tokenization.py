@@ -240,21 +240,48 @@ if __name__ == '__main__':
     path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'
     path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
     
-    # Load dataset
-    print("Loading dataset...")
-    dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False, excluded_vocabs=['STANFORD_OBS'])
+    # FEMR Tokenizer
+    if False:
+        print("Loading dataset...")
+        dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False, excluded_vocabs=['STANFORD_OBS'])
+        print("Loading tokenizers...")
+        tokenizer = FEMRTokenizer(path_to_code_2_detail, excluded_vocabs=['STANFORD_OBS'])
+        
+        tokens = tokenizer([ dataset[288000][1], dataset[288001][1], dataset[288002][1], dataset[288003][1] ], 
+                        truncation=True,
+                        padding=True,
+                        is_truncation_random=True, 
+                        max_length=1024, 
+                        seed=0, 
+                        add_special_tokens=True,
+                        return_tensors='pt')
+        print(tokens)
+        
+    # Desc Tokenizer
+    if False:
+        desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
     
-    # Load tokenizers
-    print("Loading tokenizers...")
-    tokenizer = FEMRTokenizer(path_to_code_2_detail, excluded_vocabs=['STANFORD_OBS'])
-    desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
-    
-    tokens = tokenizer([ dataset[288000][1], dataset[288001][1], dataset[288002][1], dataset[288003][1] ], 
-                       truncation=True,
-                       padding=True,
-                       is_truncation_random=True, 
-                       max_length=1024, 
-                       seed=0, 
-                       add_special_tokens=True,
-                       return_tensors='pt')
-    print(tokens)
+    # CLMBR Tokenizer
+    if True:
+        path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8_clmbr/code_2_detail.json'
+        print("Loading dataset...")
+        dataset = FEMRDataset(path_to_femr_extract, 
+                            path_to_code_2_detail, 
+                            split='train', 
+                            is_remap_numerical_codes=True, 
+                            is_clmbr=True,
+                            excluded_vocabs=['STANFORD_OBS'])
+        print("Loading tokenizers...")
+        tokenizer = FEMRTokenizer(path_to_code_2_detail, 
+                                  is_remap_numerical_codes=True,
+                                  excluded_vocabs=['STANFORD_OBS'])
+        
+        tokens = tokenizer([ [ 'LOINC/34441-6 || None || R0', ]], 
+                        truncation=True,
+                        padding=True,
+                        is_truncation_random=True, 
+                        max_length=1024, 
+                        seed=0, 
+                        add_special_tokens=True,
+                        return_tensors='pt')
+        print(tokens)

@@ -163,7 +163,8 @@ class FEMRDataset(Dataset):
         if self.is_clmbr:
             assert self.is_remap_numerical_codes, f"ERROR - Cannot have `is_clmbr=True` and `is_remap_numerical_codes=False`"
             assert not self.is_remap_codes_to_desc, f"ERROR - Cannot have `is_clmbr=True` and `is_remap_codes_to_desc=True`"
-        
+            assert self.excluded_vocabs == ['STANFORD_OBS'], f"ERROR - If `is_clmbr=True`, then `excluded_vocabs` must be ['STANFORD_OBS']"
+
         # Sanity check
         if self.is_remap_numerical_codes:
             assert self.code_2_detail is not None, f"self.code_2_detail cannot be NONE if self.is_remap_numerical_codes=True"
