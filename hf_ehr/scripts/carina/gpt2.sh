@@ -9,9 +9,6 @@
 #SBATCH --gres=gpu:1
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
-set -e
-source base.sh
-
 # CLI arguments
 MODEL_SIZE=$1
 TOKENIZER=$2
@@ -19,6 +16,14 @@ CONTEXT_LENGTH=$3
 DATALOADER_MODE=$4
 EXTRA=$([[ ! $5 == --* ]] && echo $5 || echo "") # only accept if not a --flag
 IS_FORCE_REFRESH=$( [[ " $* " == *" --is_force_refresh "* ]] && echo true || echo false ) # optional
+IS_SKIP_BASE=$( [[ " $* " == *" --is_skip_base "* ]] && echo true || echo false ) # optional - useful if we know env is already initialized on node and are running parallel jobs
+
+# Load environment (if not skipping)
+if [[ $IS_SKIP_BASE == true ]]; then
+    echo "Skipping base.sh"
+else
+    source base.sh
+fi
 
 # Partition-specific settings
 MAX_TOKENS=4096
@@ -57,7 +62,7 @@ fi
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
-echo "sbatch command: $0 $@" | tee /dev/stderr
+echo "Command run: $0 $@" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \

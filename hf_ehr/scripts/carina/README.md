@@ -22,3 +22,10 @@ sbatch gpt2.sh large femr 1024 approx
 # Run GPT-2 large model with FEMR tokenizer, approxbatchsampler dataloader, and 1024 context length; resume prior run if exists; overwrite the default device assignment to GPU 1
 sbatch gpt2.sh large femr 1024 approx "+trainer.devices=[1]"
 ```
+
+## Parallel Runs
+
+To run 4 runs in parallel on the same node (each job gets 1 GPU), you must:
+
+1. Modify `parallel.sh`, specifically `RUN_NAMES` and `RUN_ARGS`.
+2. Run `sbatch parallel.sh`.
