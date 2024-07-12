@@ -154,9 +154,11 @@ def main(config: DictConfig) -> None:
     path_to_log_dir: str = os.path.join(path_to_output_dir, 'logs/')
     path_to_ckpt_dir: str = os.path.join(path_to_output_dir, 'ckpts/')
     path_to_log_file: str = os.path.join(path_to_log_dir, 'info.log')
+    path_to_artifacts_dir: str = os.path.join(path_to_log_dir, 'artifacts/')
     os.makedirs(path_to_output_dir, exist_ok=True)
     os.makedirs(path_to_log_dir, exist_ok=True)
     os.makedirs(path_to_ckpt_dir, exist_ok=True)
+    os.makedirs(path_to_artifacts_dir, exist_ok=True)
     
     # Logging
     logger.add(path_to_log_file, enqueue=True, mode='a')
@@ -376,6 +378,11 @@ def main(config: DictConfig) -> None:
         ]
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
+    
+    # Copy artifacts into output directory for reproducibility
+    shutil.copy(path_to_tokenizer_code_2_detail, path_to_artifacts_dir) # save tokenizer code_2_detail
+    with open(os.path.join(path_to_artifacts_dir, 'config.yaml'), 'w') as fd: # save config
+        OmegaConf.save(config=config, f=fd)
 
     # Trainer
     trainer = pl.Trainer(
