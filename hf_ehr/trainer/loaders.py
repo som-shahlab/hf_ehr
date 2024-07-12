@@ -97,36 +97,20 @@ def load_datasets(config: DictConfig) -> Dict[str, FEMRDataset]:
     seed: int = config.main.seed
     
     # Load datasets
-    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', 
-                                sampling_strat=sampling_strat, 
-                                sampling_kwargs=sampling_kwargs, 
-                                excluded_vocabs=excluded_vocabs,
-                                is_remap_numerical_codes=is_remap_numerical_codes,
-                                is_remap_codes_to_desc=is_remap_codes_to_desc,
-                                is_clmbr=is_clmbr,
-                                min_code_count=min_code_count,
-                                is_debug=is_debug, 
-                                seed=seed)
-    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', 
-                                sampling_strat=sampling_strat, 
-                                sampling_kwargs=sampling_kwargs, 
-                                excluded_vocabs=excluded_vocabs,
-                                is_remap_numerical_codes=is_remap_numerical_codes,
-                                is_remap_codes_to_desc=is_remap_codes_to_desc,
-                                is_clmbr=is_clmbr,
-                                min_code_count=min_code_count,
-                                is_debug=is_debug, 
-                                seed=seed)
-    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', 
-                                sampling_strat=sampling_strat, 
-                                sampling_kwargs=sampling_kwargs, 
-                                excluded_vocabs=excluded_vocabs,
-                                is_remap_numerical_codes=is_remap_numerical_codes,
-                                is_remap_codes_to_desc=is_remap_codes_to_desc,
-                                is_clmbr=is_clmbr,
-                                min_code_count=min_code_count,
-                                is_debug=is_debug, 
-                                seed=seed)
+    kwargs = {
+        'sampling_strat' : sampling_strat,
+        'sampling_kwargs' : sampling_kwargs,
+        'excluded_vocabs' : excluded_vocabs,
+        'is_remap_numerical_codes' : is_remap_numerical_codes,
+        'is_remap_codes_to_desc' : is_remap_codes_to_desc,
+        'is_clmbr' : is_clmbr,
+        'min_code_count' : min_code_count,
+        'is_debug' : is_debug,
+        'seed' : seed,
+    }
+    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', **kwargs)
+    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', **kwargs)
+    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', **kwargs)
     
     return { 
             'train' : train_dataset, 

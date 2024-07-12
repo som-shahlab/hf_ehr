@@ -77,12 +77,13 @@ class ApproxBatchSampler(BatchSampler):
         self.sample_lengths: List[int] = sample_lengths
         self.sampler = sampler
         self.model_context_window: int = model_context_window # max size of seq that model can handle, so any seq great than this will get truncated anyway
-        self.max_tokens: int = max_tokens
-        self.max_examples: int = max_examples
+        self.max_tokens: int = max_tokens # max tokens per batch
+        self.max_examples: int = max_examples # max examples per batch
         self.batch_mult: int = batch_mult # make batch sizes a multiple of this
         self.drop_last: bool = drop_last
         self.length = None # result of len(self)
         self.last_length_epoch_calc = None # for tracking self.length caching
+        assert self.max_tokens >= self.model_context_window, f"ERROR: max_tokens ({self.max_tokens}) must be >= model_context_window ({self.model_context_window}). Otherwise, you could get a sequence that is too long to be included in any batch, i.e. len(seq) == model_context_window > max_tokens, which means some batches will return empty which throws an error. It doesn't make sense to limit the batch size to be less than the model context window, b/c then you'll never fully fill the model's context window."
 
     def __len__(self):
         if not (self.length and self.last_length_epoch_calc == self.sampler.epoch): 

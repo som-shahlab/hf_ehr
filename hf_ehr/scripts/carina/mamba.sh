@@ -57,11 +57,15 @@ else
     exit 1
 fi
 
+# Force max_tokens to be at least as large as context_length (otherwise ApproxBatchSampler might return an empty batch, causing an error)
+MAX_TOKENS=$((CONTEXT_LENGTH > MAX_TOKENS ? CONTEXT_LENGTH : MAX_TOKENS))
+echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
+
 # Sanity checks
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
-echo "Command run: $0 $@" | tee /dev/stderr
+echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \

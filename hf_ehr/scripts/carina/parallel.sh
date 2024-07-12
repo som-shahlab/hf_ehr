@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=parallel_sweep
+#SBATCH --output=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/parallel_sweep2.out
+#SBATCH --error=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/parallel_sweep2.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu,nigam-v100
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=20
 #SBATCH --gres=gpu:4
-#SBATCH --output=/share/pi/nigam/suhana/hf_ehr/slurm_logs/parallel_sweep2.out
-#SBATCH --error=/share/pi/nigam/suhana/hf_ehr/slurm_logs/parallel_sweep2.err
 
 child_pids=()
 stop_child_processes() {
@@ -21,12 +21,12 @@ trap 'stop_child_processes' SIGTERM SIGINT
 source base.sh
 
 # Experiment names
-RUN_NAMES=("bert-base-512" "bert-base-1024" "bert-base-2048" "bert-base-4096")
+RUN_NAMES=("hyena-medium-1024--clmbr" "hyena-medium-4096--clmbr" "hyena-medium-8192--clmbr" "hyena-medium-16384--clmbr" )
 RUN_ARGS=(
-    "bert.sh base femr 512 approx"
-    "bert.sh base femr 1024 approx"
-    "bert.sh base femr 2048 approx"
-    "bert.sh base femr 4096 approx"
+    "hyena.sh medium clmbr 1024 approx"
+    "hyena.sh medium clmbr 4096 approx"
+    "hyena.sh medium clmbr 8192 approx"
+    "hyena.sh medium clmbr 16384 approx"
 )
 
 # Ensure that 1 <= len(RUN_ARGS) <= 5

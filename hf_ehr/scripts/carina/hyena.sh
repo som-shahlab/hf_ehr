@@ -3,9 +3,9 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/hyena_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/hyena_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu,nigam-v100
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
@@ -57,11 +57,15 @@ else
     exit 1
 fi
 
+# Force max_tokens to be at least as large as context_length (otherwise ApproxBatchSampler might return an empty batch, causing an error)
+MAX_TOKENS=$((CONTEXT_LENGTH > MAX_TOKENS ? CONTEXT_LENGTH : MAX_TOKENS))
+echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
+
 # Sanity checks
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
-echo "Command run: $0 $@" | tee /dev/stderr
+echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \

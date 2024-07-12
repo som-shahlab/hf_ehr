@@ -28,11 +28,11 @@ def convert_event_to_token(e: Event, code_2_detail: Code2Detail, **kwargs) -> Op
         If return `None`, then ignore this event (i.e. has no corresponding token).
     """
     # Parse kwargs
-    excluded_vocabs: Set[str] = kwargs.get('excluded_vocabs', {})
+    excluded_vocabs: Set[str] = kwargs.get('excluded_vocabs', {}) or {}
     min_code_count: Optional[int] = kwargs.get('min_code_count', None)
-    is_remap_numerical_codes: bool = kwargs.get('is_remap_numerical_codes', False)
-    is_remap_codes_to_desc: bool = kwargs.get('is_remap_codes_to_desc', False)
-    is_clmbr: bool = kwargs.get('is_clmbr', False)
+    is_remap_numerical_codes: bool = kwargs.get('is_remap_numerical_codes', False) or False
+    is_remap_codes_to_desc: bool = kwargs.get('is_remap_codes_to_desc', False) or False
+    is_clmbr: bool = kwargs.get('is_clmbr', False) or False
 
     # Default the token to just being the literal code
     token: str = e.code # e.g. "LOINC/10230-1"
@@ -414,6 +414,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
     '''Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     '''
+    breakpoint()
     # Otherwise, truncate on right hand side of sequence
     tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
                                                                         truncation=True, 
@@ -442,15 +443,23 @@ if __name__ == '__main__':
     path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
     
     # Tokenizer
-    tokenizer = FEMRTokenizer(path_to_code_2_detail)
-    desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
-    biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
-    pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
-    # Dataset
-    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
-    #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
-    #test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
+    dataset = FEMRDataset(path_to_femr_extract, 
+                        path_to_code_2_detail, 
+                        split='train', 
+                        is_remap_numerical_codes=True, 
+                        is_clmbr=True,
+                        excluded_vocabs=['STANFORD_OBS'])
+    tokenizer = FEMRTokenizer(path_to_code_2_detail, 
+                                is_remap_numerical_codes=True,
+                                excluded_vocabs=['STANFORD_OBS'])
+        
 
+    # Dataset
+    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
+    val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
+    test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
+
+    print(train_dataset[0])
     # Stats
     print('train', len(train_dataset))
     #print('val', len(val_dataset))
@@ -467,45 +476,44 @@ if __name__ == '__main__':
     # # Print average time per event
     # print("Average time per patient: ", (t2 - t1) / 100000)
     # print("Average time per event: ", (t2 - t1) / event_count)
-    """
-    # Dataset with numerical lab remapping
-    train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
-    # Dataset with textual desc code remapping
-    train_dataset_desc = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_codes_to_desc=True)
-    
-    # Check numerical codes
-    print("bert tokenizer")
-    print(train_dataset_desc[-1])
-    print(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
-    print(desc_tokenizer.batch_decode(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    print("pubmed tokenizer")
-    print(train_dataset_desc[-1])
-    print(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
-    print(pubmed_tokenizer.batch_decode(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    print("biogpt tokenizer")
-    print(train_dataset_desc[-1])
-    print(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
-    print(biogpt_tokenizer.batch_decode(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    
-    exit()    
-    train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
-    val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
-    test_seq_lengths: List[int] = test_dataset.get_seq_lengths()
-    assert len(train_seq_lengths) == len(train_dataset)
-    assert len(val_seq_lengths) == len(val_dataset)
-    assert len(test_seq_lengths) == len(test_dataset)
 
-    # Sanity checking
-    print(train_dataset)
-    print(train_dataset[-1])
-    print(tokenizer(train_dataset[-1:][1])['input_ids'])
-    print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
-    assert tokenizer(train_dataset[-1:][1])['input_ids'] == [[109803, 8187, 8185, 93995, 91564, 95332, 154435, 155073, 91689, 8184, 155175, 49815, 167230]]
+    # # Dataset with numerical lab remapping
+    # train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
+    # # Dataset with textual desc code remapping
+    # train_dataset_desc = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_codes_to_desc=True)
     
-    long_seq = [x for i in range(10) for x in train_dataset[i][1] ]
-    assert len(long_seq) == 2846
-    print(tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'])
-    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
-    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
-    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
-    """
+    # # Check numerical codes
+    # print("bert tokenizer")
+    # print(train_dataset_desc[-1])
+    # print(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    # print(desc_tokenizer.batch_decode(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    # print("pubmed tokenizer")
+    # print(train_dataset_desc[-1])
+    # print(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    # print(pubmed_tokenizer.batch_decode(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    # print("biogpt tokenizer")
+    # print(train_dataset_desc[-1])
+    # print(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
+    # print(biogpt_tokenizer.batch_decode(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
+    
+    # exit()    
+    # train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
+    # val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
+    # test_seq_lengths: List[int] = test_dataset.get_seq_lengths()
+    # assert len(train_seq_lengths) == len(train_dataset)
+    # assert len(val_seq_lengths) == len(val_dataset)
+    # assert len(test_seq_lengths) == len(test_dataset)
+
+    # # Sanity checking
+    # print(train_dataset)
+    # print(train_dataset[-1])
+    # print(tokenizer(train_dataset[-1:][1])['input_ids'])
+    # print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
+    # assert tokenizer(train_dataset[-1:][1])['input_ids'] == [[109803, 8187, 8185, 93995, 91564, 95332, 154435, 155073, 91689, 8184, 155175, 49815, 167230]]
+    
+    # long_seq = [x for i in range(10) for x in train_dataset[i][1] ]
+    # assert len(long_seq) == 2846
+    # print(tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'])
+    # assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
+    # assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
+    # assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
