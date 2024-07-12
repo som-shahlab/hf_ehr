@@ -39,7 +39,7 @@ if __name__ == '__main__':
         if type_ == 'numeric':
             code_2_detail[code]['unit_2_ranges']['None'].append((val_start, val_end))
             code_2_detail[code]['token_2_count'][f"{code} || None || R0"] = None # special case for out of range
-            code_2_detail[code]['token_2_count'][f"{code} || None || R{len(code_2_detail[code]['unit_2_ranges']['None']) + 1}"] = None # Special case for out of range
+            code_2_detail[code]['token_2_count'][f"{code} || None || R{len(code_2_detail[code]['unit_2_ranges']['None'])}"] = None # Special case for out of range
             code_2_detail[code]['is_numeric'] = True
         elif type_ == 'text':
             code_2_detail[code]['categorical_values'].append(text_string)
