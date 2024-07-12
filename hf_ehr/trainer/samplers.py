@@ -21,12 +21,13 @@ class SortishSampler(Sampler):
         n_buckets: int = int(np.ceil(len(self.data) / self.bucket_size))
         self.data = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
         self.epoch: int = 0
+	self.current_iter: int = 0
         self.total_size: int = self.num_samples * self.num_replicas
         self.is_random_shuffle_across_buckets: bool = is_random_shuffle_across_buckets
         self.is_random_shuffle_within_buckets: bool = is_random_shuffle_within_buckets
-        np.random.seed(self.epoch)
 
     def __iter__(self):
+        np.random.seed(self.epoch * 10_000_000 + self.current_iter)
         self.rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
         if self.is_random_shuffle_within_buckets:
             for bucket in self.data:
@@ -40,6 +41,7 @@ class SortishSampler(Sampler):
         start = self.rank * self.num_samples
         end = start + self.num_samples
         indices = indices[start:end]
+	self.current_iter += 1
         assert len(indices) == self.num_samples
         return iter(indices)
 
@@ -50,7 +52,7 @@ class SortishSampler(Sampler):
         # Different shuffling for each epoch
         # ! Be sure to add this to PyTorch Lightning hook
         self.epoch: int = epoch
-        np.random.seed(self.epoch)
+	self.current_iter: int = 0
 
 
 class ApproxBatchSampler(BatchSampler):
