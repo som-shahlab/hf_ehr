@@ -47,12 +47,13 @@ class StartTrainingCheckpoint(ModelCheckpoint):
         super().__init__(**kwargs)
 
     def on_train_start(self, trainer, pl_module):
+        if rank_zero_only.rank != 0:
+            return
         checkpoint_file = os.path.join(self.dirpath, f"{self.filename}.ckpt")
         if not os.path.exists(checkpoint_file):
             # Save a checkpoint at the beginning of training
             self._save_checkpoint(trainer, checkpoint_file)
 
-            
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
         """
@@ -71,6 +72,8 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         self.last_ckpt_metric_value: Optional[Any] = None
 
     def on_train_batch_end(self, trainer, *args, **kwargs):
+        if rank_zero_only.rank != 0:
+            return
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
 
@@ -144,7 +147,8 @@ def main(config: DictConfig) -> None:
         print("====================================")
         is_resume_from_ckpt = False
         path_to_resume_ckpt = None
-        shutil.rmtree(path_to_output_dir)
+        if os.path.exists(path_to_output_dir):
+            shutil.rmtree(path_to_output_dir)
 
     # Paths
     path_to_log_dir: str = os.path.join(path_to_output_dir, 'logs/')
@@ -213,6 +217,7 @@ def main(config: DictConfig) -> None:
                 if config.logging.wandb.is_force_create_wandb_run_from_scratch:
                     logger.info(f"Creating new wandb run from scratch")
                     run = wandb.init(
+                        entity='ehr-fm',
                         project='hf_ehr', 
                         dir=path_to_log_dir, 
                         name=config.logging.wandb.name,
@@ -235,6 +240,7 @@ def main(config: DictConfig) -> None:
         else:
             if rank_zero_only.rank == 0:
                 run = wandb.init(
+                    entity='ehr-fm',
                     project='hf_ehr', 
                     dir=path_to_log_dir, 
                     name=config.logging.wandb.name

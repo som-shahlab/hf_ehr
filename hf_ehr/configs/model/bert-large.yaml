@@ -13,4 +13,3 @@ model:
     num_hidden_layers: 24
     num_attention_heads: 16
     hidden_size: 1024
-    d_head: 64

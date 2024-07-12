@@ -9,6 +9,7 @@ from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union
 from calflops import calculate_flops
 import wandb
+from lightning.pytorch.utilities import rank_zero_only
 
 from hf_ehr.utils import lr_warmup_with_constant_plateau
 from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
@@ -133,8 +134,11 @@ class BaseModel(L.LightningModule):
         super().on_load_checkpoint(checkpoint)
 
     def on_train_start(self):
-        wandb.run.summary["flops_per_token"] = self.flops_per_token
-        wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
+        if rank_zero_only.rank == 0 and wandb and wandb.run:
+            print(self.flops_per_token, type(self.flops_per_token))
+            print(self.vocab_size, type(self.vocab_size))
+            wandb.run.summary["flops_per_token"] = self.flops_per_token
+            wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
 
         if self.trainer.global_step > 0:
             # Make ApproxBatchSampler deterministic by looping through dataset until we hit

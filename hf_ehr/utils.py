@@ -11,14 +11,14 @@ def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, r
     for idx, (start_val, end_val) in enumerate(ranges):
         if start_val <= value <= end_val:
             return f"{code} || {unit} || R{idx + 1}" # "STANFORD_OBS/123 | mmol | R3"
-    return f"{code} || {unit}"
+    return f"{code} || {unit} || R0" # out of range, "STANFORD_OBS/123 | mmol | R0"
 
 def convert_lab_value_to_token_from_quantiles(code: str, unit: str, value: float, quantiles: List[float]) -> str:
     # Note: If we have Q1, Q2, Q3, Q4, then `len(quantiles) == 3` b/c have [0.25, 0.5, 0.75]
     for q_idx, q in enumerate(quantiles):
         if value <= q: 
             return get_lab_value_token_name(code, unit, str(q_idx + 1))
-    return get_lab_value_token_name(code, unit, str(len(quantiles) + 1))
+    return get_lab_value_token_name(code, unit, "0") # out of range, "STANFORD_OBS/123 | mmol | Q0"
 
 def get_lab_value_token_name(code: str, unit: str, quantile: str) -> str:
     return f"{code} || {unit} || Q{quantile}" # "STANFORD_OBS/123 | mmol | Q4"

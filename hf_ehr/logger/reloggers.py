@@ -55,7 +55,8 @@ class WandbRelogger:
         last_step = self.get_last_step(ckpt_path)
         logger.info(f"Last step found in checkpoint: {last_step}")
         old_run = self.api.run(f'{self.entity}/{self.project}/runs/{run_id}')
-        new_run = wandb.init(project=self.project,
+        new_run = wandb.init(entity='ehr-fm',
+                             project=self.project,
                              name=old_run.name, 
                              dir=run_log_dir,
                              resume='never',

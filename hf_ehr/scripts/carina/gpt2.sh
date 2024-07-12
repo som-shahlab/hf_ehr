@@ -57,8 +57,7 @@ fi
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
-echo "sbatch command: $BASH_COMMAND" >&2
-echo "sbatch command: $BASH_COMMAND"
+echo "sbatch command: $0 $@" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \
