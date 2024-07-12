@@ -18,7 +18,7 @@ stop_child_processes() {
 
 trap 'stop_child_processes' SIGTERM SIGINT
 
-# source base.sh
+source base.sh
 
 # Experiment names
 RUN_NAMES=("bert-base-512" "bert-base-1024" "bert-base-2048" "bert-base-4096")
