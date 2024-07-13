@@ -84,7 +84,7 @@ def main():
     device: str = args.device
     checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
     config = get_config(checkpoint)
-    
+
     # Get proper tokenizer
     tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
     tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
@@ -93,18 +93,22 @@ def main():
     tokenizer__is_clmbr: bool = config.data.tokenizer.is_clmbr if hasattr(config.data.tokenizer, 'is_clmbr') else False
     tokenizer__is_remap_codes_to_desc: bool = config.data.tokenizer.is_remap_codes_to_desc if hasattr(config.data.tokenizer, 'is_remap_codes_to_desc') else False
     tokenizer__desc_emb_tokenizer: bool = config.data.tokenizer.desc_emb_tokenizer if hasattr(config.data.tokenizer, 'desc_emb_tokenizer') else False
+    tokenizer__code_2_detail: Dict[str, str] = json.load(open(tokenizer__path_to_code_2_detail, 'r'))
 
     if tokenizer__is_clmbr:
         # CLMBR
-        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, excluded_vocabs=tokenizer__excluded_vocabs)
+        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
+                                  excluded_vocabs=tokenizer__excluded_vocabs,
+                                  is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                                  min_code_count=tokenizer__min_code_count)
     elif tokenizer__is_remap_codes_to_desc:
         # DescTokenizer
         tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
     else:
         # FEMRTokenizer
         tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
-                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
                                     excluded_vocabs=tokenizer__excluded_vocabs,
+                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
                                     min_code_count=tokenizer__min_code_count)
     
     model_map = {
@@ -227,7 +231,7 @@ def main():
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)
     label_times = np.array(label_times)
-    results = [feature_matrix, patient_ids, label_values, label_times, { 'wandb_run_id' : wandb_run_id }, { 'path_to_ckpt' : path_to_ehrshot_model }, { 'path_to_ckpt_orig' : PATH_TO_MODEL }]
+    results = [feature_matrix, patient_ids, label_values, label_times, { 'wandb_run_id' : wandb_run_id }, { 'path_to_ckpt' : path_to_model_ehrshot_dir }, { 'path_to_ckpt_orig' : PATH_TO_MODEL }]
 
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
     logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}.pkl`")
