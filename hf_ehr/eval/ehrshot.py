@@ -5,7 +5,6 @@ python3 ehrshot.py \
     --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
     --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-base-clmbr/ckpts/epoch=1-step=150000-recent.ckpt \
-    --path_to_tokenizer /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json \
     --embed_strat last \
     --chunk_strat last
 """
@@ -18,7 +17,7 @@ import pickle
 import numpy as np
 import torch
 import femr.datasets
-
+import shutil
 from typing import List, Dict, Tuple, Optional, Any
 from tqdm import tqdm
 from loguru import logger
@@ -37,7 +36,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
     parser.add_argument("--path_to_model", type=str, help="Path to model .ckpt")
-    parser.add_argument("--path_to_tokenizer", type=str, help="Path to tokenizer code_2_detail.json")
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
@@ -70,11 +68,9 @@ def main():
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_MODEL = args.path_to_model
-    PATH_TO_TOKENIZER_CODE_2_DETAIL = args.path_to_tokenizer
-    batch_size: int = args.batch_size
     MODEL: str = args.path_to_model.split("/")[-3]
     CKPT: str = get_ckpt_name(PATH_TO_MODEL) 
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features.pkl')
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features')
 
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
 
@@ -90,26 +86,23 @@ def main():
     config = get_config(checkpoint)
     
     # Get proper tokenizer
+    tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
     tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
     tokenizer__min_code_count: Optional[int] = config.data.tokenizer.min_code_count if hasattr(config.data.tokenizer, 'min_code_count') else None
     tokenizer__is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes if hasattr(config.data.tokenizer, 'is_remap_numerical_codes') else False
     tokenizer__is_clmbr: bool = config.data.tokenizer.is_clmbr if hasattr(config.data.tokenizer, 'is_clmbr') else False
     tokenizer__is_remap_codes_to_desc: bool = config.data.tokenizer.is_remap_codes_to_desc if hasattr(config.data.tokenizer, 'is_remap_codes_to_desc') else False
     tokenizer__desc_emb_tokenizer: bool = config.data.tokenizer.desc_emb_tokenizer if hasattr(config.data.tokenizer, 'desc_emb_tokenizer') else False
-    tokenizer__code_2_detail = json.load(open(PATH_TO_TOKENIZER_CODE_2_DETAIL, 'r'))
 
     if tokenizer__is_clmbr:
         # CLMBR
-        # Fix path to tokenizer
-        PATH_TO_TOKENIZER_CODE_2_DETAIL = PATH_TO_TOKENIZER_CODE_2_DETAIL.replace("tokenizer_v8", "tokenizer_v8_clmbr")
-        tokenizer__code_2_detail = json.load(open(PATH_TO_TOKENIZER_CODE_2_DETAIL, 'r'))
-        tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, excluded_vocabs=tokenizer__excluded_vocabs)
+        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, excluded_vocabs=tokenizer__excluded_vocabs)
     elif tokenizer__is_remap_codes_to_desc:
         # DescTokenizer
         tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
     else:
         # FEMRTokenizer
-        tokenizer = FEMRTokenizer(PATH_TO_TOKENIZER_CODE_2_DETAIL, 
+        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
                                     is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
                                     excluded_vocabs=tokenizer__excluded_vocabs,
                                     min_code_count=tokenizer__min_code_count)
@@ -212,21 +205,33 @@ def main():
                 feature_matrix.append(patient_rep)
 
     # Associate this featurization with its wandb run id + model path
+    ## Save wandb run id of ckpt
     wandb_run_id = None
     path_to_wandb_txt: str = os.path.join(PATH_TO_MODEL, "../logs/wandb_run_id.txt")
     if os.path.exists(path_to_wandb_txt):
         with open(path_to_wandb_txt, 'r') as f:
             wandb_run_id = int(f.read())
+    ## Copy model ckpt .pt file over
+    path_to_model_ehrshot_dir = os.path.abspath(os.path.join(PATH_TO_FEATURES_DIR, "../models/", os.path.basename(PATH_TO_OUTPUT_FILE)))
+    logger.info(f"Copying model ckpt from `{PATH_TO_MODEL}` to `{path_to_model_ehrshot_dir}`")
+    if os.path.exists(path_to_model_ehrshot_dir):
+        shutil.rmtree(path_to_model_ehrshot_dir)
+    os.makedirs(path_to_model_ehrshot_dir, exist_ok=True)
+    shutil.copy(PATH_TO_MODEL, path_to_model_ehrshot_dir)
+    ## Copy logging files over
+    logger.info(f"Copying logs from `{os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/')}` to `{path_to_model_ehrshot_dir}/logs`")
+    shutil.copytree(os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/'), os.path.join(path_to_model_ehrshot_dir, 'logs/'))
 
+    # Save EHRSHOT featurization results
     feature_matrix = np.stack(feature_matrix)
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)
     label_times = np.array(label_times)
-    results = [feature_matrix, patient_ids, label_values, label_times, { 'wandb_run_id' : wandb_run_id }, { 'path_to_ckpt' : PATH_TO_MODEL }]
+    results = [feature_matrix, patient_ids, label_values, label_times, { 'wandb_run_id' : wandb_run_id }, { 'path_to_ckpt' : path_to_ehrshot_model }, { 'path_to_ckpt_orig' : PATH_TO_MODEL }]
 
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
-    logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
-    with open(PATH_TO_OUTPUT_FILE, 'wb') as f:
+    logger.info(f"Saving results to `{PATH_TO_OUTPUT_FILE}.pkl`")
+    with open(PATH_TO_OUTPUT_FILE + '.pkl', 'wb') as f:
         pickle.dump(results, f)
 
     logger.info("FeaturizedPatient stats:\n"

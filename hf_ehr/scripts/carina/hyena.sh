@@ -29,28 +29,44 @@ fi
 MAX_TOKENS=2048
 BATCH_SIZE=2
 if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
+    if [[ "$MODEL_SIZE" == "tiny" ]]; then
         :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
+    elif [[ "$MODEL_SIZE" == "small" ]]; then
+        :
+    elif [[ "$MODEL_SIZE" == "medium" ]]; then
         :
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
+    if [[ "$MODEL_SIZE" == "tiny" ]]; then
         :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
+    elif [[ "$MODEL_SIZE" == "small" ]]; then
+        :
+    elif [[ "$MODEL_SIZE" == "medium" ]]; then
         :
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
+    if [[ "$MODEL_SIZE" == "tiny" ]]; then
         :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
+    elif [[ "$MODEL_SIZE" == "small" ]]; then
+        :
+    elif [[ "$MODEL_SIZE" == "medium" ]]; then
         :
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
+    if [[ "$MODEL_SIZE" == "tiny" ]]; then
         :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
+    elif [[ "$MODEL_SIZE" == "small" ]]; then
         :
+    elif [[ "$MODEL_SIZE" == "medium" ]]; then
+        if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
+            MAX_TOKENS=8192
+        elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
+            MAX_TOKENS=6144
+        elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
+            MAX_TOKENS=4096
+        elif [[ "$CONTEXT_LENGTH" == "16384" ]]; then
+            MAX_TOKENS=2048
+        fi
     fi
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
@@ -59,13 +75,13 @@ fi
 
 # Force max_tokens to be at least as large as context_length (otherwise ApproxBatchSampler might return an empty batch, causing an error)
 MAX_TOKENS=$((CONTEXT_LENGTH > MAX_TOKENS ? CONTEXT_LENGTH : MAX_TOKENS))
-echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
 
 # Sanity checks
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
 echo "Command run: '$0 $@'" | tee /dev/stderr
+echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \
@@ -76,7 +92,7 @@ python3 ../run.py \
     data.dataloader.approx_batch_sampler.max_tokens=$MAX_TOKENS \
     data.dataloader.max_length=$CONTEXT_LENGTH \
     model.config_kwargs.max_seq_len=$CONTEXT_LENGTH \
-    logging.wandb.name=hyena-$MODEL_SIZE-$CONTEXT_LENGTH \
+    logging.wandb.name=hyena-$MODEL_SIZE-$CONTEXT_LENGTH--$TOKENIZER \
     main.is_force_restart=$IS_FORCE_REFRESH \
     $EXTRA
     # main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/hyena-$MODEL_SIZE-$CONTEXT_LENGTH/ \

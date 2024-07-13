@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=parallel_sweep
-#SBATCH --output=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/parallel_sweep2.out
-#SBATCH --error=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/parallel_sweep2.err
+#SBATCH --job-name=parallel_gpt_2
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/parallel_%A.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/parallel_%A.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=gpu,nigam-v100
 #SBATCH --mem=200G
@@ -21,12 +21,12 @@ trap 'stop_child_processes' SIGTERM SIGINT
 source base.sh
 
 # Experiment names
-RUN_NAMES=("hyena-medium-1024--clmbr" "hyena-medium-4096--clmbr" "hyena-medium-8192--clmbr" "hyena-medium-16384--clmbr" )
+RUN_NAMES=("gpt-base-1024--clmbr" "gpt-base-2048--clmbr" "gpt-base-4096--clmbr" "gpt-base-8192--clmbr" )
 RUN_ARGS=(
-    "hyena.sh medium clmbr 1024 approx"
-    "hyena.sh medium clmbr 4096 approx"
-    "hyena.sh medium clmbr 8192 approx"
-    "hyena.sh medium clmbr 16384 approx"
+    "gpt2.sh medium clmbr 1024 approx"
+    "gpt2.sh medium clmbr 2048 approx"
+    "gpt2.sh medium clmbr 4096 approx"
+    "gpt2.sh medium clmbr 8192 approx"
 )
 
 # Ensure that 1 <= len(RUN_ARGS) <= 5

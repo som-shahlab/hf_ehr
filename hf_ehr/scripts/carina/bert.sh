@@ -70,13 +70,13 @@ fi
 
 # Force max_tokens to be at least as large as context_length (otherwise ApproxBatchSampler might return an empty batch, causing an error)
 MAX_TOKENS=$((CONTEXT_LENGTH > MAX_TOKENS ? CONTEXT_LENGTH : MAX_TOKENS))
-echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
 
 # Sanity checks
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
 echo "Command run: '$0 $@'" | tee /dev/stderr
+echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \
@@ -87,7 +87,7 @@ python3 ../run.py \
     data.dataloader.approx_batch_sampler.max_tokens=$MAX_TOKENS \
     data.dataloader.max_length=$CONTEXT_LENGTH \
     model.config_kwargs.max_position_embeddings=$CONTEXT_LENGTH \
-    logging.wandb.name=bert-$MODEL_SIZE-$CONTEXT_LENGTH \
+    logging.wandb.name=bert-$MODEL_SIZE-$CONTEXT_LENGTH--$TOKENIZER \
     main.is_force_restart=$IS_FORCE_REFRESH \
     $EXTRA
     # main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/bert-$MODEL_SIZE-$CONTEXT_LENGTH/ \

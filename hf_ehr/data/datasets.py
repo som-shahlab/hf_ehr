@@ -414,7 +414,6 @@ def collate_femr_timelines(batch: List[Tuple[int, List[int]]],
     '''Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     '''
-    breakpoint()
     # Otherwise, truncate on right hand side of sequence
     tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
                                                                         truncation=True, 

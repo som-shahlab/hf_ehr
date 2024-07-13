@@ -49,7 +49,15 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
+        if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
+            MAX_TOKENS=4096
+        elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
+            MAX_TOKENS=2048
+        elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
+            MAX_TOKENS=4096 # OOM
+        elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
+            MAX_TOKENS=8192 # OOM
+        fi
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :
     fi
@@ -60,13 +68,13 @@ fi
 
 # Force max_tokens to be at least as large as context_length (otherwise ApproxBatchSampler might return an empty batch, causing an error)
 MAX_TOKENS=$((CONTEXT_LENGTH > MAX_TOKENS ? CONTEXT_LENGTH : MAX_TOKENS))
-echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
 
 # Sanity checks
 source checks.sh $MODEL_SIZE $TOKENIZER $CONTEXT_LENGTH $DATALOADER_MODE
 
 # Run script
 echo "Command run: '$0 $@'" | tee /dev/stderr
+echo "MAX_TOKENS=$MAX_TOKENS" | tee /dev/stderr
 python3 ../run.py \
     +data=v8 \
     +trainer=single_gpu \
@@ -77,7 +85,7 @@ python3 ../run.py \
     data.dataloader.approx_batch_sampler.max_tokens=$MAX_TOKENS \
     data.dataloader.max_length=$CONTEXT_LENGTH \
     model.config_kwargs.n_positions=$CONTEXT_LENGTH \
-    logging.wandb.name=gpt2-$MODEL_SIZE-$CONTEXT_LENGTH \
+    logging.wandb.name=gpt2-$MODEL_SIZE-$CONTEXT_LENGTH--$TOKENIZER \
     main.is_force_restart=$IS_FORCE_REFRESH \
     $EXTRA
     # main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/gpt2-$MODEL_SIZE-$CONTEXT_LENGTH/ \
