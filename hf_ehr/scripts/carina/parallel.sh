@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=parallel_gpt_2
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/parallel_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/parallel_%A.err
+#SBATCH --job-name=mamba_parallel
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/mamba_parallel_%A.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/mamba_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu,nigam-v100
+#SBATCH --partition=nigam-h100,nigam-v100,nigam-a100,gpu
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=20
 #SBATCH --gres=gpu:4
@@ -21,12 +21,12 @@ trap 'stop_child_processes' SIGTERM SIGINT
 source base.sh
 
 # Experiment names
-RUN_NAMES=("gpt-base-1024--clmbr" "gpt-base-2048--clmbr" "gpt-base-4096--clmbr" "gpt-base-8192--clmbr" )
+RUN_NAMES=("mamba-tiny-1024--clmbr" "mamba-tiny-4096--clmbr" "mamba-tiny-8192--clmbr" "mamba-tiny-16384--clmbr" )
 RUN_ARGS=(
-    "gpt2.sh medium clmbr 1024 approx"
-    "gpt2.sh medium clmbr 2048 approx"
-    "gpt2.sh medium clmbr 4096 approx"
-    "gpt2.sh medium clmbr 8192 approx"
+    "mamba.sh tiny clmbr 1024 approx"
+    "mamba.sh tiny clmbr 4096 approx"
+    "mamba.sh tiny clmbr 8192 approx"
+    "mamba.sh tiny clmbr 16384 approx"
 )
 
 # Ensure that 1 <= len(RUN_ARGS) <= 5
@@ -41,7 +41,7 @@ for i in "${!RUN_NAMES[@]}"; do
     RUN_ARG=${RUN_ARGS[i]}
     echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}'"
     
-    EXTRA="+trainer.devices=[${i}] main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/runs/${RUN_NAME}/ logging.wandb.name=${RUN_NAME}"
+    EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME}"
     STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.out
     STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.err
     bash $RUN_ARG "${EXTRA}" --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &

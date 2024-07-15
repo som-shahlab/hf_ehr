@@ -324,7 +324,7 @@ def main(config: DictConfig) -> None:
         # Save checkpoint at end of every epoch
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
-            filename='{epoch}-epoch',
+            filename='{epoch}-epoch-persist',
             save_top_k=-1,
             every_n_epochs=1,
             save_weights_only=False, # If False, then save optimizer + scheduler states as well

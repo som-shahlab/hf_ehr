@@ -69,7 +69,8 @@ def main():
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_MODEL = args.path_to_model
     MODEL: str = args.path_to_model.split("/")[-3]
-    CKPT: str = get_ckpt_name(PATH_TO_MODEL) 
+    CKPT: str = get_ckpt_name(PATH_TO_MODEL)
+    batch_size: int = args.batch_size
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features')
 
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
