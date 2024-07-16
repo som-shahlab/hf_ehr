@@ -6,6 +6,7 @@ import torch
 import femr.datasets
 import torch.nn as nn
 import torch.optim as optim
+import pandas as pd
 from tqdm import tqdm
 from loguru import logger
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
@@ -28,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fine-tune a model for EHRSHOT tasks")
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
+    parser.add_argument("--path_to_ehrshot_split", required=True, type=str, help="Path to EHRSHOT split CSV")
     parser.add_argument("--path_to_model", type=str, required=True, help="Path to model .ckpt")
     parser.add_argument("--finetune_type", type=str, required=True, choices=["full", "last_n_layers"], help="Type of finetuning")
     parser.add_argument("--n_layers", type=int, default=1, help="Number of layers to finetune if finetune_type is 'last_n_layers'")
@@ -66,7 +68,7 @@ def load_model(path_to_model: str, tokenizer: Any) -> nn.Module:
     model.load_state_dict(checkpoint['state_dict'])
     return model
 
-def add_linear_head(model: nn.Module) -> nn.Module:
+def add_linear_head(model: nn.Module, device: str) -> nn.Module:
     hidden_size = model.config.model.config_kwargs.get('d_model', None)
     if hidden_size is None:
         hidden_size = model.config.model.config_kwargs.get('n_embd', None)
@@ -75,6 +77,7 @@ def add_linear_head(model: nn.Module) -> nn.Module:
         raise ValueError("Neither 'd_model' nor 'n_embd' is defined in the model's config")
 
     model.classifier = nn.Linear(hidden_size, 2)  # Assuming binary classification
+    model.classifier = model.classifier.to(device)
     return model
 
 def setup_finetuning(model: nn.Module, finetune_type: str, n_layers: int) -> nn.Module:
@@ -96,6 +99,10 @@ def save_finetuned_model(model: nn.Module, ckpt_name: str, ehrshot_task_name: st
 def main() -> None:
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Load EHRSHOT split CSV
+    ehrshot_split_df = pd.read_csv(args.path_to_ehrshot_split)
+    train_patient_ids = set(ehrshot_split_df[ehrshot_split_df['split'] == 'train']['omop_person_id'])
 
     labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(args.path_to_labels_dir, 'all_labels.csv'))
     database = femr.datasets.PatientDatabase(args.path_to_database, read_all=True)
@@ -128,7 +135,7 @@ def main() -> None:
     model = load_model(args.path_to_model, tokenizer)
     model.to(args.device)
     model = setup_finetuning(model, args.finetune_type, args.n_layers)
-    model = add_linear_head(model)
+    model = add_linear_head(model, args.device)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     criterion = nn.CrossEntropyLoss()
@@ -139,90 +146,126 @@ def main() -> None:
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
     
-    pat_num = 0
-    for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
-        if pat_num > 3:
-            break
-        pat_num = pat_num + 1
-        full_timeline: List[Tuple[datetime.datetime, int]] = [
-            (
-                e.start, 
-                convert_event_to_token(e,
-                    tokenizer__code_2_detail, 
-                    excluded_vocabs=tokenizer__excluded_vocabs,
-                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                    is_remap_codes_to_desc=tokenizer__is_remap_codes_to_desc,
-                    min_code_count=tokenizer__min_code_count,
-                    is_clmbr=tokenizer__is_clmbr,
-                )
-            ) for e in database[patient_id].events
-        ]
+        # Iterate over each subdirectory in the labels directory
+    for ehrshot_task in os.listdir(args.path_to_labels_dir):
+        task_labels_dir = os.path.join(args.path_to_labels_dir, ehrshot_task)
+        if not os.path.isdir(task_labels_dir):
+            continue
 
-        timeline_with_valid_tokens = [x for x in full_timeline if x[1] in tokenizer.get_vocab()]
-        timeline_starts = [x[0] for x in timeline_with_valid_tokens]
-        timeline_tokens = tokenizer([x[1] for x in timeline_with_valid_tokens])['input_ids'][0]
-        assert len(timeline_starts) == len(timeline_tokens), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
+        labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(task_labels_dir, 'labeled_patients.csv'))
 
-        for label in labels:
-            patient_ids.append(patient_id)
-            label_values.append(label.value)
-            label_times.append(label.time)
-    del database
+        pat_num = 0
+        for patient_id, labels in tqdm(labeled_patients.items(), desc=f"Loading EHRSHOT patient timelines for task {ehrshot_task}"):
+            if patient_id not in train_patient_ids:
+                continue  # Skip patients not in the 'train' split
+            if pat_num > 10:
+                break
+            pat_num += 1
+            full_timeline: List[Tuple[datetime.datetime, int]] = [
+                (
+                    e.start, 
+                    convert_event_to_token(e,
+                        tokenizer__code_2_detail, 
+                        excluded_vocabs=tokenizer__excluded_vocabs,
+                        is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                        is_remap_codes_to_desc=tokenizer__is_remap_codes_to_desc,
+                        min_code_count=tokenizer__min_code_count,
+                        is_clmbr=tokenizer__is_clmbr,
+                    )
+                ) for e in database[patient_id].events
+            ]
 
-    max_length: int = config.data.dataloader.max_length
-    pad_token_id: int = tokenizer.token_2_idx['[PAD]']
+            timeline_with_valid_tokens = [x for x in full_timeline if x[1] in tokenizer.get_vocab()]
+            timeline_starts = [x[0] for x in timeline_with_valid_tokens]
+            timeline_tokens = tokenizer([x[1] for x in timeline_with_valid_tokens])['input_ids'][0]
+            assert len(timeline_starts) == len(timeline_tokens), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
 
-    for batch_start in tqdm(range(0, len(patient_ids), args.batch_size), desc='Generating patient representations', total=len(patient_ids) // args.batch_size):
-        pids = patient_ids[batch_start:batch_start + args.batch_size]
-        values = label_values[batch_start:batch_start + args.batch_size]
-        times = label_times[batch_start:batch_start + args.batch_size]
-        timelines = []
+            for label in labels:
+                patient_ids.append(patient_id)
+                label_values.append(label.value)
+                label_times.append(label.time)
 
-        for pid, l_value, l_time in zip(pids, values, times):
-            timeline_starts_for_pid = timeline_starts
-            timeline_tokens_for_pid = timeline_tokens
-            timeline = [token for start, token in zip(timeline_starts_for_pid, timeline_tokens_for_pid) if start <= l_time]
-            timelines.append(timeline)
+        for batch_start in tqdm(range(0, len(patient_ids), args.batch_size), desc='Generating patient representations', total=len(patient_ids) // args.batch_size):
+            pids = patient_ids[batch_start:batch_start + args.batch_size]
+            values = label_values[batch_start:batch_start + args.batch_size]
+            times = label_times[batch_start:batch_start + args.batch_size]
+            timelines = []
 
-        if args.chunk_strat == 'last':
-            timelines = [x[-max_length:] for x in timelines]
-        else:
-            raise ValueError(f"Chunk strategy `{args.chunk_strat}` not supported.")
+            for pid, l_value, l_time in zip(pids, values, times):
+                timeline_starts_for_pid = timeline_starts
+                timeline_tokens_for_pid = timeline_tokens
+                timeline = [token for start, token in zip(timeline_starts_for_pid, timeline_tokens_for_pid) if start <= l_time]
+                timelines.append(timeline)
 
-        max_timeline_length = max(len(x) for x in timelines)
-        timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines]
-        input_ids = torch.stack([torch.tensor(x, device=args.device) for x in timelines_w_pad])
-        attention_mask = (input_ids != pad_token_id).int()
-        
-        # Shift labels by one token for language modeling
-        labels = input_ids.clone()
-        labels[:, :-1] = input_ids[:, 1:]
-        labels[:, -1] = pad_token_id
-        labels = labels.long()
+            if args.chunk_strat == 'last':
+                timelines = [x[-max_length:] for x in timelines]
+            else:
+                raise ValueError(f"Chunk strategy `{args.chunk_strat}` not supported.")
 
-        batch = {
-            'input_ids': input_ids,
-            'attention_mask': attention_mask,
-            'labels': labels
-        }
+            max_timeline_length = max(len(x) for x in timelines)
+            timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines]
+            # Check lengths and content of timelines_w_pad
+            filtered_timelines = []
+            for idx, t in enumerate(timelines_w_pad):
+                if len(t) != max_timeline_length:
+                    print(f"Length mismatch at index {idx}: {len(t)} != {max_timeline_length}")
+                    print(f"Content: {t}")
+                    continue
+                
+                if all(token == pad_token_id for token in t):
+                    print(f"Skipping patient at index {idx} with only padding tokens.")
+                    continue
 
-        print(f"Calling model.model() with batch sizes - input_ids: {batch['input_ids'].shape}, attention_mask: {batch['attention_mask'].shape}, labels: {batch['labels'].shape}")
-        print("Batch contents before calling model.model():")
-        print(f"input_ids: {batch['input_ids']}")
-        print(f"attention_mask: {batch['attention_mask']}")
-        print(f"labels: {batch['labels']}")
+                filtered_timelines.append(t)
 
-        optimizer.zero_grad()
-        results = model.model(**batch, output_hidden_states=True)
-        loss = criterion(results.logits.view(-1, results.logits.size(-1)), batch['labels'].view(-1))
-        loss.backward()
-        optimizer.step()
+            if not filtered_timelines:
+                print("All patient timelines were skipped due to padding. Exiting...")
+                continue
 
-        print("Results obtained after calling model.model()")
-        print(results)
+            try:
+                input_ids = torch.stack([torch.tensor(x, device=args.device) for x in filtered_timelines])
+            except Exception as e:
+                # Debugging statements to inspect filtered_timelines when an error occurs
+                print("Error occurred during torch.stack. filtered_timelines:")
+                for t in filtered_timelines:
+                    print(t)
+                raise e
+            #input_ids = torch.stack([torch.tensor(x, device=args.device) for x in timelines_w_pad])
+            attention_mask = (input_ids != pad_token_id).int().to(args.device)
+            
+            # Shift labels by one token for language modeling
+            labels = input_ids.clone()
+            labels[:, :-1] = input_ids[:, 1:]
+            labels[:, -1] = pad_token_id
+            labels = labels.long().to(args.device)
 
-    # Save the fine-tuned model
-    save_finetuned_model(model, ckpt_name=os.path.basename(args.path_to_model).split('.')[0], ehrshot_task_name="ehrshot_task", fine_tune_strat=args.finetune_type, output_dir=args.output_dir)
+            batch = {
+                'input_ids': input_ids,
+                'attention_mask': attention_mask,
+                'labels': labels
+            }
+
+            optimizer.zero_grad()
+            results = model.model(**batch, output_hidden_states=True)
+            
+            # Ensure hidden_states are on the same device as the classifier
+            hidden_states = results.hidden_states[-1]
+            hidden_states = hidden_states.to(args.device)
+
+            # Compute classification logits
+            classification_logits = model.classifier(hidden_states[:, 0, :])
+            
+            # Compute classification loss using binary labels
+            binary_labels = torch.tensor(values, device=args.device).long()
+            loss = criterion(classification_logits, binary_labels)
+            
+            # Backward pass and optimization step
+            loss.backward()
+            optimizer.step()
+
+    
+        # Save the fine-tuned model
+        save_finetuned_model(model, ckpt_name=os.path.basename(args.path_to_model).split('.')[0], ehrshot_task_name=ehrshot_task, fine_tune_strat=args.finetune_type, output_dir=args.output_dir)
 
     logger.success("Done!")
 
