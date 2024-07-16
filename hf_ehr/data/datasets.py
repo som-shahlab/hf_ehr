@@ -77,6 +77,10 @@ def convert_event_to_token(e: Event, code_2_detail: Code2Detail, **kwargs) -> Op
 
             # Determine range for (code, unit, value)
             token = convert_lab_value_to_token_from_ranges(token, unit, e.value, ranges)
+
+            # If code is out of range of CLMBR vocab, return None
+            if token.endswith("R0"):
+                return None
         
         # If textual code...
         if code_2_detail[e.code].get('is_categorical', False) and (

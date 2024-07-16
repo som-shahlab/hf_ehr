@@ -3,9 +3,9 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt2_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt2_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu
+#SBATCH --partition=nigam-h100
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:1
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
@@ -28,26 +28,21 @@ fi
 # Partition-specific settings
 MAX_TOKENS=4096
 BATCH_SIZE=4
-if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
+if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
-        MAX_TOKENS=8192
-        BATCH_SIZE=8
+        if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
+            MAX_TOKENS=16384
+        elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
+            MAX_TOKENS=16384
+        elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
+            MAX_TOKENS=4096 # OOM
+        elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
+            MAX_TOKENS=8192 # OOM
+        fi
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :
     fi
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
-    fi
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
-    fi
-elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
+elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
         if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
             MAX_TOKENS=4096

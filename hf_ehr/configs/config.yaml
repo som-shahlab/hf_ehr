@@ -27,8 +27,8 @@ callbacks:
     most_recent_every_n_train_steps: 10_000
     # Save model every N global steps; persists permanently
     every_n_train_steps: 30_000
-    # Save model every N nonPAD training tokens seen; persists permanently; defaults to 2 billion
-    every_n_train_nonPAD_tokens: 2_000_000_000
+    # Save model every N nonPAD training tokens seen; persists permanently; defaults to 500 million
+    every_n_train_nonPAD_tokens: 500_000_000
     # Save model every N FLOPs; defaults to 50 quadrillion FLOPs
     every_n_flops: 50_000_000_000_000_000
 
@@ -82,7 +82,7 @@ trainer:
   # Limits training to a minimum number of epochs
   min_epochs: 1
   # Limits training to a max number number of epochs
-  max_epochs: 2
+  max_epochs: 20
   # Limits training to `N` batches if `int`, or `N%` of batches if `float`
   limit_train_batches: null
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`

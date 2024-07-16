@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=bert
-#SBATCH --output=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/bert_%A.out
-#SBATCH --error=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/bert_%A.err
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/bert_%A.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/bert_%A.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=gpu
 #SBATCH --mem=200G
@@ -30,25 +30,13 @@ fi
 MAX_TOKENS=4096
 BATCH_SIZE=4
 
-if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
+if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
         :
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :
     fi
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
-    fi
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
-    fi
-elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
+elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
         if [[ "$CONTEXT_LENGTH" == "512" ]]; then
             MAX_TOKENS=6144
@@ -90,5 +78,5 @@ python3 ../run.py \
     logging.wandb.name=bert-$MODEL_SIZE-$CONTEXT_LENGTH--$TOKENIZER \
     main.is_force_restart=$IS_FORCE_REFRESH \
     $EXTRA
-    # main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/bert-$MODEL_SIZE-$CONTEXT_LENGTH/ \
+    # main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/bert-$MODEL_SIZE-$CONTEXT_LENGTH--$TOKENIZER/ \
 

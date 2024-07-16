@@ -27,7 +27,6 @@ if __name__ == '__main__':
         if code not in code_2_detail:
             code_2_detail[code] = {
                 'token_2_count' : {
-                    code: None,
                 },
                 'categorical_values' : [],
                 'unit_2_ranges' : {
@@ -35,10 +34,10 @@ if __name__ == '__main__':
                     ],
                 },
             }
-        
+
         if type_ == 'numeric':
             code_2_detail[code]['unit_2_ranges']['None'].append((val_start, val_end))
-            code_2_detail[code]['token_2_count'][f"{code} || None || R0"] = None # special case for out of range
+            # code_2_detail[code]['token_2_count'][f"{code} || None || R0"] = None # special case for out of range
             code_2_detail[code]['token_2_count'][f"{code} || None || R{len(code_2_detail[code]['unit_2_ranges']['None'])}"] = None # Special case for out of range
             code_2_detail[code]['is_numeric'] = True
         elif type_ == 'text':
@@ -46,8 +45,15 @@ if __name__ == '__main__':
             code_2_detail[code]['token_2_count'][f"{code} || {text_string}"] = None
             code_2_detail[code]['is_categorical'] = True
         elif type_ == 'code':
-            pass
+            code_2_detail[code]['token_2_count'][code] = None
         else:
             raise ValueError(f"Code {code} has unknown type: {type_}")
 
     json.dump(code_2_detail, open(os.path.join(path_to_output_dir, 'code_2_detail.json'), 'w'), indent=2)
+    
+    n_new_tokens: int = len([ x for code in code_2_detail for x in code_2_detail[code]['token_2_count'] ])
+    n_old_tokens: int = len([ x for x in clmbr['regular'] if x['type'] != 'unused' ])
+
+    print("Number of tokens in new CLMBR vocab: ", n_new_tokens)
+    print("Number of tokens in old CLMBR vocab: ", n_old_tokens)
+    assert n_new_tokens == n_old_tokens, f"ERROR - Mismatch in vocab lengths"

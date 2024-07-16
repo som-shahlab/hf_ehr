@@ -28,25 +28,13 @@ fi
 # Partition-specific settings
 MAX_TOKENS=2048
 BATCH_SIZE=2
-if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
+if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
         :
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :
     fi
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
-    fi
-elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
-    fi
-elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
+elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
         :
     elif [[ "$MODEL_SIZE" == "large" ]]; then

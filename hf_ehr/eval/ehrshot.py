@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
     parser.add_argument("--path_to_model", type=str, help="Path to model .ckpt")
+    parser.add_argument("--model_name", type=str, default=None, help="If specified, replace folder name with this as the model's name")
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
@@ -68,9 +69,9 @@ def main():
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_MODEL = args.path_to_model
-    MODEL: str = args.path_to_model.split("/")[-3]
+    MODEL: str = args.path_to_model.split("/")[-3] if args.model_name in [ None, '' ] else args.model_name
     CKPT: str = get_ckpt_name(PATH_TO_MODEL)
-    batch_size: int = args.batch_size
+    batch_size: int = args.batch_size if args.batch_size not in [None, ''] else 16
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features')
 
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
@@ -119,6 +120,7 @@ def main():
         'mamba': MambaLanguageModel,
         't5': T5LanguageModel
     }
+    print("MODEL", MODEL)
     model_class = next((m for k, m in model_map.items() if k in MODEL), None)
     if not model_class:
         raise ValueError(f"Model `{MODEL}` not supported.")
@@ -160,7 +162,6 @@ def main():
             patient_ids.append(patient_id)
             label_values.append(label.value)
             label_times.append(label.time)
-    del database
 
     max_length: int = model.config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']

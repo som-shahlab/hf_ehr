@@ -101,6 +101,13 @@ class BaseModel(L.LightningModule):
         for key, metric in self.sum_metrics.items():
             checkpoint[key] = metric.compute()
 
+    def on_load_checkpoint(self, checkpoint):
+        """Restore each metric's state from the checkpoint."""
+        super().on_load_checkpoint(checkpoint)
+        for key, metric in self.sum_metrics.items():
+            self.sum_metrics[key].update(checkpoint[key])
+            print(f"Loaded metric `{key}` from chekpoint with value: `{self.sum_metrics[key].cuda().compute()}`")
+
     def validation_step(self, 
                         batch: Dict[str, Any],
                         batch_idx: int) -> Optional[torch.Tensor]:
@@ -129,9 +136,6 @@ class BaseModel(L.LightningModule):
     def on_train_epoch_end(self):
         # Needed for ApproxBatchSampler to reset random seed after every epoch
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
-    
-    def on_load_checkpoint(self, checkpoint):
-        super().on_load_checkpoint(checkpoint)
 
     def on_train_start(self):
         if rank_zero_only.rank == 0 and wandb and wandb.run:
@@ -139,7 +143,8 @@ class BaseModel(L.LightningModule):
             print(self.vocab_size, type(self.vocab_size))
             wandb.run.summary["flops_per_token"] = self.flops_per_token
             wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
-
+            wandb.run.summary["model_parameter_count"] = self.get_param_count()
+            
         if self.trainer.global_step > 0:
             # Make ApproxBatchSampler deterministic by looping through dataset until we hit
             # the current step; otherwise, when Lightning restarts from a checkpoint it will
@@ -157,6 +162,11 @@ class BaseModel(L.LightningModule):
         ppl: torch.Tensor = torch.exp(loss)
         self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
+        self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32))
+        self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
+        self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
+        if self.flops_per_token is not None:
+            self.log('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)
 
     def log_training_step(self, loss: torch.Tensor, B: int, tokens: Dict[str, Any], lr: float):
         """
