@@ -40,7 +40,15 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam
             MAX_TOKENS=8192
         fi
     elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
+        if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
+            :
+        elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
+            :
+        elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
+            :
+        elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
+            :
+        fi
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then

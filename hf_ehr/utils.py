@@ -1,10 +1,10 @@
 from functools import partial
-from typing import List, Tuple, Any, Dict
+from typing import List, Tuple, Any, Dict, Optional
 import torch
 import uuid
 import hashlib
 
-def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float]]) -> str:
+def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float, float]]) -> str:
     # Given a list of ranges (i.e. tuples of [start, end] values), remaps the code to the index in the `ranges` array corresponds
     # to this code's value, i.e. "code" => "{code} || {idx}"
     # If the value doesn't fit in any of the ranges, returns the code itself, i.e. "{code}"
@@ -95,14 +95,86 @@ def hash_string_to_uuid(input: Any) -> str:
     
     return str(generated_uuid)
 
-def get_ckpt_config(checkpoint) -> Dict[str, Any]:
+def load_config_from_ckpt(ckpt) -> Dict[str, Any]:
     """Given a model checkpoint (from torch.load()), returns its config"""
-    config = checkpoint['hyper_parameters']['config']
-    def recurse(d: Dict[str, Any]) -> Dict[str, Any]:
+    config = ckpt['hyper_parameters']['config']
+    def recurse(d: Dict[str, Any]):
         for k, v in d.items():
             if v == 'None':
                 d[k] = None
             elif isinstance(v, dict):
                 recurse(v)
     recurse(config)
-    return config    
+    return config
+
+def load_tokenizer_from_config(config):
+    """Load tokenizer from config."""
+    from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
+    from transformers import AutoTokenizer
+    
+    # Load config
+    tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
+    tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
+    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
+    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
+    tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
+    tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
+
+    if tokenizer__is_clmbr:
+        # CLMBR
+        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
+                                  excluded_vocabs=tokenizer__excluded_vocabs,
+                                  is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                                  min_code_count=tokenizer__min_code_count)
+    elif tokenizer__is_remap_codes_to_desc:
+        # DescTokenizer
+        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
+    else:
+        # FEMRTokenizer
+        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
+                                    excluded_vocabs=tokenizer__excluded_vocabs,
+                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                                    min_code_count=tokenizer__min_code_count)
+    return tokenizer
+
+def load_tokenizer_from_path(path_to_ckpt: str):
+    """Given a path to a model checkpoint, load the tokenizer."""
+    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    config = load_config_from_ckpt(ckpt)
+    return load_tokenizer_from_config(config)
+
+def load_config_from_path(path_to_ckpt: str) -> Dict[str, Any]:
+    """Given a path to a model checkpoint, load the model."""
+    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    config = load_config_from_ckpt(ckpt)
+    return config
+
+def load_model_from_path(path_to_ckpt: str, tokenizer: Any) -> torch.nn.Module:
+    """Given a path to a model checkpoint, load the model."""
+    from hf_ehr.models.gpt import GPTLanguageModel
+    from hf_ehr.models.bert import BERTLanguageModel
+    from hf_ehr.models.hyena import HyenaLanguageModel
+    from hf_ehr.models.mamba import MambaLanguageModel
+    from hf_ehr.models.t5 import T5LanguageModel
+
+    # Load checkpoint
+    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    config = load_config_from_ckpt(ckpt)
+
+    # Determine type of model based on config.model.name
+    model_map = {
+        'bert': BERTLanguageModel,
+        'gpt': GPTLanguageModel,
+        'hyena': HyenaLanguageModel,
+        'mamba': MambaLanguageModel,
+        't5': T5LanguageModel
+    }
+    model_name: str = config['model']['name']
+    model_class = next((m for k, m in model_map.items() if k in model_name), None)
+    if not model_class: raise ValueError(f"Model `{model_name}` not supported.")
+
+    # Load model
+    model = model_class(**ckpt['hyper_parameters'], tokenizer=tokenizer)
+    model.load_state_dict(ckpt['state_dict'])
+    return model

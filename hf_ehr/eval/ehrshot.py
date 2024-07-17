@@ -18,18 +18,12 @@ import numpy as np
 import torch
 import femr.datasets
 import shutil
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Set, Union
 from tqdm import tqdm
 from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
-from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
 from hf_ehr.data.datasets import convert_event_to_token
-from hf_ehr.models.gpt import GPTLanguageModel
-from hf_ehr.models.bert import BERTLanguageModel
-from hf_ehr.models.hyena import HyenaLanguageModel
-from hf_ehr.models.mamba import MambaLanguageModel
-from hf_ehr.models.t5 import T5LanguageModel
-from hf_ehr.utils import get_ckpt_config
+from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path, load_tokenizer_from_config
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate patient representations (for all tasks at once)")
@@ -38,93 +32,45 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
     parser.add_argument("--path_to_model", type=str, help="Path to model .ckpt")
     parser.add_argument("--model_name", type=str, default=None, help="If specified, replace folder name with this as the model's name")
-    parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
-    parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
+    parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'mean' (avg all tokens).")
+    parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'mean' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to run inference on")
     return parser.parse_args()
-        
 
 def get_ckpt_name(path_to_ckpt: str) -> str:
     base_name = os.path.basename(path_to_ckpt)
     file_name, _ = os.path.splitext(base_name)
     return file_name
     
-
-def main():
-    args = parse_args()
-    EMBED_STRAT: str = args.embed_strat
-    CHUNK_STRAT: str = args.chunk_strat
-    PATH_TO_PATIENT_DATABASE = args.path_to_database
-    PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
-    PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
-    PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
-    PATH_TO_MODEL = args.path_to_model
-    MODEL: str = args.path_to_model.split("/")[-3] if args.model_name in [ None, '' ] else args.model_name
-    CKPT: str = get_ckpt_name(PATH_TO_MODEL)
-    batch_size: int = args.batch_size if args.batch_size not in [None, ''] else 16
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features')
-
-    assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
-
-    logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELED_PATIENTS}`")
-    labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
-    
-    logger.info(f"Loading PatientDatabase from `{PATH_TO_PATIENT_DATABASE}`")
-    database = femr.datasets.PatientDatabase(PATH_TO_PATIENT_DATABASE, read_all=True)
- 
-    feature_matrix, patient_ids, label_values, label_times = [], [], [], []
-    device: str = args.device
-    checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
-    config = get_ckpt_config(checkpoint)
-
-    # Get proper tokenizer
-    tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
+def generate_ehrshot_timelines(database: femr.datasets.PatientDatabase,
+                               config,
+                               labeled_patients: LabeledPatients, 
+                               allowed_pids: Optional[Union[Set[int], List[int]]] = None,
+                               tqdm_desc: str = "Loading EHRSHOT patient timelines") -> Dict[str, Any]:
+    """Generate patient timelines for EHRSHOT task."""
+    # Load config
     tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
     tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
     tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
     tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
     tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
-    tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
+    tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
     tokenizer__code_2_detail: Dict[str, str] = json.load(open(tokenizer__path_to_code_2_detail, 'r'))
 
-    if tokenizer__is_clmbr:
-        # CLMBR
-        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
-                                  excluded_vocabs=tokenizer__excluded_vocabs,
-                                  is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                                  min_code_count=tokenizer__min_code_count)
-    elif tokenizer__is_remap_codes_to_desc:
-        # DescTokenizer
-        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
-    else:
-        # FEMRTokenizer
-        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
-                                    excluded_vocabs=tokenizer__excluded_vocabs,
-                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                                    min_code_count=tokenizer__min_code_count)
-    
-    model_map = {
-        'bert': BERTLanguageModel,
-        'gpt': GPTLanguageModel,
-        'hyena': HyenaLanguageModel,
-        'mamba': MambaLanguageModel,
-        't5': T5LanguageModel
-    }
-    print("MODEL", MODEL)
-    model_class = next((m for k, m in model_map.items() if k in MODEL), None)
-    if not model_class:
-        raise ValueError(f"Model `{MODEL}` not supported.")
-    model = model_class(**checkpoint['hyper_parameters'], tokenizer=tokenizer)
-    model.load_state_dict(checkpoint['state_dict'])
-    model.to(device)
-    model.eval()  # Set the model to evaluation mode
-    
+    tokenizer = load_tokenizer_from_config(config)
+        
+    # Initialize variables for storing patient timelines
     timeline_starts: Dict[int, List[datetime.datetime]] = {}
     timeline_tokens: Dict[int, List[int]] = {}
     timeline_n_dropped_tokens: Dict[int, List[int]] = {} # for tracking the count of dropped tokens at each `timeline_start`
+    
     vocab = tokenizer.get_vocab()
-    for patient_id, labels in tqdm(labeled_patients.items(), desc="Loading EHRSHOT patient timelines"):
+    patient_ids, label_values, label_times = [], [], []
+    for patient_id, labels in tqdm(labeled_patients.items(), desc=tqdm_desc):
+        if allowed_pids is not None and patient_id not in allowed_pids:
+            # Skip patients not in `allowed_pids`
+            continue
         full_timeline: List[Tuple[datetime.datetime, int]] = [
             (
                 e.start, 
@@ -154,9 +100,65 @@ def main():
             label_values.append(label.value)
             label_times.append(label.time)
 
+    return {
+        'tokenizer' : tokenizer,
+        'patient_ids': patient_ids,
+        'label_values': label_values,
+        'label_times': label_times,
+        'timeline_starts': timeline_starts,
+        'timeline_tokens': timeline_tokens,
+        'timeline_n_dropped_tokens': timeline_n_dropped_tokens
+    }
+
+
+def main():
+    args = parse_args()
+    EMBED_STRAT: str = args.embed_strat
+    CHUNK_STRAT: str = args.chunk_strat
+    PATH_TO_PATIENT_DATABASE = args.path_to_database
+    PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
+    PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
+    PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
+    PATH_TO_MODEL = args.path_to_model
+    MODEL: str = args.path_to_model.split("/")[-3] if args.model_name in [ None, '' ] else args.model_name
+    CKPT: str = get_ckpt_name(PATH_TO_MODEL)
+    batch_size: int = args.batch_size if args.batch_size not in [None, ''] else 16
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}_features')
+    device: str = args.device
+
+    assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
+
+    logger.info(f"Loading LabeledPatients from `{PATH_TO_LABELED_PATIENTS}`")
+    labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
+    
+    logger.info(f"Loading PatientDatabase from `{PATH_TO_PATIENT_DATABASE}`")
+    database = femr.datasets.PatientDatabase(PATH_TO_PATIENT_DATABASE, read_all=True)
+ 
+    logger.info(f"Loading Config from `{PATH_TO_MODEL}`")
+    config = load_config_from_path(PATH_TO_MODEL)
+
+    logger.info(f"Loading Tokenizer from `{PATH_TO_MODEL}")
+    tokenizer = load_tokenizer_from_path(PATH_TO_MODEL)
+
+    logger.info(f"Loading Model from `{PATH_TO_MODEL}`")
+    model = load_model_from_path(PATH_TO_MODEL, tokenizer)
+    model.to(device)
+    model.eval()  # Set the model to evaluation mode
+    
+    # Get patient timelines
+    logger.info("Generating patient timelines")
+    ehrshot = generate_ehrshot_timelines(database, config, labeled_patients)
+    patient_ids = ehrshot['patient_ids']
+    label_values = ehrshot['label_values']
+    label_times = ehrshot['label_times']
+    timeline_starts = ehrshot['timeline_starts']
+    timeline_tokens = ehrshot['timeline_tokens']
+    timeline_n_dropped_tokens = ehrshot['timeline_n_dropped_tokens'] # TODO - track this
+    
+    # Generate patient representations
+    feature_matrix, patient_ids, label_values, label_times = [], [], [], []
     max_length: int = model.config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
-    
     with torch.no_grad():
         for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
             pids = patient_ids[batch_start:batch_start + batch_size]
@@ -170,31 +172,33 @@ def main():
                 timeline = [token for start, token in zip(timeline_starts_for_pid, timeline_tokens_for_pid) if start <= l_time]
                 timelines.append(timeline)
             
+            # Determine how timelines longer than max-length will be chunked
             if CHUNK_STRAT == 'last':
                 timelines = [x[-max_length:] for x in timelines]
             else:
                 raise ValueError(f"Chunk strategy `{CHUNK_STRAT}` not supported.")
 
+            # Create batch
             max_timeline_length = max(len(x) for x in timelines)
-            timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines]
+            timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines] # left padding
             input_ids = torch.stack([torch.tensor(x, device=device) for x in timelines_w_pad])
             attention_mask = (input_ids != pad_token_id).int()
-            
             batch = {
                 'input_ids': input_ids,
-                'attention_mask': attention_mask if "hyena" not in MODEL else None
+                'attention_mask': attention_mask if "hyena" not in config['model']['name'] else None
             }
             
-            if 'hyena' in MODEL:
+            if 'hyena' in config['model']['name']:
                 batch.pop('attention_mask')
 
+            # Run model inference
             results = model.model(**batch, output_hidden_states=True)
             hidden_states = results.hidden_states[-1]
 
             for idx in range(len(pids)):
                 if EMBED_STRAT == 'last':
                     patient_rep = hidden_states[idx, -1, :].cpu().numpy()
-                elif EMBED_STRAT == 'avg':
+                elif EMBED_STRAT == 'mean':
                     mask = input_ids[idx] != pad_token_id
                     patient_rep = hidden_states[idx, mask].mean(dim=0).cpu().numpy()
                 else:

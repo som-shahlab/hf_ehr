@@ -139,10 +139,9 @@ class BaseModel(L.LightningModule):
 
     def on_train_start(self):
         if rank_zero_only.rank == 0 and wandb and wandb.run:
-            print(self.flops_per_token, type(self.flops_per_token))
-            print(self.vocab_size, type(self.vocab_size))
             wandb.run.summary["flops_per_token"] = self.flops_per_token
             wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
+            wandb.run.summary["tokenizer_pad_token_id"] = self.pad_token_id
             wandb.run.summary["model_parameter_count"] = self.get_param_count()
             
         if self.trainer.global_step > 0:
