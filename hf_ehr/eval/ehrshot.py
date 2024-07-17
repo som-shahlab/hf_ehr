@@ -29,6 +29,7 @@ from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
+from hf_ehr.utils import get_ckpt_config
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate patient representations (for all tasks at once)")
@@ -42,17 +43,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to run inference on")
     return parser.parse_args()
-
-def get_config(checkpoint) -> Dict[str, Any]:
-    config = checkpoint['hyper_parameters']['config']
-    def recurse(d: Dict[str, Any]) -> Dict[str, Any]:
-        for k, v in d.items():
-            if v == 'None':
-                d[k] = None
-            elif isinstance(v, dict):
-                recurse(v)
-    recurse(config)
-    return config            
+        
 
 def get_ckpt_name(path_to_ckpt: str) -> str:
     base_name = os.path.basename(path_to_ckpt)
@@ -85,16 +76,16 @@ def main():
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
     device: str = args.device
     checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
-    config = get_config(checkpoint)
+    config = get_ckpt_config(checkpoint)
 
     # Get proper tokenizer
     tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
     tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
-    tokenizer__min_code_count: Optional[int] = config.data.tokenizer.min_code_count if hasattr(config.data.tokenizer, 'min_code_count') else None
-    tokenizer__is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes if hasattr(config.data.tokenizer, 'is_remap_numerical_codes') else False
-    tokenizer__is_clmbr: bool = config.data.tokenizer.is_clmbr if hasattr(config.data.tokenizer, 'is_clmbr') else False
-    tokenizer__is_remap_codes_to_desc: bool = config.data.tokenizer.is_remap_codes_to_desc if hasattr(config.data.tokenizer, 'is_remap_codes_to_desc') else False
-    tokenizer__desc_emb_tokenizer: bool = config.data.tokenizer.desc_emb_tokenizer if hasattr(config.data.tokenizer, 'desc_emb_tokenizer') else False
+    tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
+    tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
+    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
+    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
+    tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
     tokenizer__code_2_detail: Dict[str, str] = json.load(open(tokenizer__path_to_code_2_detail, 'r'))
 
     if tokenizer__is_clmbr:

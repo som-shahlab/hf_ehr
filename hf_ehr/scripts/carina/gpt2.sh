@@ -35,9 +35,9 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam
         elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
             MAX_TOKENS=16384
         elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
-            MAX_TOKENS=4096 # OOM
+            MAX_TOKENS=8192
         elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
-            MAX_TOKENS=8192 # OOM
+            MAX_TOKENS=8192
         fi
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :

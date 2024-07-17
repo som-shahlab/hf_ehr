@@ -152,6 +152,9 @@ class BaseModel(L.LightningModule):
             # by repeatedly calling __iter__() until we hit our current step in order to recreate the
             # last actual state of the PRNG corresponding to this checkpoint
             if self.config.data.dataloader.mode == 'approx':
+                self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.trainer.current_epoch)
+                # TODO - just change `current_iter`
+                # self.trainer.train_dataloader.batch_sampler.sampler.current_iter = self.trainer.global_step
                 print(f"We are resuming from a checkpoint that used `ApproxBatchSampler`, so iterate through training dataloader until it matches the checkpoint's current step")
                 self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.trainer.current_epoch)
                 for idx, __ in tqdm(enumerate(self.trainer.train_dataloader), total=self.trainer.global_step, desc='Iterating thru train DataLoader to align `ApproxBatchSampler` with ckpt\'s current step...'):

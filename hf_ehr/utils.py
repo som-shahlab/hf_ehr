@@ -1,5 +1,5 @@
 from functools import partial
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Dict
 import torch
 import uuid
 import hashlib
@@ -94,3 +94,15 @@ def hash_string_to_uuid(input: Any) -> str:
     generated_uuid = uuid.UUID(md5_hash)
     
     return str(generated_uuid)
+
+def get_ckpt_config(checkpoint) -> Dict[str, Any]:
+    """Given a model checkpoint (from torch.load()), returns its config"""
+    config = checkpoint['hyper_parameters']['config']
+    def recurse(d: Dict[str, Any]) -> Dict[str, Any]:
+        for k, v in d.items():
+            if v == 'None':
+                d[k] = None
+            elif isinstance(v, dict):
+                recurse(v)
+    recurse(config)
+    return config    

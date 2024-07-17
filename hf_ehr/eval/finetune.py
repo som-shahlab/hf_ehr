@@ -11,8 +11,6 @@ from tqdm import tqdm
 from loguru import logger
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
 from typing import Dict, Any, List, Optional, Tuple, Union
-from omegaconf import DictConfig
-from jaxtyping import Float
 
 from femr.labelers import LabeledPatients, load_labeled_patients
 from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
@@ -23,6 +21,7 @@ from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.modules import BaseModel
+from hf_ehr.utils import get_ckpt_config
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,19 +36,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+    parser.add_argument("--lr", type=float, default=1e-4, help="LR for Adam")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to run training on")
     return parser.parse_args()
-
-def get_config(checkpoint: Dict[str, Any]) -> Dict[str, Any]:
-    config = checkpoint['hyper_parameters']['config']
-    def recurse(d: Dict[str, Any]) -> None:
-        for k, v in d.items():
-            if v == 'None':
-                d[k] = None
-            elif isinstance(v, dict):
-                recurse(v)
-    recurse(config)
-    return config
 
 def load_model(path_to_model: str, tokenizer: Any) -> nn.Module:
     checkpoint = torch.load(path_to_model, map_location='cpu')
@@ -101,24 +90,27 @@ def main() -> None:
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Load EHRSHOT split CSV
-    ehrshot_split_df = pd.read_csv(args.path_to_ehrshot_split)
-    train_patient_ids = set(ehrshot_split_df[ehrshot_split_df['split'] == 'train']['omop_person_id'])
+    df_ehrshot_split = pd.read_csv(args.path_to_ehrshot_split)
+    train_patient_ids = set(df_ehrshot_split[df_ehrshot_split['split'] == 'train']['omop_person_id'])
 
-    labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(args.path_to_labels_dir, 'all_labels.csv'))
+    # Load FEMR db
     database = femr.datasets.PatientDatabase(args.path_to_database, read_all=True)
 
+    # Load model checkpoint
     checkpoint = torch.load(args.path_to_model, map_location='cpu')
-    config = get_config(checkpoint)
+    config = get_ckpt_config(checkpoint)
 
+    # Get tokenizer details
     tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
     tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
-    tokenizer__min_code_count: Optional[int] = config.data.tokenizer.min_code_count if hasattr(config.data.tokenizer, 'min_code_count') else None
-    tokenizer__is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes if hasattr(config.data.tokenizer, 'is_remap_numerical_codes') else False
-    tokenizer__is_clmbr: bool = config.data.tokenizer.is_clmbr if hasattr(config.data.tokenizer, 'is_clmbr') else False
-    tokenizer__is_remap_codes_to_desc: bool = config.data.tokenizer.is_remap_codes_to_desc if hasattr(config.data.tokenizer, 'is_remap_codes_to_desc') else False
-    tokenizer__desc_emb_tokenizer: bool = config.data.tokenizer.desc_emb_tokenizer if hasattr(config.data.tokenizer, 'desc_emb_tokenizer') else False
+    tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
+    tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
+    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
+    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
+    tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
     tokenizer__code_2_detail: Dict[str, str] = json.load(open(tokenizer__path_to_code_2_detail, 'r'))
 
+    # Load tokenizer
     if tokenizer__is_clmbr:
         tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
                                   excluded_vocabs=tokenizer__excluded_vocabs,
@@ -132,35 +124,31 @@ def main() -> None:
                                     is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
                                     min_code_count=tokenizer__min_code_count)
 
+    # Load model
     model = load_model(args.path_to_model, tokenizer)
-    model.to(args.device)
     model = setup_finetuning(model, args.finetune_type, args.n_layers)
     model = add_linear_head(model, args.device)
-
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
-
-    model.train()  # Set the model to training mode
+    model.to(args.device)
+    model.train()
 
     max_length: int = config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
     feature_matrix, patient_ids, label_values, label_times = [], [], [], []
-    
-        # Iterate over each subdirectory in the labels directory
+
+    # Iterate over each subdirectory in the labels directory
     for ehrshot_task in os.listdir(args.path_to_labels_dir):
-        task_labels_dir = os.path.join(args.path_to_labels_dir, ehrshot_task)
+        task_labels_dir: str = os.path.join(args.path_to_labels_dir, ehrshot_task)
         if not os.path.isdir(task_labels_dir):
             continue
 
         labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(task_labels_dir, 'labeled_patients.csv'))
 
-        pat_num = 0
         for patient_id, labels in tqdm(labeled_patients.items(), desc=f"Loading EHRSHOT patient timelines for task {ehrshot_task}"):
             if patient_id not in train_patient_ids:
-                continue  # Skip patients not in the 'train' split
-            if pat_num > 10:
-                break
-            pat_num += 1
+                # Skip patients not in the 'train' split
+                continue
             full_timeline: List[Tuple[datetime.datetime, int]] = [
                 (
                     e.start, 
