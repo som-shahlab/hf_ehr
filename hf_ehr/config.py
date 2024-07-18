@@ -107,9 +107,15 @@ class TokenizerConfigEntry():
     def to_token(self):
         raise NotImplementedError("Subclasses must implement this method.")
     
-    def from_json(cls, json_str: str):
-        data = json.loads(json_str)
-        return cls(**data)
+    def get_stat(self, type_: str, settings: dict)-> Optional[TCEStat]:
+        """Returns stat with specified type and settings"""
+        for s in stats:
+            if s.type == type_:
+                for key, val in settings.items():
+                    if getattr(s, key) != val:
+                        break
+                return s
+        return None
 
 @dataclass(frozen=True)
 class CodeTCE(TokenizerConfigEntry):

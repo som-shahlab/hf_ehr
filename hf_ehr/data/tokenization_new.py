@@ -13,7 +13,7 @@ def convert_event_to_token(e: Event, tokenizer_config: Code2Detail, **kwargs) ->
     """
     # Parse kwargs
     excluded_vocabs: Set[str] = kwargs.get('excluded_vocabs', {}) or {}
-    min_code_count: Optional[int] = kwargs.get('min_code_count', None)
+    min_code_occurrence_count: Optional[int] = kwargs.get('min_code_occurrence_count', None)
     is_remap_numerical_codes: bool = kwargs.get('is_remap_numerical_codes', False) or False
     is_remap_codes_to_desc: bool = kwargs.get('is_remap_codes_to_desc', False) or False
     is_clmbr: bool = kwargs.get('is_clmbr', False) or False
@@ -26,16 +26,16 @@ def convert_event_to_token(e: Event, tokenizer_config: Code2Detail, **kwargs) ->
         return None
     
     # Check if code is above min count
-    def is_code_above_min_count(token: str, min_code_count: int) -> bool:
+    def is_code_above_min_count(token: str, min_code_occurrence_count: int) -> bool:
         if token in tokenizer_config:
             code: str = token
         else:
             code: str = token.split(" || ")[0]
         token_2_count = tokenizer_config[code]['token_2_count']
-        return sum(token_2_count.values()) >= min_code_count
+        return sum(token_2_count.values()) >= min_code_occurrence_count
 
-    if min_code_count:
-        if not is_code_above_min_count(token, min_code_count):
+    if min_code_occurrence_count:
+        if not is_code_above_min_count(token, min_code_occurrence_count):
             return None
     
     # If CLMBR then do special mapping and continue
@@ -68,10 +68,9 @@ def convert_event_to_token(e: Event, tokenizer_config: Code2Detail, **kwargs) ->
     return token
 
 class BaseCodeTokenizer(PreTrainedTokenizer):
-    def __init__(self, non_special_tokens: List[str]) -> None:
+    def __init__(self) -> None:
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
-        self.non_special_tokens = non_special_tokens
         self.vocab = self.special_tokens + self.non_special_tokens
 
         # Map tokens -> idxs
@@ -118,14 +117,14 @@ class BaseCodeTokenizer(PreTrainedTokenizer):
             # List[Event] => List[List[Event]]
             batch_of_events = [ batch_of_events ] # type: ignore
         
-        # First, convert all Events => tokens
+        # First, convert all Events => ProtoTokens
         batch: List[List[str]] = [ self.convert_events_to_tokens(x) for x in batch_of_events ]
         
         # Second, add special tokens (if applicable)
         if kwargs.get("add_special_tokens", False):
             batch = [ [ self.cls_token, self.bos_token ] + x + [ self.eos_token ] for x in batch ]
 
-        # Second, tokenize the batch
+        # Third, tokenize the batch
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
             if not max_length:
@@ -186,54 +185,116 @@ class BaseCodeTokenizer(PreTrainedTokenizer):
         raise self.idx_2_token[index]
 
 class CookbookTokenizer(BaseCodeTokenizer):
+    # TODO - move this settings upstream to the creation of the actual tokenizer_config.json
+    """
+        Settings:
+            is_remap_numerical_codes: bool
+                - If TRUE, then remap numericals to buckets based on quantile of value
+            excluded_vocabs: Optional[List[str]]
+                - List of vocabs to exclude from the tokenizer. Determined by the first part of the code before the '/' (e.g. "STANFORD_OBS" in "STANFORD_OBS/1234")
+            min_code_occurrence_count: Optional[int]
+                - Only keep tokens with >= `min_code_occurrence_count` total occurrences in our dataset
+    """
     def __init__(self, 
                  path_to_tokenizer_config: str, 
                  is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
-                 excluded_vocabs: Optional[List[str]] = None,
-                 min_code_count: Optional[int] = None) -> None:
+                 excluded_vocabs: Optional[Union[Set[str], List[str]]] = None,
+                 min_code_occurrence_count: Optional[int] = None) -> None:
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
-        self.tokenizer_config: List[TokenizerConfigEntry] = json.load(open(path_to_tokenizer_config, 'r'))
+        self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        
+        # Settings
         self.is_remap_numerical_codes: bool = is_remap_numerical_codes
         self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
-        self.min_code_count: Optional[int] = min_code_count
+        self.min_code_occurrence_count: Optional[int] = min_code_occurrence_count
         
-        # Index tokenizer vocab entries by raw code
-        self.code_2_entries: Dict[str, List[TokenizerConfigEntry]] = collections.defaultdict(list)
+        # Tokens
+        self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
+        self.non_special_tokens: List[str] = []
+        self.excluded_tokens: List[str] = [] # for tracking purposes
+
+        # Preprocess tokenizer config for quick access
         for entry in self.tokenizer_config:
-            self.code_2_entries[entry.code].append(entry)
-        self.code_2_entries = dict(self.code_2_entries)
+            
+            # Settings (if applicable)
+            ## Remove tokens from excluded vocabs
+            if (
+                self.excluded_vocabs is not None
+                and entry.code.split("/")[0].lower() in self.excluded_vocabs
+            ):
+                self.excluded_tokens.append(entry.to_token())
+                continue
+            ## Remove tokens with < `min_code_occurrence_count` occurrences in our dataset
+            if (
+                min_code_occurrence_count is not None
+                and entry.get_stat('count_occurrences') < min_code_occurrence_count
+            ):
+                self.excluded_tokens.append(entry.to_token())
+                continue
 
-        # Get vocabulary
-        non_special_tokens: List[str] = []
-        if is_remap_numerical_codes:
-            # Use the lab-value quantiled version of the FEMR codes
-            for detail in self.tokenizer_config.values():
-                non_special_tokens += list(detail['token_2_count'].keys())
-        else:
-            # Just use the raw FEMR codes as is
-            non_special_tokens: List[str] = sorted(list(self.tokenizer_config.keys()))
-
-        # Filter out excluded vocabs (if applicable)
-        if excluded_vocabs is not None:
-            non_special_tokens = [ x for x in non_special_tokens if x.split("/")[0].lower() not in self.excluded_vocabs ]
-
-        # Only keep non_special_tokens with >= `min_code_count` occurrences in our dataset
-        if min_code_count is not None:
-            non_special_tokens = [x for x in non_special_tokens if self.is_code_above_min_count(x)]
+            # If we've made it here, then we want to keep this token
+            if entry.code not in self.code_2_token: self.code_2_token[entry.code] = {}
+            if entry.type not in self.code_2_token[entry.code]: self.code_2_token[entry.code][entry.type] = []
+            self.code_2_token[entry.code][entry.type].append({
+                'tokenization': entry.tokenization,
+                'token' : entry.to_token(),
+            })
+            self.non_special_tokens.append(entry.to_token())
 
         # Create tokenizer
-        super().__init__(
-            non_special_tokens=non_special_tokens
-        )
+        super().__init__()
+
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        """NOTE: This is basically the same as the CLMBR tokenizer's version."""
+        # If code isn't in vocab => ignore
+        if e.code not in self.code_2_token:
+            return None
         
-    def is_code_above_min_count(self, token: str) -> bool:
-        assert self.min_code_count is not None, f"Can't call is_code_above_min_count() when self.min_code_count is None."
-        if token in self.tokenizer_config:
-            code: str = token
-        else:
-            code: str = token.split(" || ")[0]
-        token_2_count = self.tokenizer_config[code]['token_2_count']
-        return sum(token_2_count.values()) >= self.min_code_count
+        # If numerical code...
+        if (
+            'numerical_range' in self.code_2_token[e.code] # `numerical_range` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and ( # `value` is numeric
+                isinstance(e.value, float)
+                or isinstance(e.value, int)
+            )
+        ):
+            for token_range in self.code_2_token[e.code]['numerical_range']:
+                assert 'token' in token_range, f"ERROR - Missing 'token' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                assert 'tokenization' in token_range, f"ERROR - Missing 'tokenization' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                token: str = token_range['token']
+                unit: str = token_range['tokenization']['unit']
+                range_start: float = token_range['tokenization']['range_start']
+                range_end: float = token_range['tokenization']['range_end']
+                if range_start <= e.value <= range_end and e.unit == unit:
+                    return token
+            return None
+
+        # If textual code...
+        if (
+            'categorical' in self.code_2_token[e.code] # `categorical` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and e.value != '' # `value` is not blank
+            and ( # `value` is textual
+                isinstance(e.value, str)
+            )
+        ):
+            for categorical_value in self.code_2_token[e.code]['categorical']:
+                assert 'token' in categorical_value, f"ERROR - Missing 'token' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                assert 'tokenization' in categorical_value, f"ERROR - Missing 'tokenization' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                if e.value in categorical_value['tokenization']['categories']:
+                    token: str = categorical_value['token']
+                    return token
+            return None
+
+        # If just vanilla code...
+        if (
+            'code' in self.code_2_token[e.code] # `code` is a valid type for this code
+        ):
+            token: str = self.code_2_token[e.code]['code'][0]['token']
+            return token
+
+        return None
 
 class CLMBRTokenizer(BaseCodeTokenizer):
     def __init__(self, path_to_tokenizer_config: str) -> None:
@@ -242,7 +303,7 @@ class CLMBRTokenizer(BaseCodeTokenizer):
 
         # Preprocess tokenizer config for quick access
         self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
-        non_special_tokens: List[str] = []
+        self.non_special_tokens: List[str] = []
         for entry in self.tokenizer_config:
             if entry.code not in self.code_2_token: self.code_2_token[entry.code] = {}
             if entry.type not in self.code_2_token[entry.code]: self.code_2_token[entry.code][entry.type] = []
@@ -250,12 +311,12 @@ class CLMBRTokenizer(BaseCodeTokenizer):
                 'tokenization': entry.tokenization,
                 'token' : entry.to_token(),
             })
-            non_special_tokens.append(entry.to_token())
+            self.non_special_tokens.append(entry.to_token())
 
-        assert len(non_special_tokens) == 39811, f"ERROR - Expected 39811 non_special_tokens, but got {len(non_special_tokens)}"
+        assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
 
         # Create tokenizer
-        super().__init__(non_special_tokens=non_special_tokens)
+        super().__init__()
 
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
         # If code isn't in CLMBR vocab => ignore
@@ -311,9 +372,18 @@ class CLMBRTokenizer(BaseCodeTokenizer):
 class DescTokenizer(PreTrainedTokenizer):
     """Converts codes => textual descriptions, then tokenizes
     """
-    def __init__(self, tokenizer: AutoTokenizer) -> None:
+    def __init__(self, path_to_tokenizer_config: str, tokenizer: AutoTokenizer) -> None:
+        self.path_to_tokenizer_config: str = path_to_tokenizer_config
+        self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        self.event_separator: str = ' ' # character that gets inserted between Events when transformed into their textual descriptions
         self.tokenizer = tokenizer
         
+        # Preprocess tokenizer config for quick access
+        self.code_2_desc: Dict[str, str] = {}
+        for entry in self.tokenizer_config:
+            if entry.description is not None:
+                self.code_2_desc[entry.code] = entry.description
+
         super().__init__(
             bos_token=tokenizer.bos_token,
             eos_token=tokenizer.eos_token,
@@ -322,26 +392,36 @@ class DescTokenizer(PreTrainedTokenizer):
             pad_token=tokenizer.pad_token,
             cls_token=tokenizer.cls_token
         )
+    
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        if e.code not in self.code_2_desc:
+            return None
+        return self.code_2_desc[e.code]
 
     def __call__(self, 
-                 batch: Union[List[str], List[List[str]]],
+                 batch_of_events: Union[List[Event], List[List[Event]]],
                  is_truncation_random: bool = False,
                  seed: int = 1,
                  **kwargs) -> Dict[str, torch.Tensor]:
         '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
             We add the ability to truncate seqs at random time points.
             
-            Expects as input a list of text-fied code descriptions in either the format of:
-                A list of codes (List[str])
-                A list of lists of codes (List[str])
+            Expects as input a list of Events
         '''
-        if isinstance(batch[0], str):
-            # List[str] => List[List[str]]
-            batch = [ batch ]
+        if not isinstance(batch_of_events[0], list):
+            # List[Event] => List[List[Event]]
+            batch_of_events = [ batch_of_events ] # type: ignore
+        
+        # First, convert all Events => ProtoTokens
+        batch: List[List[str]] = [ self.convert_events_to_tokens(x) for x in batch_of_events ] 
+        
+        # Second, add special tokens (if applicable)
+        if kwargs.get("add_special_tokens", False):
+            batch = [ [ self.cls_token, self.bos_token ] + x + [ self.eos_token ] for x in batch ]
 
         # Concatenate all strings together for tokenization by traditional HF tokenizer
-        # List[List[str]] => List[str]git 
-        batch = [ self.code_separator.join(x) for x in batch ]
+        # List[List[str]] => List[str]
+        batch = [ self.event_separator.join(x) for x in batch ] # type: ignore
 
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
