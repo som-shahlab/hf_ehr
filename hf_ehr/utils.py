@@ -158,7 +158,7 @@ def load_config_from_path(path_to_ckpt: str) -> Dict[str, Any]:
     config = load_config_from_ckpt(ckpt)
     return config
 
-def load_model_from_path(path_to_ckpt: str, tokenizer: Any) -> torch.nn.Module:
+def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     """Given a path to a model checkpoint, load the model."""
     from hf_ehr.models.gpt import GPTLanguageModel
     from hf_ehr.models.bert import BERTLanguageModel
@@ -169,6 +169,9 @@ def load_model_from_path(path_to_ckpt: str, tokenizer: Any) -> torch.nn.Module:
     # Load checkpoint
     ckpt = torch.load(path_to_ckpt, map_location='cpu')
     config = load_config_from_ckpt(ckpt)
+    
+    # Load tokenizer
+    tokenizer = load_tokenizer_from_path(path_to_ckpt)
 
     # Determine type of model based on config.model.name
     model_map = {

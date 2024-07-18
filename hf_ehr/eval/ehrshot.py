@@ -149,8 +149,7 @@ def main():
     tokenizer = load_tokenizer_from_path(PATH_TO_MODEL)
 
     logger.info(f"Loading Model from `{PATH_TO_MODEL}`")
-    model = load_model_from_path(PATH_TO_MODEL, tokenizer)
-    model = model.to(torch.bfloat16)
+    model = load_model_from_path(PATH_TO_MODEL)
     model.to(device)
     model.eval()  # Set the model to evaluation mode
     
@@ -250,6 +249,7 @@ def main():
     shutil.copytree(os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/'), os.path.join(path_to_model_ehrshot_dir, 'logs/'))
 
     # Save EHRSHOT featurization results
+    logger.info(f"Stacking featurization results...")
     feature_matrix = np.stack(feature_matrix)
     patient_ids = np.array(patient_ids)
     label_values = np.array(label_values)

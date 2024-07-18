@@ -1,6 +1,6 @@
 import json
 import os
-from typing import TypedDict, Dict, Optional, List, Any, Literal
+from typing import TypedDict, Dict, Optional, List, Any, Literal, Union, Tuple
 from omegaconf import DictConfig, OmegaConf
 from loguru import logger
 from dataclasses import dataclass, asdict, field
@@ -17,7 +17,9 @@ GPU_BASE_DIR: str = '/home/hf_ehr/'
 PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
 PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/') # TODO - NEW
 PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/') # TODO - NEW
+PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/') # TODO - NEW
 PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json') # TODO - NEW
+PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json') # TODO - NEW
 
 PATH_TO_TOKENIZER_v8_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v8/')
 PATH_TO_TOKENIZER_v8_CLMBR_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v8_clmbr/')
@@ -39,7 +41,7 @@ class Code2Detail(TypedDict):
     code: Detail
 # TODO - remove end
 
-@dataclass(frozen=True)
+@dataclass()
 class Event():
     code: str # LOINC/1234
     value: Optional[Any] = None # 123.45 or 'YES' or None
@@ -56,14 +58,14 @@ class Event():
 # Token Stats
 #
 #############################################
-@dataclass(frozen=True)
+@dataclass()
 class TCEStat():
     type: Literal['count_occurrences', 'count_patients', 'ppl'] # type of this stat
 
     def to_dict(self) -> dict:
         return asdict(self)
     
-@dataclass(frozen=True)
+@dataclass()
 class CountOccurrencesTCEStat(TCEStat):
     # Counts total # of occurrences of token in dataset split
     split: Optional[str] = None
@@ -71,7 +73,7 @@ class CountOccurrencesTCEStat(TCEStat):
     count: int = 0
     type: str = 'count_occurrences'
 
-@dataclass(frozen=True)
+@dataclass()
 class CountPatientsTCEStat(TCEStat):
     # Counts total # of unique patients with this token in dataset split
     split: Optional[str] = None
@@ -79,7 +81,7 @@ class CountPatientsTCEStat(TCEStat):
     count: Optional[int] = None
     type: str = 'count_patients'
 
-@dataclass(frozen=True)
+@dataclass()
 class PPLTCEStat(TCEStat):
     # Record the average perplexity of the token in the dataset split
     split: Optional[str] = None
@@ -93,7 +95,7 @@ class PPLTCEStat(TCEStat):
 # Token Types
 #
 #############################################
-@dataclass(frozen=True)
+@dataclass()
 class TokenizerConfigEntry():
     code: str # LOINC/1234 -- raw code
     type: Literal['numerical_range', 'categorical', 'code'] # type of this token
@@ -117,7 +119,7 @@ class TokenizerConfigEntry():
                 return s
         return None
 
-@dataclass(frozen=True)
+@dataclass()
 class CodeTCE(TokenizerConfigEntry):
     type: str = 'code'
 
@@ -125,7 +127,7 @@ class CodeTCE(TokenizerConfigEntry):
         # LOINC/1234
         return f"{self.code}"
 
-@dataclass(frozen=True)
+@dataclass()
 class NumericalRangeTCE(TokenizerConfigEntry):
     type: str = 'numerical_range'
     tokenization: Dict[str, Any] = field(default_factory=lambda: {'unit' : None, 'range_start': None, 'range_end' : None, })
@@ -134,7 +136,7 @@ class NumericalRangeTCE(TokenizerConfigEntry):
         # LOINC/1234 || mg/dL || 0.0 - 100.0
         return f"{self.code} || {self.tokenization['unit']} || {self.tokenization['range_start']} - {self.tokenization['range_end']}"
 
-@dataclass(frozen=True)
+@dataclass()
 class CategoricalTCE(TokenizerConfigEntry):
     type: str = 'categorical'
     tokenization: Dict[str, Any] = field(default_factory=lambda: {'categories': [] })
@@ -149,12 +151,22 @@ class CategoricalTCE(TokenizerConfigEntry):
 # Tokenizer config helpers
 #
 #############################################
+def save_tokenizer_config_to_path(path_to_tokenizer_config: str, tokenizer_config: List[TokenizerConfigEntry], metadata: Optional[Dict] = None) -> None:
+    """Given a path to a `tokenizer_config.json` file, saves the JSON config to disk."""
+    json.dump({
+        'metadata' : metadata if metadata else {},
+        'tokens' : [ x.to_dict() for x in tokenizer_config ],
+    }, open(path_to_tokenizer_config, 'w'), indent=2)
 
-def load_tokenizer_config_from_path(path_to_tokenizer_config: str) -> List[TokenizerConfigEntry]:
+def load_tokenizer_config_from_path(path_to_tokenizer_config: str, is_return_metadata: bool = False) -> Union[List[TokenizerConfigEntry], Tuple[Dict[str, Any], List[TokenizerConfigEntry]]]:
     """Given a path to a `tokenizer_config.json` file, loads the JSON config and parses into Python objects."""
     raw_data = json.load(open(path_to_tokenizer_config, 'r'))
+    raw_metadata = raw_data['metadata']
+    raw_tokens = raw_data['tokens']
+    
+    # Parse token Dict => TokenizerConfigEntry objects
     config: List[TokenizerConfigEntry] = []
-    for entry in raw_data:
+    for entry in raw_tokens:
         raw_stats = entry.pop('stats')
         stats = []
         for stat in stats:
@@ -174,7 +186,10 @@ def load_tokenizer_config_from_path(path_to_tokenizer_config: str) -> List[Token
             config.append(CategoricalTCE(**entry, stats=stats))
         else:
             raise ValueError(f"Unknown token type: {entry}")
-    return config
+    if is_return_metadata:
+        return config, raw_metadata
+    else:
+        return config
 
 #############################################
 #

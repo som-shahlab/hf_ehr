@@ -8,6 +8,7 @@ from tqdm import tqdm
 from hf_ehr.config import (
     TokenizerConfigEntry, NumericalRangeTCE, CategoricalTCE, CodeTCE, 
     CountOccurrencesTCEStat, PPLTCEStat,
+    save_tokenizer_config_to_path,
     PATH_TO_TOKENIZER_CLMBR_v8_DIR
 )
 PATH_TO_CLMBR_JSON: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'clmbr_v8_original_dictionary.json')
@@ -69,12 +70,11 @@ if __name__ == '__main__':
         tokenizer_config.append(new_token)
         
     path_to_output_file: str = os.path.join(path_to_output_dir, 'tokenizer_config.json')
-    print(f"Saving CLMBR vocab to {path_to_output_file}")
-    json.dump([ x.to_dict() for x in tokenizer_config ], open(path_to_output_file, 'w'), indent=2)
+    print(f"Saving CLMBR vocab to: `{path_to_output_file}`")
+    save_tokenizer_config_to_path(path_to_output_file, tokenizer_config)
     
     n_new_tokens: int = len(tokenizer_config)
     n_old_tokens: int = len([ x for x in clmbr['regular'] if x['type'] != 'unused' ])
-
     print("Number of tokens in new CLMBR vocab: ", n_new_tokens)
     print("Number of tokens in old CLMBR vocab: ", n_old_tokens)
     assert n_new_tokens == n_old_tokens, f"ERROR - Mismatch in vocab lengths"

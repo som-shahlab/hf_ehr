@@ -481,7 +481,7 @@ class DescTokenizer(PreTrainedTokenizer):
 
 if __name__ == '__main__':
     from hf_ehr.data.datasets_new import FEMRDataset
-    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG
+    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG
     
     # Load v8 dataset
     print("Loading v8 dataset...")
@@ -505,12 +505,12 @@ if __name__ == '__main__':
         print(tokens)
         
     # Desc Tokenizer
-    if False:
+    if True:
         print("Loading tokenizer...")
-        desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
+        desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, AutoTokenizer.from_pretrained("bert-base-uncased"))
     
     # CLMBR Tokenizer
-    if True:
+    if False:
         print("Loading tokenizer...")
         tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
 

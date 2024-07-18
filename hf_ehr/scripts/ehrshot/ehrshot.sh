@@ -4,7 +4,7 @@
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/ehrshot-eval_%A.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=nigam-a100,nigam-h100
-#SBATCH --mem=100G
+#SBATCH --mem=200G
 #SBATCH --cpus-per-task=5
 #SBATCH --gres=gpu:1
 
