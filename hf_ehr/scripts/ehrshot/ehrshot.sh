@@ -15,6 +15,8 @@ source ../carina/base.sh
 PATH_TO_CKPT=$1
 MODEL_NAME=$2
 BATCH_SIZE=$3
+# PATIENT_IDX_START=$4
+# PATIENT_IDX_END=$5
 
 python3 ../../eval/ehrshot.py \
     --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
@@ -24,4 +26,6 @@ python3 ../../eval/ehrshot.py \
     --model_name $MODEL_NAME \
     --batch_size $BATCH_SIZE \
     --embed_strat last \
-    --chunk_strat last
+    --chunk_strat last 
+    # --patient_idx_start $PATIENT_IDX_START \
+    # --patient_idx_end $PATIENT_IDX_END

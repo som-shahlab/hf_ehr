@@ -4,21 +4,29 @@ import torch
 import uuid
 import hashlib
 
-def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float, float]]) -> str:
+def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float, float]], is_tokenize_out_of_range: bool = False) -> Optional[str]:
     # Given a list of ranges (i.e. tuples of [start, end] values), remaps the code to the index in the `ranges` array corresponds
     # to this code's value, i.e. "code" => "{code} || {idx}"
     # If the value doesn't fit in any of the ranges, returns the code itself, i.e. "{code}"
     for idx, (start_val, end_val) in enumerate(ranges):
         if start_val <= value <= end_val:
             return f"{code} || {unit} || R{idx + 1}" # "STANFORD_OBS/123 | mmol | R3"
-    return f"{code} || {unit} || R0" # out of range, "STANFORD_OBS/123 | mmol | R0"
+    # Token is out of range, so decide whether to return `None` or special `R0` code
+    if is_tokenize_out_of_range:
+        return f"{code} || {unit} || R0" # "STANFORD_OBS/123 | mmol | R0"
+    else:
+        return None
 
-def convert_lab_value_to_token_from_quantiles(code: str, unit: str, value: float, quantiles: List[float]) -> str:
+def convert_lab_value_to_token_from_quantiles(code: str, unit: str, value: float, quantiles: List[float], is_tokenize_out_of_range: bool = False) -> Optional[str]:
     # Note: If we have Q1, Q2, Q3, Q4, then `len(quantiles) == 3` b/c have [0.25, 0.5, 0.75]
     for q_idx, q in enumerate(quantiles):
         if value <= q: 
             return get_lab_value_token_name(code, unit, str(q_idx + 1))
-    return get_lab_value_token_name(code, unit, "0") # out of range, "STANFORD_OBS/123 | mmol | Q0"
+    # Token is out of range, so decide whether to return `None` or special `R0` code
+    if is_tokenize_out_of_range:
+        return get_lab_value_token_name(code, unit, "0") # "STANFORD_OBS/123 | mmol | Q0"
+    else:
+        return None
 
 def get_lab_value_token_name(code: str, unit: str, quantile: str) -> str:
     return f"{code} || {unit} || Q{quantile}" # "STANFORD_OBS/123 | mmol | Q4"

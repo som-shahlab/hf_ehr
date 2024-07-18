@@ -1,18 +1,22 @@
 """
-Transforms the original CLMBR dictionary (from FEMRv1) into code_2_detail.json format
+Transforms the original CLMBR dictionary (from FEMRv1) into tokenizer_config.json format
 """
 import json
 from typing import List, Dict
 import os
 from tqdm import tqdm
-
-PATH_TO_CLMBR_JSON: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8_clmbr/clmbr_v8_original_dictionary.json'
+from hf_ehr.config import (
+    TokenizerConfigEntry, NumericalRangeTCE, CategoricalTCE, CodeTCE, 
+    CountOccurrencesTCEStat, PPLTCEStat,
+    PATH_TO_TOKENIZER_CLMBR_v8_DIR
+)
+PATH_TO_CLMBR_JSON: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'clmbr_v8_original_dictionary.json')
 
 if __name__ == '__main__':
     clmbr: Dict[str, List] = json.load(open(PATH_TO_CLMBR_JSON))
     path_to_output_dir: str = os.path.dirname(PATH_TO_CLMBR_JSON)
 
-    code_2_detail = {}
+    tokenizer_config: List[TokenizerConfigEntry] = []
     for token in tqdm(clmbr['regular'], desc='Looping thru CLMBR codes...', total=len(clmbr['regular'])):
         code: str = token['code_string']
         val_start: float = token['val_start']
@@ -24,34 +28,51 @@ if __name__ == '__main__':
         if type_ == 'unused':
             continue
 
-        if code not in code_2_detail:
-            code_2_detail[code] = {
-                'token_2_count' : {
-                },
-                'categorical_values' : [],
-                'unit_2_ranges' : {
-                    "None" : [
-                    ],
-                },
-            }
-
-        if type_ == 'numeric':
-            code_2_detail[code]['unit_2_ranges']['None'].append((val_start, val_end))
-            # code_2_detail[code]['token_2_count'][f"{code} || None || R0"] = None # special case for out of range
-            code_2_detail[code]['token_2_count'][f"{code} || None || R{len(code_2_detail[code]['unit_2_ranges']['None'])}"] = None # Special case for out of range
-            code_2_detail[code]['is_numeric'] = True
+        defaults = {
+            'code' : code,
+            'description' : None,
+            'type' : (
+                'numerical_range' if type_ == 'numeric' else
+                'categorical' if type_ == 'text' else
+                'code'
+            ),
+            'stats' : [
+                # dummy values, just to show what's possible
+                CountOccurrencesTCEStat(split='train', dataset='v8'),
+                PPLTCEStat(split='train', dataset='v8', model="gpt2-base-1024"),
+            ],
+        }
+        if type_ == 'code':
+            new_token = CodeTCE(
+                **defaults,
+            )
         elif type_ == 'text':
-            code_2_detail[code]['categorical_values'].append(text_string)
-            code_2_detail[code]['token_2_count'][f"{code} || {text_string}"] = None
-            code_2_detail[code]['is_categorical'] = True
-        elif type_ == 'code':
-            code_2_detail[code]['token_2_count'][code] = None
+            new_token = CategoricalTCE(
+                tokenization={
+                    'categories' : [ text_string ],
+                },
+                **defaults,
+            )
+        elif type_ == 'numeric':
+            unit: str = "None"
+            new_token = NumericalRangeTCE(
+                tokenization={
+                    'unit' : unit,
+                    'range_start' : val_start,
+                    'range_end' : val_end,
+                },
+                **defaults,
+            )
         else:
-            raise ValueError(f"Code {code} has unknown type: {type_}")
-
-    json.dump(code_2_detail, open(os.path.join(path_to_output_dir, 'code_2_detail.json'), 'w'), indent=2)
+            raise ValueError(f"ERROR - Unknown type for code {code}: {type_}")
+            
+        tokenizer_config.append(new_token)
+        
+    path_to_output_file: str = os.path.join(path_to_output_dir, 'tokenizer_config.json')
+    print(f"Saving CLMBR vocab to {path_to_output_file}")
+    json.dump([ x.to_dict() for x in tokenizer_config ], open(path_to_output_file, 'w'), indent=2)
     
-    n_new_tokens: int = len([ x for code in code_2_detail for x in code_2_detail[code]['token_2_count'] ])
+    n_new_tokens: int = len(tokenizer_config)
     n_old_tokens: int = len([ x for x in clmbr['regular'] if x['type'] != 'unused' ])
 
     print("Number of tokens in new CLMBR vocab: ", n_new_tokens)

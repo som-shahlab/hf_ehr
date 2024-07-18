@@ -76,7 +76,7 @@ def convert_event_to_token(e: Event, code_2_detail: Code2Detail, **kwargs) -> Op
             ranges: List[Tuple[float]] = code_2_detail[e.code]['unit_2_ranges'][unit]
 
             # Determine range for (code, unit, value)
-            token = convert_lab_value_to_token_from_ranges(token, unit, e.value, ranges)
+            token = convert_lab_value_to_token_from_ranges(token, unit, e.value, ranges, is_tokenize_out_of_range=True)
 
             # If code is out of range of CLMBR vocab, return None
             if token.endswith("R0"):
@@ -124,7 +124,7 @@ def convert_event_to_token(e: Event, code_2_detail: Code2Detail, **kwargs) -> Op
             quantiles: List[float] = code_2_detail[e.code]['unit_2_quartiles'][unit]
 
             # Determine quantile for (code, unit, value)
-            token = convert_lab_value_to_token_from_quantiles(token, unit, e.value, quantiles)
+            token = convert_lab_value_to_token_from_quantiles(token, unit, e.value, quantiles, is_tokenize_out_of_range=True)
     return token
 
 class FEMRDataset(Dataset):

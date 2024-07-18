@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import torch
 import femr.datasets
@@ -21,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_model", type=str, required=True, help="Path to model .ckpt")
     parser.add_argument("--finetune_strat", type=str, required=True, choices=["full", "last_n_layers"], help="Type of finetuning")
     parser.add_argument("--n_layers", type=int, default=1, help="Number of layers to finetune if finetune_strat is 'last_n_layers'")
-    parser.add_argument("--output_dir", type=str, required=True, help="Directory to save fine-tuned models")
+    parser.add_argument("--path_to_output_dir", type=str, required=True, help="Directory to save fine-tuned models")
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'avg' (avg all tokens).")
     parser.add_argument("--chunk_strat", type=str, help="Strategy used for condensing a timeline longer than context window C. Options: 'last' (only take last chunk), 'avg' (avg all chunks together).")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
@@ -110,8 +111,8 @@ def save_finetuned_model(model: nn.Module,
                          embed_strat: str,
                          chunk_strat: str,
                          n_layers: int,
-                         output_dir: str) -> None:
-    path_to_output: str = os.path.join(output_dir, f"ckpt={ckpt_name}--ehrshot_task={ehrshot_task_name}--finetune_strat={fine_tune_strat}--n_layers={n_layers}--embed_strat={embed_strat}--chunk_strat={chunk_strat}.pt")
+                         path_to_output_dir: str) -> None:
+    path_to_output: str = os.path.join(path_to_output_dir, f"ckpt={ckpt_name}--ehrshot_task={ehrshot_task_name}--finetune_strat={fine_tune_strat}--n_layers={n_layers}--embed_strat={embed_strat}--chunk_strat={chunk_strat}.pt")
     torch.save(model.state_dict(), path_to_output)
     logger.info(f"Model saved to {path_to_output}")
 
@@ -119,7 +120,8 @@ def main() -> None:
     args = parse_args()
     batch_size: int = args.batch_size
     chunk_strat: str = args.chunk_strat
-    os.makedirs(args.output_dir, exist_ok=True)
+    path_to_output_dir: str = args.path_to_output_dir if args.path_to_output_dir is not None else os.path.join(os.path.dirname(args.path_to_model), './finetunes')
+    os.makedirs(path_to_output_dir, exist_ok=True)
     
     # Load EHRSHOT split CSV
     logger.info(f"Loading EHRSHOT split from `{args.path_to_ehrshot_split}`")
@@ -147,81 +149,90 @@ def main() -> None:
     criterion = nn.functional.cross_entropy
 
     # Iterate over each subdirectory in the `labels/` directory
-    for ehrshot_task in os.listdir(args.path_to_labels_dir):
-        task_labels_dir: str = os.path.join(args.path_to_labels_dir, ehrshot_task)
-        if not os.path.isdir(task_labels_dir):
+    for task in os.listdir(args.path_to_labels_dir):
+        path_to_task_dir: str = os.path.join(args.path_to_labels_dir, task)
+        if not os.path.isdir(path_to_task_dir):
             continue
 
-        # Get labels + patient timelines
-        labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(task_labels_dir, 'labeled_patients.csv'))
-        ehrshot = generate_ehrshot_timelines(database, 
-                                                config, 
-                                                labeled_patients, 
-                                                allowed_pids=train_patient_ids, 
-                                                tqdm_desc=f"Loading EHRSHOT patient timelines for task {ehrshot_task}")
-        patient_ids = ehrshot['patient_ids']
-        label_values = ehrshot['label_values']
-        label_times = ehrshot['label_times']
-        timeline_starts = ehrshot['timeline_starts']
-        timeline_tokens = ehrshot['timeline_tokens']
+        # Load labels + few shots
+        path_to_few_shots: str = os.path.join(path_to_task_dir, 'all_shots_data.json')
+        few_shots: dict = json.load(open(path_to_few_shots, 'r'))
 
-        # Generate patient representations
-        max_length: int = config.data.dataloader.max_length
-        pad_token_id: int = tokenizer.token_2_idx['[PAD]']
-        for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
-            pids = patient_ids[batch_start:batch_start + batch_size]
-            values = label_values[batch_start:batch_start + batch_size]
-            times = label_times[batch_start:batch_start + batch_size]
-            timelines = []
+        for subtask in few_shots.keys():
+            for shot in few_shots[subtask].keys():
+                for replicate in few_shots[subtask][shot].keys():
+                    data = few_shots[subtask][shot][replicate]
 
-            for pid, l_value, l_time in zip(pids, values, times):
-                timeline_starts_for_pid = timeline_starts[pid]
-                timeline_tokens_for_pid = timeline_tokens[pid]
-                timeline = [token for start, token in zip(timeline_starts_for_pid, timeline_tokens_for_pid) if start <= l_time]
-                timelines.append(timeline)
-            
-            # Determine how timelines longer than max-length will be chunked
-            if chunk_strat == 'last':
-                timelines = [x[-max_length:] for x in timelines]
-            else:
-                raise ValueError(f"Chunk strategy `{chunk_strat}` not supported.")
+                    # Get labels + patient timelines
+                    labeled_patients: LabeledPatients = load_labeled_patients(os.path.join(path_to_task_dir, 'labeled_patients.csv'))
+                    ehrshot = generate_ehrshot_timelines(database, 
+                                                            config, 
+                                                            labeled_patients, 
+                                                            allowed_pids=train_patient_ids, 
+                                                            tqdm_desc=f"Loading EHRSHOT patient timelines for task={task} | subtask={subtask} | shot={shot} | replicate={replicate}")
+                    patient_ids = ehrshot['patient_ids']
+                    label_values = ehrshot['label_values']
+                    label_times = ehrshot['label_times']
+                    timeline_starts = ehrshot['timeline_starts']
+                    timeline_tokens = ehrshot['timeline_tokens']
 
-            # Create batch
-            max_timeline_length = max(len(x) for x in timelines)
-            timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines] # left padding
-            input_ids = torch.stack([torch.tensor(x, device=args.device) for x in timelines_w_pad])
-            attention_mask = (input_ids != pad_token_id).int()
-            batch = {
-                'input_ids': input_ids,
-                'attention_mask': attention_mask if "hyena" not in config['model']['name'] else None,
-            }
-            
-            # Check lengths and content of timelines_w_pad
-            for idx, t in enumerate(timelines_w_pad):
-                assert len(t) == max_timeline_length, f"Length mismatch at index {idx}: {len(t)} != {max_timeline_length} | Content: {t}"
-                assert not all(token == pad_token_id for token in t), f"Found patient at index {idx} with only padding tokens."
+                    # Generate patient representations
+                    max_length: int = config.data.dataloader.max_length
+                    pad_token_id: int = tokenizer.token_2_idx['[PAD]']
+                    for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
+                        pids = patient_ids[batch_start:batch_start + batch_size]
+                        values = label_values[batch_start:batch_start + batch_size]
+                        times = label_times[batch_start:batch_start + batch_size]
+                        timelines = []
 
-            # Run model to get logits for each class
-            logits: Float[torch.Tensor, 'B C'] = model(**batch)
+                        for pid, l_value, l_time in zip(pids, values, times):
+                            timeline_starts_for_pid = timeline_starts[pid]
+                            timeline_tokens_for_pid = timeline_tokens[pid]
+                            timeline = [token for start, token in zip(timeline_starts_for_pid, timeline_tokens_for_pid) if start <= l_time]
+                            timelines.append(timeline)
+                        
+                        # Determine how timelines longer than max-length will be chunked
+                        if chunk_strat == 'last':
+                            timelines = [x[-max_length:] for x in timelines]
+                        else:
+                            raise ValueError(f"Chunk strategy `{chunk_strat}` not supported.")
 
-            # Compute CE loss v. true binary labels
-            binary_labels: Float[torch.Tensor, 'B'] = torch.tensor(values, device=args.device).long()
-            loss = criterion(logits, binary_labels)
+                        # Create batch
+                        max_timeline_length = max(len(x) for x in timelines)
+                        timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines] # left padding
+                        input_ids = torch.stack([torch.tensor(x, device=args.device) for x in timelines_w_pad])
+                        attention_mask = (input_ids != pad_token_id).int()
+                        batch = {
+                            'input_ids': input_ids,
+                            'attention_mask': attention_mask if "hyena" not in config['model']['name'] else None,
+                        }
+                        
+                        # Check lengths and content of timelines_w_pad
+                        for idx, t in enumerate(timelines_w_pad):
+                            assert len(t) == max_timeline_length, f"Length mismatch at index {idx}: {len(t)} != {max_timeline_length} | Content: {t}"
+                            assert not all(token == pad_token_id for token in t), f"Found patient at index {idx} with only padding tokens."
 
-            # Backprop
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-    
-        # Save the fine-tuned model
-        save_finetuned_model(model, 
-                             ckpt_name=os.path.basename(args.path_to_model).split('.')[0], 
-                             ehrshot_task_name=ehrshot_task, 
-                             fine_tune_strat=args.finetune_strat, 
-                             embed_strat=args.embed_strat,
-                             chunk_strat=args.chunk_strat,
-                             n_layers=args.n_layers,
-                             output_dir=args.output_dir)
+                        # Run model to get logits for each class
+                        logits: Float[torch.Tensor, 'B C'] = model(**batch)
+
+                        # Compute CE loss v. true binary labels
+                        binary_labels: Float[torch.Tensor, 'B'] = torch.tensor(values, device=args.device).long()
+                        loss = criterion(logits, binary_labels)
+
+                        # Backprop
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+                
+                    # Save the fine-tuned model
+                    save_finetuned_model(model, 
+                                        ckpt_name=os.path.basename(args.path_to_model).split('.')[0], 
+                                        ehrshot_task_name=ehrshot_task, 
+                                        fine_tune_strat=args.finetune_strat, 
+                                        embed_strat=args.embed_strat,
+                                        chunk_strat=args.chunk_strat,
+                                        n_layers=args.n_layers,
+                                        path_to_output_dir=path_to_output_dir)
 
     logger.success("Done!")
 
