@@ -164,6 +164,9 @@ def save_tokenizer_config_to_path(path_to_tokenizer_config: str, tokenizer_confi
         'tokens' : [ x.to_dict() for x in tokenizer_config ],
     }, open(path_to_tokenizer_config, 'w'), indent=2)
 
+def load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config: str) -> Tuple[List[TokenizerConfigEntry], Dict[str, Any]]:
+    return load_tokenizer_config_from_path(path_to_tokenizer_config, is_return_metadata=True) # type: ignore
+
 def load_tokenizer_config_from_path(path_to_tokenizer_config: str, is_return_metadata: bool = False) -> Union[List[TokenizerConfigEntry], Tuple[List[TokenizerConfigEntry], Dict[str, Any]]]:
     """Given a path to a `tokenizer_config.json` file, loads the JSON config and parses into Python objects."""
     raw_data = json.load(open(path_to_tokenizer_config, 'r'))

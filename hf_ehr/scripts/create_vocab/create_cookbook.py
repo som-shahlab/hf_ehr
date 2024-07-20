@@ -1,10 +1,10 @@
 import os
 import argparse
 import time
-from typing import List
-from hf_ehr.scripts.create_vocab.utils import add_unique_codes, add_descriptions_to_codes
+from typing import Any, Callable, Dict, List
+from hf_ehr.scripts.create_vocab.utils import add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs
 from hf_ehr.data.datasets import FEMRDataset
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, wrapper_with_logging
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Generate statistics about dataset')
@@ -14,21 +14,19 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 def main():
+    start_total = time.time()
     # Parse command-line arguments
     args = parse_args()
-    start_total = time.time()
     os.makedirs(os.path.dirname(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG), exist_ok=True)
     if os.path.exists(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG):
         if args.is_force_refresh:
+            # Create empty tokenizer config
             print(f"Overwriting tokenizer config at: {PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG}")
+            with open(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, 'w') as f:
+                f.write('{"metadata" : {}, "tokens" : []}')
         else:
-            print(f"Tokenizer config already exists at: {PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG}. Exiting b/c `--is_force_refresh` is not specified.")
-            exit()
-
-    # Create empty tokenizer config
-    print(f"Creating empty tokenizer config at: {PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG}")
-    with open(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, 'w') as f:
-        f.write('{"metadata" : {}, "tokens" : []}')
+            # Keep existing tokenizer config, only fill in parts that haven't already been done
+            print(f"Tokenizer config already exists at: {PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG}. Only filling in parts that haven't already been done, according to to metadata['is_already_done']")
 
     # Load datasets
     start = time.time()
@@ -43,23 +41,22 @@ def main():
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
 
-    # Debugging info
+    # Hparams
     chunk_size = 1_000
+    excluded_vocabs = ['STANFORD_OBS']
     print(f"Running with n_procs={args.n_procs}, chunk_size={chunk_size}")
 
-    # With `n_procs=5`, should take 15 mins
-    start = time.time()
-    print("Starting add_unique_codes()...")
-    add_unique_codes(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
-    print(f"Time for add_unique_codes(): {time.time() - start:.2f}s")
-    
-    # With `n_procs=5`, should take XXXX mins
-    print("Starting add_descriptions_to_codes()...")
-    add_descriptions_to_codes(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract)
-    print(f"Time for add_descriptions_to_codes(): {time.time() - start:.2f}s")
+    # With `n_procs=5`, should take ~20 mins
+    wrapper_with_logging(add_unique_codes, 'add_unique_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
 
-    print("Done!")
+    # With `n_procs=5`, should take ~XXXX mins
+    wrapper_with_logging(remove_codes_belonging_to_vocabs, 'remove_codes_belonging_to_vocabs', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, excluded_vocabs=excluded_vocabs)
+
+    # With `n_procs=5`, should take ~XXXX mins
+    wrapper_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
+
     print(f"Total time taken: {round(time.time() - start_total, 2)}s")
+    print("Done!")
 
 if __name__ == '__main__':
     main()
