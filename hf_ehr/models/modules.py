@@ -10,9 +10,7 @@ from typing import Dict, List, Any, Optional, Union
 from calflops import calculate_flops
 import wandb
 from lightning.pytorch.utilities import rank_zero_only
-
 from hf_ehr.utils import lr_warmup_with_constant_plateau
-from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
 def calculate_flops_per_token(model, vocab_size: int) -> int:
     """Returns FLOPs per token for model."""
@@ -42,13 +40,13 @@ class BaseModel(L.LightningModule):
     pad_token_id: int
     flops_per_token: Optional[int] = None
 
-    def __init__(self, config: DictConfig, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> None:
+    def __init__(self, config: DictConfig, tokenizer: Optional, vocab_size: Optional = None, pad_token_id: Optional = None) -> None:
         super().__init__()
         self.save_hyperparameters('config') #NOTE: Need to exclude `tokenizer` otherwise internal PTL .hparam call later will hang
         self.model_name: str = config.model.name
         self.config = config
-        self.vocab_size: int = tokenizer.vocab_size
-        self.pad_token_id: int = tokenizer.pad_token_id
+        self.vocab_size: int = vocab_size if vocab_size else tokenizer.vocab_size
+        self.pad_token_id: int = pad_token_id if pad_token_id else tokenizer.pad_token_id
         self.flops_per_token = None
         
         # Metrics

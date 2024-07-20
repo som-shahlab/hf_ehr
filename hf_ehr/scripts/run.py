@@ -14,14 +14,15 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
 from transformers import  AutoTokenizer
-from hf_ehr.data.datasets import FEMRDataset, FEMRTokenizer, DescTokenizer
+from hf_ehr.data.datasets import FEMRDataset
+from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
-from hf_ehr.config import rewrite_paths_for_carina_from_config
+from hf_ehr.config import rewrite_paths_for_carina_from_config, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG
 from hf_ehr.logger.reloggers import WandbRelogger
 
 class GradNormCallback(Callback):
@@ -114,9 +115,6 @@ def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int,
 def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
     config = rewrite_paths_for_carina_from_config(config)
-    
-    if 'v9' in config.data.dataset.path_to_femr_extract:
-        config.data.tokenizer.path_to_code_2_detail = config.data.tokenizer.path_to_code_2_detail.replace("v8", "v9")
 
     # Load config
     print(config)
@@ -125,10 +123,8 @@ def main(config: DictConfig) -> None:
     is_mlflow: bool = config.logging.mlflow.is_mlflow
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
-    path_to_tokenizer_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail
-    tokenizer_is_remap_numerical_codes: bool = config.data.tokenizer.is_remap_numerical_codes
-    tokenizer_min_code_count: Optional[int] = config.data.tokenizer.min_code_count
-    tokenizer_excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    path_to_tokenizer_config: str = config.data.tokenizer.path_to_config
+    tokenizer_metadata: Dict[str, Any] = config.data.tokenizer.metadata
     seed: int = config.main.seed
     is_force_restart: bool = config.main.is_force_restart
 
@@ -261,7 +257,6 @@ def main(config: DictConfig) -> None:
         if rank_zero_only.rank == 0:
             if not is_resume_from_ckpt:
                 wandb_config = OmegaConf.to_container(config, resolve=True)
-                # wandb_config.pop('config', None)
                 run.config.update(wandb_config)
             run.define_metric('train/loss', summary='min')
             run.define_metric('val/loss', summary='min')
@@ -270,26 +265,33 @@ def main(config: DictConfig) -> None:
     logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
 
     # Tokenizer
-    if config.data.tokenizer.is_remap_codes_to_desc:
-        logger.info(f"Loading DescTokenizer: `{config.data.tokenizer.desc_emb_tokenizer}`")
-        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(config.data.tokenizer.desc_emb_tokenizer))
-    else:
-        logger.info(f"Loading FEMRTokenizer: `{path_to_tokenizer_code_2_detail}`")
-        tokenizer = FEMRTokenizer(path_to_tokenizer_code_2_detail, is_remap_numerical_codes=tokenizer_is_remap_numerical_codes, excluded_vocabs=tokenizer_excluded_vocabs, min_code_count=tokenizer_min_code_count)
+    if config.data.tokenizer.name == 'DescTokenizer':
+        # DescEmb
+        logger.info(f"Loading DescTokenizer: `{PATH_TO_TOKENIZER_DESC_v8_CONFIG}` using base tokenizer `{config.data.tokenizer.desc_emb_tokenizer}`")
+        tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=tokenizer_metadata)
+    elif config.data.tokenizer.name == 'CLMBRTokenizer':
+        # CLMBR
+        logger.info(f"Loading CLMBRTokenizer: `{PATH_TO_TOKENIZER_CLMBR_v8_CONFIG}`")
+        tokenizer = CLMBRTokenizer( PATH_TO_TOKENIZER_CLMBR_v8_CONFIG )
+    elif config.data.tokenizer.name == 'CookbookTokenizer':
+        # Custom cookbook
+        raise ValueError("CookbookTokenizer is not supported in this script. Use `create_vocab` scripts to generate a cookbook.")
+        logger.info(f"Loading CookbookTokenizer: `{path_to_tokenizer_config}`")
+        tokenizer = CookbookTokenizer( path_to_tokenizer_config, metadata=tokenizer_metadata, )
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, tokenizer)
+        model = GPTLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, tokenizer)
+        model = BERTLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, tokenizer)
+        model = HyenaLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, tokenizer)
+        model = MambaLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, tokenizer)
+        model = T5LanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
 
@@ -380,7 +382,7 @@ def main(config: DictConfig) -> None:
         callbacks += [ GradNormCallback() ]
     
     # Copy artifacts into output directory for reproducibility
-    shutil.copy(path_to_tokenizer_code_2_detail, path_to_artifacts_dir) # save tokenizer code_2_detail
+    shutil.copy(path_to_tokenizer_config, path_to_artifacts_dir) # save tokenizer code_2_detail
     with open(os.path.join(path_to_artifacts_dir, 'config.yaml'), 'w') as fd: # save config
         OmegaConf.save(config=config, f=fd)
 

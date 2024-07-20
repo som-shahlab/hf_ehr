@@ -1,6 +1,5 @@
 import torch
 import torch.distributed as dist
-
 from transformers import AutoModelForCausalLM, AutoConfig
 from typing import Dict, Any, Optional, Union
 from omegaconf import DictConfig
@@ -8,19 +7,18 @@ from typing import Dict, Any, Optional
 from jaxtyping import Float
 
 from hf_ehr.models.modules import BaseModel
-from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
 class GPTLanguageModel(BaseModel):
     """
     GPT2 with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> None:
-        super(GPTLanguageModel, self).__init__(config, tokenizer)
+    def __init__(self, config: DictConfig, tokenizer: Optional, vocab_size: Optional = None, pad_token_id: Optional = None) -> None:
+        super(GPTLanguageModel, self).__init__(config, tokenizer, vocab_size, pad_token_id)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 'gpt2')
-        model_config.vocab_size = tokenizer.vocab_size
+        model_config.vocab_size = vocab_size if vocab_size else tokenizer.vocab_size
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"

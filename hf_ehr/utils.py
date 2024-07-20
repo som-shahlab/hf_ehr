@@ -115,9 +115,9 @@ def load_config_from_ckpt(ckpt) -> Dict[str, Any]:
     recurse(config)
     return config
 
-def load_tokenizer_from_config(config):
+def load_tokenizer_old_from_config(config):
     """Load tokenizer from config."""
-    from hf_ehr.data.tokenization import FEMRTokenizer, DescTokenizer
+    from hf_ehr.data.tokenization_old import FEMRTokenizer, DescTokenizer
     from transformers import AutoTokenizer
     
     # Load config
@@ -146,6 +146,41 @@ def load_tokenizer_from_config(config):
                                     min_code_count=tokenizer__min_code_count)
     return tokenizer
 
+def load_tokenizer_from_config(config):
+    """Load tokenizer from config."""
+    from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer
+    from transformers import AutoTokenizer
+    
+    # Load config
+    name = config.data.tokenizer.name
+    path_to_config: str = config.data.tokenizer.path_to_config
+    tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
+    tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
+    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
+    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
+    tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
+
+    if name == 'CLMBRTokenizer':
+        # CLMBR
+        tokenizer = CLMBRTokenizer(path_to_config)
+    elif name == 'DescTokenizer':
+        # DescTokenizer
+        tokenizer = DescTokenizer(path_to_config, AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
+    elif name == 'CookbookTokenizer':
+        # CookbookTokenizer
+        tokenizer = CookbookTokenizer(path_to_config, 
+                                    excluded_vocabs=tokenizer__excluded_vocabs,
+                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                                    min_code_count=tokenizer__min_code_count)
+    return tokenizer
+
+def load_tokenizer_old_from_path(path_to_ckpt: str):
+    """Given a path to a model checkpoint, load the tokenizer."""
+    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    config = load_config_from_ckpt(ckpt)
+    return load_tokenizer_old_from_config(config)
+
 def load_tokenizer_from_path(path_to_ckpt: str):
     """Given a path to a model checkpoint, load the tokenizer."""
     ckpt = torch.load(path_to_ckpt, map_location='cpu')
@@ -157,6 +192,40 @@ def load_config_from_path(path_to_ckpt: str) -> Dict[str, Any]:
     ckpt = torch.load(path_to_ckpt, map_location='cpu')
     config = load_config_from_ckpt(ckpt)
     return config
+
+
+def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
+    """Given a path to a model checkpoint, load the model."""
+    from hf_ehr.models.gpt import GPTLanguageModel
+    from hf_ehr.models.bert import BERTLanguageModel
+    from hf_ehr.models.hyena import HyenaLanguageModel
+    from hf_ehr.models.mamba import MambaLanguageModel
+    from hf_ehr.models.t5 import T5LanguageModel
+
+    # Load checkpoint
+    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    config = load_config_from_ckpt(ckpt)
+    
+    # Load tokenizer
+    tokenizer = load_tokenizer_old_from_path(path_to_ckpt)
+
+    # Determine type of model based on config.model.name
+    model_map = {
+        'bert': BERTLanguageModel,
+        'gpt': GPTLanguageModel,
+        'hyena': HyenaLanguageModel,
+        'mamba': MambaLanguageModel,
+        't5': T5LanguageModel
+    }
+    model_name: str = config['model']['name']
+    model_class = next((m for k, m in model_map.items() if k in model_name), None)
+    if not model_class: raise ValueError(f"Model `{model_name}` not supported.")
+
+    # Load model
+    model = model_class(**ckpt['hyper_parameters'], tokenizer=tokenizer)
+    model.load_state_dict(ckpt['state_dict'])
+    return model
+
 
 def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     """Given a path to a model checkpoint, load the model."""

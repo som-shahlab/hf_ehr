@@ -109,13 +109,14 @@ class TokenizerConfigEntry():
     def to_token(self):
         raise NotImplementedError("Subclasses must implement this method.")
     
-    def get_stat(self, type_: str, settings: dict)-> Optional[TCEStat]:
-        """Returns stat with specified type and settings"""
-        for s in stats:
+    def get_stat(self, type_: str, settings: Optional[dict])-> Optional[TCEStat]:
+        """Returns stat with specified type (required) and settings (optional)"""
+        for s in self.stats:
             if s.type == type_:
-                for key, val in settings.items():
-                    if getattr(s, key) != val:
-                        break
+                if settings is not None:
+                    for key, val in settings.items():
+                        if getattr(s, key) != val:
+                            break
                 return s
         return None
 
@@ -158,18 +159,18 @@ def save_tokenizer_config_to_path(path_to_tokenizer_config: str, tokenizer_confi
         'tokens' : [ x.to_dict() for x in tokenizer_config ],
     }, open(path_to_tokenizer_config, 'w'), indent=2)
 
-def load_tokenizer_config_from_path(path_to_tokenizer_config: str, is_return_metadata: bool = False) -> Union[List[TokenizerConfigEntry], Tuple[Dict[str, Any], List[TokenizerConfigEntry]]]:
+def load_tokenizer_config_from_path(path_to_tokenizer_config: str, is_return_metadata: bool = False) -> Union[List[TokenizerConfigEntry], Tuple[List[TokenizerConfigEntry], Dict[str, Any]]]:
     """Given a path to a `tokenizer_config.json` file, loads the JSON config and parses into Python objects."""
     raw_data = json.load(open(path_to_tokenizer_config, 'r'))
-    raw_metadata = raw_data['metadata']
-    raw_tokens = raw_data['tokens']
+    raw_metadata: Dict[str, Any] = raw_data['metadata']
+    raw_tokens: Dict[str, Any] = raw_data['tokens']
     
     # Parse token Dict => TokenizerConfigEntry objects
     config: List[TokenizerConfigEntry] = []
     for entry in raw_tokens:
         raw_stats = entry.pop('stats')
-        stats = []
-        for stat in stats:
+        stats: List[TCEStat] = []
+        for stat in raw_stats:
             if stat['type'] == 'count_occurrences':
                 stats.append(CountOccurrencesTCEStat(**stat))
             elif stat['type'] == 'count_patients':

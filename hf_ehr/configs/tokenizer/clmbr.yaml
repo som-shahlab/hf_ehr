@@ -2,8 +2,5 @@
 
 data:
   tokenizer:
-    is_clmbr: True
-    is_remap_numerical_codes: True
-    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8_clmbr/code_2_detail.json
-    excluded_vocabs:
-      - STANFORD_OBS
+    name: CLMBRTokenizer
+    path_to_config: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/clmbr_v8/tokenizer_config.json

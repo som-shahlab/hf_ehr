@@ -23,7 +23,7 @@ from typing import List, Dict, Tuple, Optional, Any, Set, Union
 from tqdm import tqdm
 from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
-from hf_ehr.data.datasets import convert_event_to_token
+from hf_ehr.data.datasets_old import convert_event_to_token
 from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path, load_tokenizer_from_config
 
 

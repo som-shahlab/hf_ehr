@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-
 from transformers import AutoConfig, AutoModelForCausalLM
 from transformers.modeling_outputs import CausalLMOutput
 from omegaconf import DictConfig
@@ -8,7 +7,6 @@ from typing import Dict, Any, Optional, Tuple, Union
 from jaxtyping import Float
 
 from hf_ehr.models.modules import BaseModel
-from hf_ehr.data.datasets import FEMRTokenizer, DescTokenizer
 
 def hyena_forward(
     self: AutoModelForCausalLM,
@@ -75,12 +73,12 @@ class HyenaLanguageModel(BaseModel):
     Hyena with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, tokenizer: Union[FEMRTokenizer, DescTokenizer]) -> None:
-        super(HyenaLanguageModel, self).__init__(config, tokenizer)
+    def __init__(self, config: DictConfig, tokenizer: Optional, vocab_size: Optional = None, pad_token_id: Optional = None) -> None:
+        super(HyenaLanguageModel, self).__init__(config, tokenizer, vocab_size, pad_token_id)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
-        model_config.vocab_size = tokenizer.vocab_size
+        model_config.vocab_size = vocab_size if vocab_size else tokenizer.vocab_size
         #self.lm_head = nn.Linear(model_config.d_model, model_config.vocab_size, bias=False)
         model_config.n_positions = config.data.dataloader.max_length
         for key, val in config.model.config_kwargs.items():

@@ -1,43 +1,142 @@
+import datetime
+import json
 import random
 from typing import Dict, List, Optional, Set, Tuple, Union, Any, TypedDict
 import torch
-import json
 from transformers import PreTrainedTokenizer, AutoTokenizer
-from hf_ehr.config import Code2Detail
+from hf_ehr.config import Code2Detail, Event, TokenizerConfigEntry, load_tokenizer_config_from_path
+import os
+from tqdm import tqdm
 
-class FEMRTokenizer(PreTrainedTokenizer):
-    def __init__(self, 
-                 path_to_code_2_detail: str, 
-                 is_remap_numerical_codes: bool = False, # if TRUE, then remap numericals to buckets based on quantile of value
-                 excluded_vocabs: Optional[List[str]] = None,
-                 min_code_count: Optional[int] = None) -> None:
-        self.path_to_code_2_detail: str = path_to_code_2_detail
-        self.code_2_detail: Code2Detail = json.load(open(path_to_code_2_detail, 'r'))
-        self.is_remap_numerical_codes: bool = is_remap_numerical_codes
-        self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in excluded_vocabs } if excluded_vocabs else None # type: ignore
-        self.min_code_count: Optional[int] = min_code_count
+def filter_tokenizer_config(tokenizer_config: List[TokenizerConfigEntry],
+                            excluded_vocabs: Optional[Set[str]] = None,
+                            min_code_occurrence_count: Optional[int] = None,
+                            **kwargs) -> Tuple[List[TokenizerConfigEntry], List[TokenizerConfigEntry]]:
+    """
+        Given a set of filters, applies them to the `tokenizer_config`. 
+        Returns two lists -- one for valid tokens, one for invalid tokens.
+    """
+    valid_entries: List[TokenizerConfigEntry] = []
+    invalid_entries: List[TokenizerConfigEntry] = []
+    for entry in tokenizer_config:
+        # Remove tokens from excluded vocabs
+        if (
+            excluded_vocabs is not None
+            and entry.code.split("/")[0].lower() in excluded_vocabs
+        ):
+            invalid_entries.append(entry.to_token())
+            continue
+        # Remove tokens with < `min_code_occurrence_count` occurrences in our dataset
+        if (
+            min_code_occurrence_count is not None
+            and entry.get_stat('count_occurrences') < min_code_occurrence_count
+        ):
+            invalid_entries.append(entry.to_token())
+            continue
+    
+        # If we've made it here, then we want to keep this token
+        valid_entries.append(entry)
+    return valid_entries, invalid_entries
 
-        # Get vocabulary
-        codes: List[str] = []
-        if is_remap_numerical_codes:
-            # Use the lab-value quantiled version of the FEMR codes
-            for detail in self.code_2_detail.values():
-                codes += list(detail['token_2_count'].keys())
+def is_metadata_equal(metadata1: Dict, metadata2: Dict) -> bool:
+    """Return TRUE if `metadata1` EXACTLY EQUALS `metadata2`"""
+    is_match: bool = True
+    for key, val in metadata1.items():
+        if not metadata2[key] == val:
+            return False
+    for key, val in metadata2.items():
+        if not metadata1[key] == val:
+            return False
+    return is_match
+
+class BaseTokenizer(PreTrainedTokenizer):
+    path_to_tokenizer_config: str
+    
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        assert self.path_to_tokenizer_config is not None, f"ERROR - `self.path_to_tokenizer_config` must be set on `init()`"
+        assert isinstance(self.metadata, dict), f"ERROR - `self.metadata` must be a dict, but got {type(self.metadata)}"
+        self.path_to_tokenizer_version_dir: str = self.get_path_to_tokenizer_version_dir() # trigger creation of version folder if it doesn't exist
+
+    def get_path_to_tokenizer_version_dir(self) -> str:
+        """
+            Example path: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/versions/2021-08-10_15-00-00/
+
+            The tokenizer can have multiple versions depending on its `self.metadata`. 
+            This method returns the path to the folder containing the exact version that matches `self.metadata`.
+            If no folder exists for this version, then creates a new folder and return that.
+        """
+        path_to_tokenizer_dir: str = os.path.dirname(self.path_to_tokenizer_config)
+        path_to_versions_dir: str = os.path.join(path_to_tokenizer_dir, 'versions/')
+        os.makedirs(path_to_versions_dir, exist_ok=True)
+        
+        # Find folder corresponding to this version
+        for f in os.listdir(path_to_versions_dir):
+            if not os.path.isdir(os.path.join(path_to_versions_dir, f)):
+                continue
+            # Read metadata in `f``
+            f_metadata = json.load(open(os.path.join(path_to_versions_dir, f, 'metadata.json'), 'r'))
+            
+            # If `self.metadata` of this tokenizer exactly matches `metadata.json` in this folder, then return it
+            if is_metadata_equal(self.metadata, f_metadata):
+                return os.path.join(path_to_versions_dir, f)
+        
+        # No matching folders found, so create a new one for this version
+        path_to_new_folder: str = os.path.join(path_to_versions_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+        os.makedirs(path_to_new_folder, exist_ok=True)
+        json.dump(self.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'))
+        print(f"Creating new folder for this version of the tokenizer at `{path_to_new_folder}` with metadata={self.metadata}")
+        return path_to_new_folder
+    
+    def get_path_to_dataset_cache(self, dataset) -> str:
+        """
+            Example path: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/versions/2021-08-10_15-00-00/datasets/v8/
+        
+            The tokenizer can have certain dataset-specific properties. 
+            We store those in a folder within the version folder.
+        """
+        path_to_dataset_dir: str = os.path.join(self.path_to_tokenizer_version_dir, 'datasets/')
+        if 'extract_v9' in dataset.path_to_femr_extract:
+            # v9
+            return os.path.join(path_to_dataset_dir, 'v9')
+        elif 'extract_v8' in dataset.path_to_femr_extract:
+            # v8
+            return os.path.join(path_to_dataset_dir, 'v8')
         else:
-            # Just use the raw FEMR codes as is
-            codes: List[str] = sorted(list(self.code_2_detail.keys()))
+            raise ValueError(f"Couldn't determine short name for dataset with path_to_femr_extract={dataset.path_to_femr_extract}")
 
-        # Filter out excluded vocabs (if applicable)
-        if excluded_vocabs is not None:
-            codes = [ x for x in codes if x.split("/")[0].lower() not in self.excluded_vocabs ]
+    def get_seq_length_per_patient(self, dataset, is_force_refresh: bool = False) -> List[int]:
+        """Fetch the sequence length of every patient in `dataset`."""
+        
+        # Check if cache exists (otherwise takes ~10 mins to iterate over 500k patients)
+        path_to_dataset_dir: str = self.get_path_to_dataset_cache(dataset)
+        path_to_cache_file: str = os.path.join(path_to_dataset_dir, 'seq_length_per_patient.json')
 
-        # Only keep codes with >= `min_code_count` occurrences in our dataset
-        if min_code_count is not None:
-            codes = [x for x in codes if self.is_code_above_min_count(x)]
+        if not is_force_refresh:
+            # If NOT force refresh, try to load from cache
+            if os.path.exists(path_to_cache_file):
+                print(f"Loading seq_length_per_patient from `{path_to_cache_file}`")
+                data = json.load(open(path_to_cache_file, 'r'))
+                seq_lengths: List[int] = data['seq_lengths']
+                if len(seq_lengths) == len(dataset) and is_metadata_equal(self.metadata, data['metadata']):
+                    return seq_lengths
+                print(f"The # of `seq_lengths` in `{path_to_cache_file}` didn't match this dataset's length ({len(seq_lengths)} != {len(dataset)}) or the `metadata` differed ({self.metadata} != {data['metadata']}), so recreating `seq_length_per_patient.json` from scratch now...")
+            else:
+                print(f"No cache file found at `{path_to_cache_file}`. Generating `seq_length_per_patient.json` now...")
 
+        # Calculate seq lengths
+        seq_lengths: List[int] = [ 
+            len( self.tokenize( item[1] ) )
+            for item in tqdm(dataset, total=len(dataset), desc='get_seq_length_per_patient()')
+        ]
+        json.dump({ 'timestamp' : datetime.datetime.now(), 'metadata' : self.metadata, 'seq_lengths' : seq_lengths }, open(path_to_cache_file, 'w'))
+        return seq_lengths
+
+class BaseCodeTokenizer(BaseTokenizer):
+
+    def __init__(self) -> None:
         # Create vocab
         self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
-        self.non_special_tokens = codes
         self.vocab = self.special_tokens + self.non_special_tokens
 
         # Map tokens -> idxs
@@ -55,33 +154,44 @@ class FEMRTokenizer(PreTrainedTokenizer):
             mask_token='[MASK]',
         )
         self.add_tokens(self.non_special_tokens)
-        
-    def is_code_above_min_count(self, token: str) -> bool:
-        assert self.min_code_count is not None, f"Can't call is_code_above_min_count() when self.min_code_count is None."
-        if token in self.code_2_detail:
-            code: str = token
-        else:
-            code: str = token.split(" || ")[0]
-        token_2_count = self.code_2_detail[code]['token_2_count']
-        return sum(token_2_count.values()) >= self.min_code_count
+        super().__init__()
+
+    def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
+        """Provide default implementation where one Event => one token"""
+        tokens: List[str] = []
+        for e in events:
+            token: Optional[str] = self.convert_event_to_token(e, **kwargs)
+            if token is not None:
+                tokens.append(token)
+        return tokens
     
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        raise NotImplementedError("Must implement `self.convert_event_to_token()` in child class")
+
     def __call__(self, 
-                 batch: Union[List[int], List[List[int]]],
+                 batch_of_events: Union[List[Event], List[List[Event]]],
                  is_truncation_random: bool = False,
                  seed: int = 1,
                  **kwargs) -> Dict[str, torch.Tensor]:
-        '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
+        """Tokenize a batch of patient timelines, where each timeline is a list of event codes.
             We add the ability to truncate seqs at random time points.
             
-            Expects as input a list of codes in either the format of:
-                A list of codes (List[str])
-                A list of lists of codes (List[str])
-            NOTE: Must set `is_split_into_words=True` b/c we've already pre-tokenized our inputs (i.e. we're passing in a List of tokens, not a string)
-        '''
-        if isinstance(batch[0], str):
-            # List[str] => List[List[str]]
-            batch = [ batch ]
+            Expects as input a list of Events
 
+            NOTE: Must set `is_split_into_words=True` b/c we've already pre-tokenized our inputs (i.e. we're passing in a List of tokens, not a string)
+        """
+        if not isinstance(batch_of_events[0], list):
+            # List[Event] => List[List[Event]]
+            batch_of_events = [ batch_of_events ] # type: ignore
+        
+        # First, convert all Events => ProtoTokens
+        batch: List[List[str]] = [ self.convert_events_to_tokens(x) for x in batch_of_events ]
+        
+        # Second, add special tokens (if applicable)
+        if kwargs.get("add_special_tokens", False):
+            batch = [ [ self.cls_token, self.bos_token ] + x + [ self.eos_token ] for x in batch ]
+
+        # Third, tokenize the batch
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
             if not max_length:
@@ -141,42 +251,246 @@ class FEMRTokenizer(PreTrainedTokenizer):
     def _convert_id_to_token(self, index: int) -> str:
         raise self.idx_2_token[index]
 
+class CookbookTokenizer(BaseCodeTokenizer):
+    """
+        Settings:
+            is_remap_numerical_codes: bool
+                - If TRUE, then remap numericals to buckets based on quantile of value
+            excluded_vocabs: Optional[List[str]]
+                - List of vocabs to exclude from the tokenizer. Determined by the first part of the code before the '/' (e.g. "STANFORD_OBS" in "STANFORD_OBS/1234")
+            min_code_occurrence_count: Optional[int]
+                - Only keep tokens with >= `min_code_occurrence_count` total occurrences in our dataset
+    """
+    def __init__(self, 
+                 path_to_tokenizer_config: str, 
+                 metadata: Optional[Dict[str, Any]] = None) -> None:
+        self.path_to_tokenizer_config: str = path_to_tokenizer_config
+        self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
 
-class DescTokenizer(PreTrainedTokenizer):
+        # Metadata
+        metadata = {} if metadata is None else metadata
+        self.is_remap_numerical_codes: bool = metadata.get('is_remap_numerical_codes', False)
+        self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
+        self.min_code_occurrence_count: Optional[int] = metadata.get('min_code_occurrence_count', None)
+        
+        # Tokens
+        self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
+        self.non_special_tokens: List[str] = []
+        self.excluded_tokens: List[TokenizerConfigEntry] = [] # for tracking purposes
+
+        # Apply filtering
+        self.tokenizer_config, self.excluded_tokens = filter_tokenizer_config(self.tokenizer_config, 
+                                                                              self.excluded_vocabs, 
+                                                                              self.min_code_occurrence_count)
+        
+        # Preprocess tokenizer config for quick access
+        for entry in self.tokenizer_config:
+            if entry.code not in self.code_2_token: self.code_2_token[entry.code] = {}
+            if entry.type not in self.code_2_token[entry.code]: self.code_2_token[entry.code][entry.type] = []
+            self.code_2_token[entry.code][entry.type].append({
+                'tokenization': entry.tokenization,
+                'token' : entry.to_token(),
+            })
+            self.non_special_tokens.append(entry.to_token())
+
+        # Create tokenizer
+        super().__init__()
+
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        """NOTE: This is basically the same as the CLMBR tokenizer's version."""
+        # If code isn't in vocab => ignore
+        if e.code not in self.code_2_token:
+            return None
+        
+        # If numerical code...
+        if (
+            'numerical_range' in self.code_2_token[e.code] # `numerical_range` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and ( # `value` is numeric
+                isinstance(e.value, float)
+                or isinstance(e.value, int)
+            )
+        ):
+            for token_range in self.code_2_token[e.code]['numerical_range']:
+                assert 'token' in token_range, f"ERROR - Missing 'token' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                assert 'tokenization' in token_range, f"ERROR - Missing 'tokenization' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                token: str = token_range['token']
+                unit: str = token_range['tokenization']['unit']
+                range_start: float = token_range['tokenization']['range_start']
+                range_end: float = token_range['tokenization']['range_end']
+                if range_start <= e.value <= range_end and e.unit == unit:
+                    return token
+            return None
+
+        # If textual code...
+        if (
+            'categorical' in self.code_2_token[e.code] # `categorical` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and e.value != '' # `value` is not blank
+            and ( # `value` is textual
+                isinstance(e.value, str)
+            )
+        ):
+            for categorical_value in self.code_2_token[e.code]['categorical']:
+                assert 'token' in categorical_value, f"ERROR - Missing 'token' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                assert 'tokenization' in categorical_value, f"ERROR - Missing 'tokenization' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                if e.value in categorical_value['tokenization']['categories']:
+                    token: str = categorical_value['token']
+                    return token
+            return None
+
+        # If just vanilla code...
+        if (
+            'code' in self.code_2_token[e.code] # `code` is a valid type for this code
+        ):
+            token: str = self.code_2_token[e.code]['code'][0]['token']
+            return token
+
+        return None
+
+class CLMBRTokenizer(BaseCodeTokenizer):
+    def __init__(self, path_to_tokenizer_config: str) -> None:
+        self.path_to_tokenizer_config: str = path_to_tokenizer_config
+        self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+
+        # Preprocess tokenizer config for quick access
+        self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
+        self.non_special_tokens: List[str] = []
+        for entry in self.tokenizer_config:
+            if entry.code not in self.code_2_token: self.code_2_token[entry.code] = {}
+            if entry.type not in self.code_2_token[entry.code]: self.code_2_token[entry.code][entry.type] = []
+            self.code_2_token[entry.code][entry.type].append({
+                'tokenization': entry.tokenization,
+                'token' : entry.to_token(),
+            })
+            self.non_special_tokens.append(entry.to_token())
+
+        assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
+
+        # Create tokenizer
+        super().__init__()
+
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        # If code isn't in CLMBR vocab => ignore
+        if e.code not in self.code_2_token:
+            return None
+        
+        # If numerical code...
+        if (
+            'numerical_range' in self.code_2_token[e.code] # `numerical_range` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and ( # `value` is numeric
+                isinstance(e.value, float)
+                or isinstance(e.value, int)
+            )
+        ):
+            # NOTE: CLMBR ignores units
+            for token_range in self.code_2_token[e.code]['numerical_range']:
+                assert 'token' in token_range, f"ERROR - Missing 'token' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                assert 'tokenization' in token_range, f"ERROR - Missing 'tokenization' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                token: str = token_range['token']
+                range_start: float = token_range['tokenization']['range_start']
+                range_end: float = token_range['tokenization']['range_end']
+                if range_start <= e.value <= range_end:
+                    return token
+            return None
+
+        # If textual code...
+        if (
+            'categorical' in self.code_2_token[e.code] # `categorical` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and e.value != '' # `value` is not blank
+            and ( # `value` is textual
+                isinstance(e.value, str)
+            )
+        ):
+            for categorical_value in self.code_2_token[e.code]['categorical']:
+                assert 'token' in categorical_value, f"ERROR - Missing 'token' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                assert 'tokenization' in categorical_value, f"ERROR - Missing 'tokenization' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                if e.value in categorical_value['tokenization']['categories']:
+                    token: str = categorical_value['token']
+                    return token
+            return None
+
+        # If just vanilla code...
+        if (
+            'code' in self.code_2_token[e.code] # `code` is a valid type for this code
+        ):
+            token: str = self.code_2_token[e.code]['code'][0]['token']
+            return token
+
+        return None
+
+class DescTokenizer(BaseTokenizer):
     """Converts codes => textual descriptions, then tokenizes
     """
-    def __init__(self, tokenizer: AutoTokenizer) -> None:
-        self.tokenizer = tokenizer
-        self.code_separator: str = ' ' # separate descriptions with a space by default
+    def __init__(self, 
+                 path_to_tokenizer_config: str, 
+                 metadata: Optional[Dict[str, Any]] = None) -> None:
+        assert 'desc_emb_tokenizer' in metadata, f"ERROR - `metadata` must contain a 'desc_emb_tokenizer' key, but got {metadata}"
+        self.path_to_tokenizer_config: str = path_to_tokenizer_config
+        self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
         
+        # Load underlying textual tokenizer
+        self.desc_emb_tokenizer: str = metadata['desc_emb_tokenizer']
+        self.tokenizer = AutoTokenizer.from_pretrained(desc_emb_tokenizer)
+        self.event_separator: str = ' ' # character that gets inserted between Events when transformed into their textual descriptions
+        
+        # Metadata
+        metadata = {} if metadata is None else metadata
+        self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
+        self.min_code_occurrence_count: Optional[int] = metadata.get('min_code_occurrence_count', None)
+        
+        # Apply filtering
+        self.tokenizer_config, self.excluded_tokens = filter_tokenizer_config(self.tokenizer_config, 
+                                                                              self.excluded_vocabs, 
+                                                                              self.min_code_occurrence_count)
+        
+        # Preprocess tokenizer config for quick access
+        self.code_2_desc: Dict[str, str] = {}
+        for entry in self.tokenizer_config:
+            if entry.description is not None:
+                self.code_2_desc[entry.code] = entry.description
+
         super().__init__(
             bos_token=tokenizer.bos_token,
             eos_token=tokenizer.eos_token,
             unk_token=tokenizer.unk_token,
-            sep_token=self.code_separator,
+            sep_token=tokenizer.sep_token,
             pad_token=tokenizer.pad_token,
             cls_token=tokenizer.cls_token
         )
+    
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        if e.code not in self.code_2_desc:
+            return None
+        return self.code_2_desc[e.code]
 
     def __call__(self, 
-                 batch: Union[List[str], List[List[str]]],
+                 batch_of_events: Union[List[Event], List[List[Event]]],
                  is_truncation_random: bool = False,
                  seed: int = 1,
                  **kwargs) -> Dict[str, torch.Tensor]:
-        '''Tokenize a batch of patient timelines, where each timeline is a list of event codes.
+        """
+            Tokenize a batch of patient timelines, where each timeline is a list of event codes.
             We add the ability to truncate seqs at random time points.
             
-            Expects as input a list of text-fied code descriptions in either the format of:
-                A list of codes (List[str])
-                A list of lists of codes (List[str])
-        '''
-        if isinstance(batch[0], str):
-            # List[str] => List[List[str]]
-            batch = [ batch ]
+            Expects as input a list of Events
+        """
+        if not isinstance(batch_of_events[0], list):
+            # List[Event] => List[List[Event]]
+            batch_of_events = [ batch_of_events ] # type: ignore
+        
+        # First, convert all Events => ProtoTokens
+        batch: List[List[str]] = [ self.convert_events_to_tokens(x) for x in batch_of_events ] 
+        
+        # Second, add special tokens (if applicable)
+        if kwargs.get("add_special_tokens", False):
+            batch = [ [ self.cls_token, self.bos_token ] + x + [ self.eos_token ] for x in batch ]
 
         # Concatenate all strings together for tokenization by traditional HF tokenizer
-        # List[List[str]] => List[str]git 
-        batch = [ self.code_separator.join(x) for x in batch ]
+        # List[List[str]] => List[str]
+        batch = [ self.event_separator.join(x) for x in batch ] # type: ignore
 
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
@@ -234,18 +548,91 @@ class DescTokenizer(PreTrainedTokenizer):
     def _convert_id_to_token(self, index: int) -> str:
         return self.tokenizer._convert_id_to_token(index)
 
+def torch_mask_tokens(tokenizer: BaseTokenizer, 
+                      inputs: Any, 
+                      mlm_prob: float, 
+                      special_tokens_mask: Optional[Any] = None) -> Tuple[Any, Any]:
+    """
+        Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original.
+        
+        Taken from: https://github.com/huggingface/transformers/blob/09f9f566de83eef1f13ee83b5a1bbeebde5c80c1/src/transformers/data/data_collator.py#L782
+    """
+    labels = inputs.clone()
+    # We sample a few tokens in each sequence for MLM training (with probability `mlm_prob`)
+    probability_matrix = torch.full(labels.shape, mlm_prob)
+    if special_tokens_mask is None:
+        special_tokens_mask = [
+            tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()
+        ]
+        special_tokens_mask = torch.tensor(special_tokens_mask, dtype=torch.bool)
+    else:
+        special_tokens_mask = special_tokens_mask.bool()
+
+    probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
+    masked_indices = torch.bernoulli(probability_matrix).bool()
+    labels[~masked_indices] = -100  # We only compute loss on masked tokens
+
+    # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
+    indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
+    inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+
+    # 10% of the time, we replace masked input tokens with random word
+    indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+    random_words = torch.randint(len(tokenizer), labels.shape, dtype=torch.long)
+    inputs[indices_random] = random_words[indices_random]
+
+    # The rest of the time (10% of the time) we keep the masked input tokens unchanged
+    return inputs, labels
+
+def collate_femr_timelines(batch: List[Tuple[int, List[Event]]], 
+                             tokenizer: BaseTokenizer, 
+                             max_length: int,
+                             is_truncation_random: bool = False,
+                             is_mlm: bool = False,
+                             mlm_prob: float = 0.15,
+                             seed: int = 1) -> Dict[str, Any]:
+    """
+        Collate function for FEMR timelines
+        Truncate or pad to max length in batch.
+    """
+
+    # Otherwise, truncate on right hand side of sequence
+    tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
+                                                                        truncation=True, 
+                                                                        padding=True, 
+                                                                        max_length=max_length,
+                                                                        is_truncation_random=is_truncation_random,
+                                                                        seed=seed, 
+                                                                        add_special_tokens=True,
+                                                                        return_tensors='pt')
+    
+    # Set labels
+    if is_mlm:
+        # Masked LM
+        tokens["input_ids"], tokens["labels"] = torch_mask_tokens(tokenizer, tokens["input_ids"], mlm_prob)
+    else:
+        # Causal LM
+        tokens['labels'] = tokens['input_ids']
+
+    return {
+        'patient_ids' : [ x[0] for x in batch ],
+        'tokens' : tokens,
+    }
+
 if __name__ == '__main__':
-    from hf_ehr.data.datasets import FEMRDataset
+    from hf_ehr.hf_ehr.data.datasets import FEMRDataset
+    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG
     
-    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'
-    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
+    # Load v8 dataset
+    print("Loading v8 dataset...")
+    path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8
+    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=True)
     
-    # FEMR Tokenizer
+    # Cookbook Tokenizer
     if False:
-        print("Loading dataset...")
-        dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False, excluded_vocabs=['STANFORD_OBS'])
-        print("Loading tokenizers...")
-        tokenizer = FEMRTokenizer(path_to_code_2_detail, excluded_vocabs=['STANFORD_OBS'])
+        path_to_tokenizer_config: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/tokenizer_config.json'
+        print("Loading tokenizer...")
+        tokenizer = FEMRTokenizer(path_to_tokenizer_config, excluded_vocabs=['STANFORD_OBS'])
         
         tokens = tokenizer([ dataset[288000][1], dataset[288001][1], dataset[288002][1], dataset[288003][1] ], 
                         truncation=True,
@@ -258,25 +645,20 @@ if __name__ == '__main__':
         print(tokens)
         
     # Desc Tokenizer
-    if False:
-        desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
+    if True:
+        print("Loading tokenizer...")
+        desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, AutoTokenizer.from_pretrained("bert-base-uncased"))
     
     # CLMBR Tokenizer
-    if True:
-        path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8_clmbr/code_2_detail.json'
-        print("Loading dataset...")
-        dataset = FEMRDataset(path_to_femr_extract, 
-                            path_to_code_2_detail, 
-                            split='train', 
-                            is_remap_numerical_codes=True, 
-                            is_clmbr=True,
-                            excluded_vocabs=['STANFORD_OBS'])
-        print("Loading tokenizers...")
-        tokenizer = FEMRTokenizer(path_to_code_2_detail, 
-                                  is_remap_numerical_codes=True,
-                                  excluded_vocabs=['STANFORD_OBS'])
-        
-        tokens = tokenizer([ [ 'LOINC/34441-6 || None || R0', ]], 
+    if False:
+        print("Loading tokenizer...")
+        tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
+
+        # Check that initial Event => Token transformation is correct
+        transformed_events = tokenizer.convert_events_to_tokens(dataset[0][1])
+        assert transformed_events == ['SNOMED/3950001', 'Gender/F', 'Ethnicity/Hispanic', 'LOINC/10525-4', 'SNOMED/609040007', 'CPT4/82306', 'LOINC/2236-8', 'SNOMED/12199005', 'LOINC/24348-5', 'SNOMED/5113004', 'CPT4/80053', 'CPT4/84075', 'LOINC/25302-1', 'LOINC/1919-0', 'SNOMED/24509005', 'SNOMED/25197003', 'SNOMED/26758005', 'SNOMED/250564007', 'SNOMED/18207002', 'SNOMED/304383000', 'SNOMED/36048009', 'SNOMED/52302001', 'SNOMED/46511006', 'SNOMED/39748002', 'SNOMED/71878006', 'SNOMED/359986008', 'SNOMED/59573005', 'SNOMED/687005', 'SNOMED/70901006', 'SNOMED/250707004', 'LOINC/2236-8 || None || -1.7976931348623157e+308 - 4.0', 'SNOMED/12199005 || None || 26.0 - 28.899999618530273', 'CPT4/84075 || None || -1.7976931348623157e+308 - 77.0', 'LOINC/25302-1 || None || 13.0 - 17.0', 'LOINC/1919-0 || None || 17.0 - 20.0', 'SNOMED/24509005 || None || 11.0 - 13.0', 'SNOMED/25197003 || None || 136.0 - 137.0', 'SNOMED/26758005 || None || 3.799999952316284 - 4.0', 'SNOMED/250564007 || None || 22.700000762939453 - 23.799999237060547', 'SNOMED/304383000 || None || 7.0 - 7.199999809265137', 'SNOMED/52302001 || None || 84.0 - 87.0', 'SNOMED/46511006 || None || 103.0 - 104.0', 'SNOMED/71878006 || None || 9.100000381469727 - 9.300000190734863', 'SNOMED/359986008 || None || 0.5 - 0.6000000238418579', 'SNOMED/59573005 || None || 4.329999923706055 - 4.5', 'SNOMED/687005 || None || 1.2000000476837158 - 1.2999999523162842', 'SNOMED/70901006 || None || 0.800000011920929 - 0.8999999761581421', 'SNOMED/250707004 || None || 3.0 - 3.200000047683716', 'LOINC/8480-6 || None || 129.0 - 1.7976931348623157e+308', 'LOINC/8462-4 || None || 74.0 - 80.0', 'LOINC/8302-2 || None || 59.0 - 61.41699981689453', 'Domain/OMOP generated', 'LOINC/8302-2 || None || 59.0 - 61.41699981689453', 'SNOMED/110483000', 'SNOMED/228490006 || N', 'SNOMED/228510007 || N', 'SNOMED/230056004 || N', 'SNOMED/230058003 || N', 'SNOMED/230057008 || N', 'SNOMED/271649006 || None || 126.0 - 1.7976931348623157e+308', 'SNOMED/271650006 || None || 75.0 - 80.0', 'SNOMED/417662000', 'Medicare Specialty/A0', 'LOINC/11506-3', 'SNOMED/110483000', 'SNOMED/228490006 || N', 'SNOMED/228510007 || N', 'SNOMED/230056004 || N', 'SNOMED/230058003 || N', 'SNOMED/230057008 || N', 'SNOMED/417662000', 'Medicare Specialty/A0', 'LOINC/11506-3', 'Visit/OP', 'SNOMED/110483000', 'SNOMED/228490006 || N', 'SNOMED/228510007 || N', 'SNOMED/230056004 || N', 'SNOMED/230058003 || N', 'SNOMED/230057008 || N', 'SNOMED/39104002', 'SNOMED/417662000', 'Medicare Specialty/A0', 'Medicare Specialty/A0']
+
+        tokens = tokenizer([ dataset[0][1] ], 
                         truncation=True,
                         padding=True,
                         is_truncation_random=True, 
@@ -284,4 +666,12 @@ if __name__ == '__main__':
                         seed=0, 
                         add_special_tokens=True,
                         return_tensors='pt')
+
+        # Check that main Event => Token transformation is correct
+        for idx, x in enumerate(tokens['input_ids'][0][2:-1]):
+            assert tokenizer.idx_2_token[x.item()] == transformed_events[idx], f"ERROR - Mis-match between transformed_events and tokens: {tokenizer.idx_2_token[x.item()]} != {transformed_events[idx]} @ idx={idx}"
+        # Check that added special tokens are correct
+        assert tokenizer.idx_2_token[tokens['input_ids'][0][0].item()] == '[CLS]', f"ERROR - Tokenizer [CLS] mismatch"
+        assert tokenizer.idx_2_token[tokens['input_ids'][0][1].item()] == '[BOS]', f"ERROR - Tokenizer [BOS] mismatch"
+        assert tokenizer.idx_2_token[tokens['input_ids'][0][-1].item()] == '[EOS]', f"ERROR - Tokenizer [EOS] mismatch"
         print(tokens)

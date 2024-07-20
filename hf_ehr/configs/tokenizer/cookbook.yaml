@@ -1,0 +1,10 @@
+# @package _global_
+
+data:
+  tokenizer:
+    name: CookbookTokenizer
+    path_to_config: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/cookbook_v8/tokenizer_config.json
+    metadata:
+      is_remap_numerical_codes: False
+      excluded_vocabs:
+        - STANFORD_OBS
