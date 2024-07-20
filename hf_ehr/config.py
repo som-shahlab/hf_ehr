@@ -70,7 +70,7 @@ class CountOccurrencesTCEStat(TCEStat):
     # Counts total # of occurrences of token in dataset split
     split: Optional[str] = None
     dataset: Optional[str] = None
-    count: int = 0
+    count: Optional[str] = None
     type: str = 'count_occurrences'
 
 @dataclass()

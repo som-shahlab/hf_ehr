@@ -17,6 +17,7 @@ import pickle
 import numpy as np
 import torch
 import femr.datasets
+from jaxtyping import Float
 import shutil
 from typing import List, Dict, Tuple, Optional, Any, Set, Union
 from tqdm import tqdm
@@ -24,6 +25,64 @@ from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
 from hf_ehr.data.datasets import convert_event_to_token
 from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path, load_tokenizer_from_config
+
+
+class CookbookModelWithClassificationHead(torch.nn.Module):
+    def __init__(self, model: torch.nn.Module, aggregation_strat: str, n_classes: int):
+        super().__init__()
+        self.n_classes: int = n_classes
+        self.hidden_dim: int = model.model.lm_head.in_features
+
+        # Base model
+        if model.model.__class__.__name__ == 'MambaForCausalLM':
+            self.base_model = model.model.backbone
+            self.base_model_name = 'mamba'
+        elif model.model.__class__.__name__ == 'GPT2LMHeadModel':
+            self.base_model = model.model.transformer
+            self.base_model_name = 'gpt2'
+        elif model.model.__class__.__name__ == 'HyenaForCausalLM':
+            self.base_model = model.model.hyena.backbone
+            self.base_model_name = 'hyena'
+        elif model.model.__class__.__name__ == 'BertForMaskedLM':
+            self.base_model = model.model.bert.encoder
+            self.base_model_name = 'bert'
+        else:
+            raise ValueError("Model must be a MambaForCausalLM")
+
+        # Aggregation of base model reprs for classification
+        self.aggregation_strat = aggregation_strat
+
+        # Linear head
+        self.classifier = torch.nn.Linear(self.hidden_dim, n_classes)
+
+    def aggregate(self, x: Float[torch.Tensor, 'B L H']) -> Float[torch.Tensor, 'B H']:
+        if self.aggregation_strat == 'mean':
+            return torch.mean(x, dim=1)
+        elif self.aggregation_strat == 'max':
+            return torch.max(x, dim=1)
+        elif self.aggregation_strat == 'last':
+            return x[:, -1, :]
+        elif self.aggregation_strat == 'first':
+            return x[:, 0, :]
+        else:
+           raise ValueError(f"Aggregation strategy `{self.aggregation_strat}` not supported.") 
+
+    def forward(self, input_ids: Float[torch.Tensor, 'B L'] = None, attention_mask: Float[torch.Tensor, 'B L'] = None, **kwargs) -> Float[torch.Tensor, 'B C']:
+        """Return logits for classification task"""
+        reprs: Float[torch.Tensor, 'B L H'] = self.base_model(input_ids=input_ids, attention_mask=attention_mask, **kwargs).last_hidden_state
+        agg: Float[torch.Tensor, 'B H'] = self.aggregate(reprs)
+        logits: Float[torch.Tensor, 'B C'] = self.classifier(agg)
+        return logits
+    
+    def predict_proba(self, input_ids: Float[torch.Tensor, 'B L'] = None, attention_mask: Float[torch.Tensor, 'B L'] = None, **kwargs) -> Float[torch.Tensor, 'B C']:
+        """Return a probability distribution over classes."""
+        logits: Float[torch.Tensor, 'B C'] = self.forward(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+        return torch.softmax(logits, dim=-1)
+
+    def predict(self, input_ids: Float[torch.Tensor, 'B L'] = None, attention_mask: Float[torch.Tensor, 'B L'] = None, **kwargs) -> Float[torch.Tensor, 'B']:
+        """Return index of predicted class."""
+        logits: Float[torch.Tensor, 'B C'] = self.forward(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+        return torch.argmax(logits, dim=-1)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate patient representations (for all tasks at once)")
