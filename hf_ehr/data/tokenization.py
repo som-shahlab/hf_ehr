@@ -6,7 +6,7 @@ import random
 from typing import Dict, List, Optional, Set, Tuple, Union, Any, TypedDict
 import torch
 from transformers import PreTrainedTokenizer, AutoTokenizer
-from hf_ehr.config import Event, TokenizerConfigEntry, load_tokenizer_config_from_path
+from hf_ehr.config import Event, TokenizerConfigEntry, load_tokenizer_config_from_path, save_tokenizer_config_to_path
 import os
 from tqdm import tqdm
 
@@ -79,6 +79,14 @@ class BaseTokenizer(PreTrainedTokenizer):
         assert hasattr(self, 'metadata'), f"ERROR - `self.metadata` must be set on `init()`"
         assert isinstance(self.metadata, dict), f"ERROR - `self.metadata` must be a dict, but got {type(self.metadata)}"
         self.path_to_tokenizer_version_dir: str = self.get_path_to_tokenizer_version_dir() # trigger creation of version folder if it doesn't exist
+        
+        # Dump vocab for this tokenizer version
+        json.dump({
+            'timestamp' : datetime.datetime.now().isoformat(),
+            'metadata' : self.metadata,
+            'vocab' : self.get_vocab(),
+        }, open(os.path.join(self.path_to_tokenizer_version_dir, 'vocab.json'), 'w'), indent=2)
+        save_tokenizer_config_to_path(os.path.join(self.path_to_tokenizer_version_dir, 'tokenizer_config_filtered.json'), self.tokenizer_config)
 
     def get_path_to_tokenizer_version_dir(self) -> str:
         """
@@ -188,9 +196,8 @@ class BaseTokenizer(PreTrainedTokenizer):
                 results: List[List[Tuple[int,int]]] = list(tqdm(pool.imap_unordered(self.get_seq_length, tasks), total=len(tasks), desc=f"tokenizer.get_seq_length_per_patient() | n_procs={n_procs}"))
         flattened_results: List[Tuple[int, int]] = [ x for sublist in results for x in sublist ] # type: ignore
         seq_lengths: List[int] = [ x[1] for x in sorted(flattened_results, key=lambda x: x[0]) ]
-
         json.dump({ 
-            'timestamp' : str(datetime.datetime.now()), 
+            'timestamp' : datetime.datetime.now().isoformat(), 
             'tokenizer_metadata' : self.metadata, 
             'dataset_metadata' : dataset.metadata, 
             'seq_lengths' : seq_lengths 
@@ -693,10 +700,10 @@ if __name__ == '__main__':
     # Load v8 dataset
     print("Loading v8 dataset...")
     path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8
-    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=True)
+    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     
     # Cookbook Tokenizer
-    if True:
+    if False:
         print("Loading tokenizer...")
         tokenizer = CookbookTokenizer(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, metadata={
             'is_remap_numerical_codes_to_quantiles': False, # If True, remap numerical codes to a bucketed range
@@ -722,12 +729,11 @@ if __name__ == '__main__':
         desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased' })
     
     # CLMBR Tokenizer
-    if False:
+    if True:
         print("Loading tokenizer...")
         tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
         
-        tokenizer.get_seq_length_per_patient(dataset, n_procs=5, is_force_refresh=True)
-        exit()
+        tokenizer.get_seq_length_per_patient(dataset, n_procs=5)
 
         # Check that initial Event => Token transformation is correct
         transformed_events = tokenizer.convert_events_to_tokens(dataset[0][1])
@@ -750,3 +756,5 @@ if __name__ == '__main__':
         assert tokenizer.idx_2_token[tokens['input_ids'][0][1].item()] == '[BOS]', f"ERROR - Tokenizer [BOS] mismatch"
         assert tokenizer.idx_2_token[tokens['input_ids'][0][-1].item()] == '[EOS]', f"ERROR - Tokenizer [EOS] mismatch"
         print(tokens)
+
+        exit()

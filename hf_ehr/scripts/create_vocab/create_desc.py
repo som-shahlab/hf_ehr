@@ -8,7 +8,6 @@ from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Generate statistics about dataset')
-    parser.add_argument('--dataset', choices=['v8', 'v9'], default='v8', help='FEMR dataset version to use: v8 or v9')
     parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
     parser.add_argument('--is_force_refresh', action='store_true', default=False, help='If specified, will force refresh the tokenizer config')
     return parser.parse_args()
@@ -30,12 +29,7 @@ def main():
 
     # Load datasets
     start = time.time()
-    if args.dataset == 'v8':
-        path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v8
-    elif args.dataset == 'v9':
-        path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
-    else:
-        raise ValueError(f'Invalid FEMR dataset: {args.dataset}')
+    path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v8
     dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()

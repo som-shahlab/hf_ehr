@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 from typing import TypedDict, Dict, Optional, List, Any, Literal, Union, Tuple
@@ -160,6 +161,7 @@ class CategoricalTCE(TokenizerConfigEntry):
 def save_tokenizer_config_to_path(path_to_tokenizer_config: str, tokenizer_config: List[TokenizerConfigEntry], metadata: Optional[Dict] = None) -> None:
     """Given a path to a `tokenizer_config.json` file, saves the JSON config to disk."""
     json.dump({
+        'timestamp' : str(datetime.datetime.now().isoformat()),
         'metadata' : metadata if metadata else {},
         'tokens' : [ x.to_dict() for x in tokenizer_config ],
     }, open(path_to_tokenizer_config, 'w'), indent=2)
