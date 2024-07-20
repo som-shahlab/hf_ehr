@@ -11,9 +11,12 @@ class SortishSampler(Sampler):
     Set bucket_size = 1 to do perfect sampling
     """
 
-    def __init__(self, sequence_lengths: List[int], bucket_size: int, 
-                    is_random_shuffle_across_buckets: bool = False, is_random_shuffle_within_buckets: bool = False,
-                    num_replicas: int = 1):
+    def __init__(self, 
+                 sequence_lengths: List[int], 
+                 bucket_size: int, 
+                 is_random_shuffle_across_buckets: bool = False, 
+                 is_random_shuffle_within_buckets: bool = False,
+                 num_replicas: int = 1):
         self.data: np.ndarray = np.argsort(-1 * np.array(sequence_lengths)) # sort longest -> shortest; NOTE: keep so that if we blow out memory, we do so earlier rather than later
         self.num_replicas: int = num_replicas
         self.num_samples: int = int(math.ceil(len(self.data) * 1.0 / self.num_replicas))
@@ -72,8 +75,14 @@ class ApproxBatchSampler(BatchSampler):
 		List of lengths of sequences in the order of the dataset
 	"""
 
-    def __init__(self, sample_lengths: List[int], sampler, model_context_window: int, max_tokens: int = 99999999, max_examples: int = 99999999, 
-                 batch_mult: int = 1, drop_last: bool = True):
+    def __init__(self, 
+                sample_lengths: List[int], 
+                sampler, 
+                model_context_window: int, 
+                max_tokens: int = 99999999, 
+                max_examples: int = 99999999, 
+                batch_mult: int = 1, 
+                drop_last: bool = True):
         self.sample_lengths: List[int] = sample_lengths
         self.sampler = sampler
         self.model_context_window: int = model_context_window # max size of seq that model can handle, so any seq great than this will get truncated anyway

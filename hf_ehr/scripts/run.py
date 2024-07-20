@@ -267,6 +267,7 @@ def main(config: DictConfig) -> None:
     # Tokenizer
     if config.data.tokenizer.name == 'DescTokenizer':
         # DescEmb
+        raise ValueError("DescTokenizer is not supported in this script yet.")
         logger.info(f"Loading DescTokenizer: `{PATH_TO_TOKENIZER_DESC_v8_CONFIG}` using base tokenizer `{config.data.tokenizer.desc_emb_tokenizer}`")
         tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=tokenizer_metadata)
     elif config.data.tokenizer.name == 'CLMBRTokenizer':
@@ -275,7 +276,7 @@ def main(config: DictConfig) -> None:
         tokenizer = CLMBRTokenizer( PATH_TO_TOKENIZER_CLMBR_v8_CONFIG )
     elif config.data.tokenizer.name == 'CookbookTokenizer':
         # Custom cookbook
-        raise ValueError("CookbookTokenizer is not supported in this script. Use `create_vocab` scripts to generate a cookbook.")
+        raise ValueError("CookbookTokenizer is not supported in this script yet.")
         logger.info(f"Loading CookbookTokenizer: `{path_to_tokenizer_config}`")
         tokenizer = CookbookTokenizer( path_to_tokenizer_config, metadata=tokenizer_metadata, )
     logger.info(f"Vocab size: `{tokenizer.vocab_size}`")

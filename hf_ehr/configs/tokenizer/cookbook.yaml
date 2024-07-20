@@ -5,6 +5,8 @@ data:
     name: CookbookTokenizer
     path_to_config: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/cookbook_v8/tokenizer_config.json
     metadata:
-      is_remap_numerical_codes: False
-      excluded_vocabs:
+      is_remap_numerical_codes_to_quantiles: False # If True, remap numerical codes to a bucketed range
+      min_code_occurrence_count: 0 # Any code that occurs < `min_code_occurrence_count` times in the train dataset will be excluded
+      keep_n_max_occurrence_codes: None # Keep only the top `keep_n_max_occurrence_codes` codes, sorted by occurrence count in train dataset
+      excluded_vocabs: # Exclude all codes that are in these vocabularies
         - STANFORD_OBS

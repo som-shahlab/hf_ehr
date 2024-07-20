@@ -28,6 +28,7 @@ class FEMRDataset(Dataset):
         self.seed: int = seed
         
         # Set metadata -- used for tokenizer versioning later
+        # ! CAUTION: Essential that this contains all args/kwargs; otherwise get_seq_length_per_patient() in tokenizer breaks!
         self.metadata = {
             'path_to_femr_extract': path_to_femr_extract,
             'split' : split,

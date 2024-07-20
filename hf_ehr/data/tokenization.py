@@ -1,16 +1,26 @@
+import multiprocessing
 import datetime
 import json
+import multiprocessing.managers
 import random
 from typing import Dict, List, Optional, Set, Tuple, Union, Any, TypedDict
 import torch
 from transformers import PreTrainedTokenizer, AutoTokenizer
-from hf_ehr.config import Code2Detail, Event, TokenizerConfigEntry, load_tokenizer_config_from_path
+from hf_ehr.config import Event, TokenizerConfigEntry, load_tokenizer_config_from_path
 import os
 from tqdm import tqdm
+
+class TokenizerSeqLengthPerPatientCache(TypedDict):
+    """Typing for `seq_length_per_patient.json` cache file"""
+    timestamp: str
+    tokenizer_metadata: Dict[str, Any]
+    dataset_metadata: Dict[str, Any]
+    seq_lengths: List[int]
 
 def filter_tokenizer_config(tokenizer_config: List[TokenizerConfigEntry],
                             excluded_vocabs: Optional[Set[str]] = None,
                             min_code_occurrence_count: Optional[int] = None,
+                            keep_n_max_occurrence_codes: Optional[int] = None,
                             **kwargs) -> Tuple[List[TokenizerConfigEntry], List[TokenizerConfigEntry]]:
     """
         Given a set of filters, applies them to the `tokenizer_config`. 
@@ -36,16 +46,27 @@ def filter_tokenizer_config(tokenizer_config: List[TokenizerConfigEntry],
     
         # If we've made it here, then we want to keep this token
         valid_entries.append(entry)
+    
+    # Keep only the top `keep_n_max_occurrence_codes` tokens, sorted by occurrence count (if specified)
+    if keep_n_max_occurrence_codes is not None:
+        sorted_entries: List[TokenizerConfigEntry] = sorted(valid_entries, key=lambda x: x.get_stat('count_occurrences'), reverse=True)
+        valid_entries = sorted_entries[:keep_n_max_occurrence_codes]
+        invalid_entries = sorted_entries[keep_n_max_occurrence_codes:]
+
     return valid_entries, invalid_entries
 
 def is_metadata_equal(metadata1: Dict, metadata2: Dict) -> bool:
     """Return TRUE if `metadata1` EXACTLY EQUALS `metadata2`"""
     is_match: bool = True
     for key, val in metadata1.items():
-        if not metadata2[key] == val:
+        if key not in metadata2:
+            return False
+        if metadata2[key] != val:
             return False
     for key, val in metadata2.items():
-        if not metadata1[key] == val:
+        if key not in metadata1:
+            return False
+        if metadata1[key] != val:
             return False
     return is_match
 
@@ -55,6 +76,7 @@ class BaseTokenizer(PreTrainedTokenizer):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         assert self.path_to_tokenizer_config is not None, f"ERROR - `self.path_to_tokenizer_config` must be set on `init()`"
+        assert hasattr(self, 'metadata'), f"ERROR - `self.metadata` must be set on `init()`"
         assert isinstance(self.metadata, dict), f"ERROR - `self.metadata` must be a dict, but got {type(self.metadata)}"
         self.path_to_tokenizer_version_dir: str = self.get_path_to_tokenizer_version_dir() # trigger creation of version folder if it doesn't exist
 
@@ -84,7 +106,7 @@ class BaseTokenizer(PreTrainedTokenizer):
         # No matching folders found, so create a new one for this version
         path_to_new_folder: str = os.path.join(path_to_versions_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
         os.makedirs(path_to_new_folder, exist_ok=True)
-        json.dump(self.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'))
+        json.dump(self.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'), indent=2)
         print(f"Creating new folder for this version of the tokenizer at `{path_to_new_folder}` with metadata={self.metadata}")
         return path_to_new_folder
     
@@ -113,13 +135,28 @@ class BaseTokenizer(PreTrainedTokenizer):
         # No matching folders found, so create a new one for this version's dataset
         path_to_new_folder: str = os.path.join(path_to_datasets_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
         os.makedirs(path_to_new_folder, exist_ok=True)
-        json.dump(self.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'))
+        json.dump(dataset.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'), indent=2)
         print(f"Creating new folder for this dataset of this version of the tokenizer at `{path_to_new_folder}` with metadata={dataset.metadata}")
         return path_to_new_folder
             
-    def get_seq_length_per_patient(self, dataset, is_force_refresh: bool = False) -> List[int]:
-        """Fetch the sequence length of every patient in `dataset`."""
+    def get_seq_length(self, args: Tuple['FEMRDataset', int, int]) -> List[Tuple[int, int]]:
+        """Given a dataset and a range of indices, return the sequence length of each patient in that range"""
+        dataset_metadata, start_idx, end_idx = args # type is: FEMRDataset, int, int
+        dataset = FEMRDataset(**dataset_metadata)
+        results: List[Tuple[int, int]] = []
+        for idx in range(start_idx, end_idx):
+            events: List[Event] = dataset.__getitem__(idx)[1]
+            results.append((idx, len(self.__call__(events)['input_ids'][0])))
+        return results
+
+    def get_seq_length_per_patient(self, dataset, n_procs: int = 5, is_force_refresh: bool = False) -> List[int]:
+        """
+            Fetch the sequence length of every patient in `dataset`, save to cache, and return the list of lengths.
+            If cache exists, then load from cache (unless `is_force_refresh` is set to TRUE).
+            If cache doesn't exist or `is_force_refresh` is TRUE, then calculate the lengths in parallel. 
+                For `n_procs=5`, this takes ~5 hrs for 2.5M patients.
         
+        """
         # Check if cache exists (otherwise takes ~10 mins to iterate over 500k patients)
         path_to_dataset_dir: str = self.get_path_to_dataset_dir(dataset)
         path_to_cache_file: str = os.path.join(path_to_dataset_dir, 'seq_length_per_patient.json')
@@ -128,20 +165,36 @@ class BaseTokenizer(PreTrainedTokenizer):
             # If NOT force refresh, try to load from cache
             if os.path.exists(path_to_cache_file):
                 print(f"Loading seq_length_per_patient from `{path_to_cache_file}`")
-                data = json.load(open(path_to_cache_file, 'r'))
+                data: TokenizerSeqLengthPerPatientCache = json.load(open(path_to_cache_file, 'r'))
                 seq_lengths: List[int] = data['seq_lengths']
-                if len(seq_lengths) == len(dataset) and is_metadata_equal(self.metadata, data['metadata']):
+                if (
+                    len(seq_lengths) == len(dataset) 
+                    and is_metadata_equal(self.metadata, data.get('tokenizer_metadata'))
+                    and is_metadata_equal(dataset.metadata, data.get('dataset_metadata'))
+                ):
                     return seq_lengths
-                print(f"The # of `seq_lengths` in `{path_to_cache_file}` didn't match this dataset's length ({len(seq_lengths)} != {len(dataset)}) or the `metadata` differed ({self.metadata} != {data['metadata']}), so recreating `seq_length_per_patient.json` from scratch now...")
+                print(f"The # of `seq_lengths` in `{path_to_cache_file}` didn't match this dataset's length ({len(seq_lengths)} != {len(dataset)}) or the `metadata` differed for tokenizer ({self.metadata} != {data['tokenizer_metadata']}) or dataset ({dataset.metadata} != {data['dataset_metadata']}), so recreating `seq_length_per_patient.json` from scratch now...")
             else:
                 print(f"No cache file found at `{path_to_cache_file}`. Generating `seq_length_per_patient.json` now...")
 
-        # Calculate seq lengths
-        seq_lengths: List[int] = [ 
-            len( self.tokenize( item[1] ) )
-            for item in tqdm(dataset, total=len(dataset), desc='get_seq_length_per_patient()')
-        ]
-        json.dump({ 'timestamp' : datetime.datetime.now(), 'metadata' : self.metadata, 'seq_lengths' : seq_lengths }, open(path_to_cache_file, 'w'))
+        # Calculate seq lengths in parallel
+        if n_procs == 1:
+            tasks: List[Tuple] = [(dataset.metadata, start, min(len(dataset), start + 1),) for start in range(0, len(dataset), 1) ]
+            results: List[List[Tuple[int,int]]] = [ self.get_seq_length(t) for t in tqdm(tasks, total=len(tasks), desc=f"tokenizer.get_seq_length_per_patient() | n_procs={n_procs}") ]
+        else:
+            chunk_size: int = 5_000
+            tasks: List[Tuple] = [(dataset.metadata, start, min(len(dataset), start + chunk_size),) for start in range(0, len(dataset), chunk_size) ]
+            with multiprocessing.Pool(processes=n_procs) as pool:
+                results: List[List[Tuple[int,int]]] = list(tqdm(pool.imap_unordered(self.get_seq_length, tasks), total=len(tasks), desc=f"tokenizer.get_seq_length_per_patient() | n_procs={n_procs}"))
+        flattened_results: List[Tuple[int, int]] = [ x for sublist in results for x in sublist ] # type: ignore
+        seq_lengths: List[int] = [ x[1] for x in sorted(flattened_results, key=lambda x: x[0]) ]
+
+        json.dump({ 
+            'timestamp' : str(datetime.datetime.now()), 
+            'tokenizer_metadata' : self.metadata, 
+            'dataset_metadata' : dataset.metadata, 
+            'seq_lengths' : seq_lengths 
+        }, open(path_to_cache_file, 'w'), indent=2)
         return seq_lengths
 
 class BaseCodeTokenizer(BaseTokenizer):
@@ -166,7 +219,6 @@ class BaseCodeTokenizer(BaseTokenizer):
             mask_token='[MASK]',
         )
         self.add_tokens(self.non_special_tokens)
-        super().__init__()
 
     def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
         """Provide default implementation where one Event => one token"""
@@ -266,7 +318,7 @@ class BaseCodeTokenizer(BaseTokenizer):
 class CookbookTokenizer(BaseCodeTokenizer):
     """
         Settings:
-            is_remap_numerical_codes: bool
+            is_remap_numerical_codes_to_quantiles: bool
                 - If TRUE, then remap numericals to buckets based on quantile of value
             excluded_vocabs: Optional[List[str]]
                 - List of vocabs to exclude from the tokenizer. Determined by the first part of the code before the '/' (e.g. "STANFORD_OBS" in "STANFORD_OBS/1234")
@@ -281,19 +333,19 @@ class CookbookTokenizer(BaseCodeTokenizer):
 
         # Metadata
         metadata = {} if metadata is None else metadata
-        self.is_remap_numerical_codes: bool = metadata.get('is_remap_numerical_codes', False)
+        self.is_remap_numerical_codes_to_quantiles: bool = metadata.get('is_remap_numerical_codes_to_quantiles', False)
         self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
         self.min_code_occurrence_count: Optional[int] = metadata.get('min_code_occurrence_count', None)
-
-        # Tokens
-        self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
-        self.non_special_tokens: List[str] = []
-        self.excluded_tokens: List[TokenizerConfigEntry] = [] # for tracking purposes
+        self.keep_n_max_occurrence_codes: Optional[int] = metadata.get('keep_n_max_occurrence_codes', None)
 
         # Apply filtering
         self.tokenizer_config, self.excluded_tokens = filter_tokenizer_config(self.tokenizer_config, 
                                                                               self.excluded_vocabs, 
-                                                                              self.min_code_occurrence_count)
+                                                                              self.min_code_occurrence_count,
+                                                                              self.keep_n_max_occurrence_codes)
+        # Tokens
+        self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
+        self.non_special_tokens: List[str] = []
         
         # Preprocess tokenizer config for quick access
         for entry in self.tokenizer_config:
@@ -380,6 +432,7 @@ class CLMBRTokenizer(BaseCodeTokenizer):
         assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
 
         # Create tokenizer
+        self.metadata = {}
         super().__init__()
 
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
@@ -452,11 +505,13 @@ class DescTokenizer(BaseTokenizer):
         metadata = {} if metadata is None else metadata
         self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
         self.min_code_occurrence_count: Optional[int] = metadata.get('min_code_occurrence_count', None)
+        self.keep_n_max_occurrence_codes: Optional[int] = metadata.get('keep_n_max_occurrence_codes', None)
         
         # Apply filtering
         self.tokenizer_config, self.excluded_tokens = filter_tokenizer_config(self.tokenizer_config, 
                                                                               self.excluded_vocabs, 
-                                                                              self.min_code_occurrence_count)
+                                                                              self.min_code_occurrence_count,
+                                                                              self.keep_n_max_occurrence_codes)
         
         # Preprocess tokenizer config for quick access
         self.code_2_desc: Dict[str, str] = {}
@@ -632,8 +687,8 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
     }
 
 if __name__ == '__main__':
-    from hf_ehr.hf_ehr.data.datasets import FEMRDataset
-    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG
+    from hf_ehr.data.datasets import FEMRDataset
+    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
     
     # Load v8 dataset
     print("Loading v8 dataset...")
@@ -641,11 +696,16 @@ if __name__ == '__main__':
     dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=True)
     
     # Cookbook Tokenizer
-    if False:
-        path_to_tokenizer_config: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/tokenizer_config.json'
+    if True:
         print("Loading tokenizer...")
-        tokenizer = FEMRTokenizer(path_to_tokenizer_config, excluded_vocabs=['STANFORD_OBS'])
-        
+        tokenizer = CookbookTokenizer(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, metadata={
+            'is_remap_numerical_codes_to_quantiles': False, # If True, remap numerical codes to a bucketed range
+            'min_code_occurrence_count': 0, # Any code that occurs < `min_code_occurrence_count` times in the train dataset will be excluded
+            'keep_n_max_occurrence_codes': None, # Keep only the top `keep_n_max_occurrence_codes` codes, sorted by occurrence count in train dataset
+            'excluded_vocabs': ['STANFORD_OBS'], # Exclude all codes that are in these vocabularies
+        })
+        tokenizer.get_seq_length_per_patient(dataset, n_procs=5, is_force_refresh=True)
+
         tokens = tokenizer([ dataset[288000][1], dataset[288001][1], dataset[288002][1], dataset[288003][1] ], 
                         truncation=True,
                         padding=True,
@@ -657,7 +717,7 @@ if __name__ == '__main__':
         print(tokens)
         
     # Desc Tokenizer
-    if True:
+    if False:
         print("Loading tokenizer...")
         desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased' })
     
@@ -665,6 +725,9 @@ if __name__ == '__main__':
     if False:
         print("Loading tokenizer...")
         tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
+        
+        tokenizer.get_seq_length_per_patient(dataset, n_procs=5, is_force_refresh=True)
+        exit()
 
         # Check that initial Event => Token transformation is correct
         transformed_events = tokenizer.convert_events_to_tokens(dataset[0][1])
