@@ -659,7 +659,7 @@ if __name__ == '__main__':
     # Desc Tokenizer
     if True:
         print("Loading tokenizer...")
-        desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, AutoTokenizer.from_pretrained("bert-base-uncased"))
+        desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased' })
     
     # CLMBR Tokenizer
     if False:
