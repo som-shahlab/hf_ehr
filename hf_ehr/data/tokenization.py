@@ -88,28 +88,40 @@ class BaseTokenizer(PreTrainedTokenizer):
         print(f"Creating new folder for this version of the tokenizer at `{path_to_new_folder}` with metadata={self.metadata}")
         return path_to_new_folder
     
-    def get_path_to_dataset_cache(self, dataset) -> str:
+    def get_path_to_dataset_dir(self, dataset: 'FEMRDataset') -> str:
         """
             Example path: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/versions/2021-08-10_15-00-00/datasets/v8/
         
             The tokenizer can have certain dataset-specific properties. 
-            We store those in a folder within the version folder.
+            We store those in a datasets/ folder within the versions/ folder.
+            We make sure that the dataset we retrieve matches the metadata of the argument `dataset`.
         """
-        path_to_dataset_dir: str = os.path.join(self.path_to_tokenizer_version_dir, 'datasets/')
-        if 'extract_v9' in dataset.path_to_femr_extract:
-            # v9
-            return os.path.join(path_to_dataset_dir, 'v9')
-        elif 'extract_v8' in dataset.path_to_femr_extract:
-            # v8
-            return os.path.join(path_to_dataset_dir, 'v8')
-        else:
-            raise ValueError(f"Couldn't determine short name for dataset with path_to_femr_extract={dataset.path_to_femr_extract}")
+        path_to_datasets_dir: str = os.path.join(self.path_to_tokenizer_version_dir, 'datasets/')
+        os.makedirs(path_to_datasets_dir, exist_ok=True)
+        
+        # Find folder corresponding to this version's dataset
+        for f in os.listdir(path_to_datasets_dir):
+            if not os.path.isdir(os.path.join(path_to_datasets_dir, f)):
+                continue
+            # Read metadata in `f``
+            f_metadata = json.load(open(os.path.join(path_to_datasets_dir, f, 'metadata.json'), 'r'))
+            
+            # If `self.metadata` of this dataset exactly matches `metadata.json` in this folder, then return it
+            if is_metadata_equal(dataset.metadata, f_metadata):
+                return os.path.join(path_to_datasets_dir, f)
 
+        # No matching folders found, so create a new one for this version's dataset
+        path_to_new_folder: str = os.path.join(path_to_datasets_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+        os.makedirs(path_to_new_folder, exist_ok=True)
+        json.dump(self.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'))
+        print(f"Creating new folder for this dataset of this version of the tokenizer at `{path_to_new_folder}` with metadata={dataset.metadata}")
+        return path_to_new_folder
+            
     def get_seq_length_per_patient(self, dataset, is_force_refresh: bool = False) -> List[int]:
         """Fetch the sequence length of every patient in `dataset`."""
         
         # Check if cache exists (otherwise takes ~10 mins to iterate over 500k patients)
-        path_to_dataset_dir: str = self.get_path_to_dataset_cache(dataset)
+        path_to_dataset_dir: str = self.get_path_to_dataset_dir(dataset)
         path_to_cache_file: str = os.path.join(path_to_dataset_dir, 'seq_length_per_patient.json')
 
         if not is_force_refresh:
@@ -272,7 +284,7 @@ class CookbookTokenizer(BaseCodeTokenizer):
         self.is_remap_numerical_codes: bool = metadata.get('is_remap_numerical_codes', False)
         self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
         self.min_code_occurrence_count: Optional[int] = metadata.get('min_code_occurrence_count', None)
-        
+
         # Tokens
         self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
         self.non_special_tokens: List[str] = []

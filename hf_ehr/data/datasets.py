@@ -26,6 +26,14 @@ class FEMRDataset(Dataset):
         self.split: str = split
         self.is_debug: bool = is_debug
         self.seed: int = seed
+        
+        # Set metadata -- used for tokenizer versioning later
+        self.metadata = {
+            'path_to_femr_extract': path_to_femr_extract,
+            'split' : split,
+            'is_debug' : is_debug,
+            'seed' : seed,
+        }
 
         # Pre-calculate canonical splits based on patient ids
         all_pids: np.ndarray = np.array([ pid for pid in self.femr_db ])
