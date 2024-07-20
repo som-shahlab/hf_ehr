@@ -28,13 +28,13 @@ def main():
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
     else:
         raise ValueError(f'Invalid FEMR dataset: {args.dataset}')
-    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=True)
+    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
 
     # Debugging info
-    chunk_size = 10
+    chunk_size = 32
     print(f"Running with n_procs={args.n_procs}, chunk_size={chunk_size}")
 
     start = time.time()

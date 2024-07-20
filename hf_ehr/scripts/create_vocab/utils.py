@@ -87,7 +87,7 @@ def run_helper(calc_func: Callable, merge_func: Callable, path_to_femr_db: str, 
                                 merge_func, 
                                 pids=pids,
                                 **kwargs)
-    results = merge_func(results)
+    #results = merge_func(results)
     return results
 
 def add_unique_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], **kwargs):
