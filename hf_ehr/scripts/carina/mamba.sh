@@ -3,9 +3,9 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/mamba_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/mamba_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-a100
+#SBATCH --partition=nigam-a100,nigam-h100
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=6
 #SBATCH --gres=gpu:1
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
@@ -30,7 +30,7 @@ MAX_TOKENS=2048
 BATCH_SIZE=2
 if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
+        MAX_TOKENS=16384
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :
     fi

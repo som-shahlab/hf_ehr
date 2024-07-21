@@ -34,7 +34,7 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam
     elif [[ "$MODEL_SIZE" == "small" ]]; then
         :
     elif [[ "$MODEL_SIZE" == "medium" ]]; then
-        :
+        MAX_TOKENS=16384
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "tiny" ]]; then

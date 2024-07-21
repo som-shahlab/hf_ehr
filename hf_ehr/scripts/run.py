@@ -124,7 +124,7 @@ def main(config: DictConfig) -> None:
     is_log_grad_norm: bool = config.logging.is_log_grad_norm
     model_name: str = config.model.name
     path_to_tokenizer_config: str = config.data.tokenizer.path_to_config
-    tokenizer_metadata: Dict[str, Any] = config.data.tokenizer.metadata
+    tokenizer_metadata: Dict[str, Any] = getattr(config.data.tokenizer, 'metadata', {})
     seed: int = config.main.seed
     is_force_restart: bool = config.main.is_force_restart
 
@@ -175,7 +175,6 @@ def main(config: DictConfig) -> None:
             loggers += [ 
                     MLFlowLogger(experiment_name='hf_ehr',
                                     run_id=mlflow_run_id,
-                                    #log_checkpoint=True,
                                     log_model='all',
                                     save_dir=f"{path_to_log_dir}",
                                     tracking_uri=f"file:{path_to_log_dir}") 
@@ -184,7 +183,6 @@ def main(config: DictConfig) -> None:
             loggers += [ 
                     MLFlowLogger(experiment_name='hf_ehr',
                                     run_name=config.logging.mlflow.name,
-                                    #log_checkpoint=True,
                                     log_model='all',
                                     save_dir=f"{path_to_log_dir}",
                                     tracking_uri=f"file:{path_to_log_dir}") 

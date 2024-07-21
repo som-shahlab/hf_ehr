@@ -57,6 +57,11 @@ def filter_tokenizer_config(tokenizer_config: List[TokenizerConfigEntry],
 
 def is_metadata_equal(metadata1: Dict, metadata2: Dict) -> bool:
     """Return TRUE if `metadata1` EXACTLY EQUALS `metadata2`"""
+    # Handle special case of paths that get rewritten
+    metadata_paths: List[str] = [ 'path_to_femr_extract' ]
+    metadata1 = { key: val if not key in metadata_paths else os.path.basename(val) for key, val in metadata1.items() }
+    metadata2 = { key: val if not key in metadata_paths else os.path.basename(val) for key, val in metadata2.items() }
+    
     is_match: bool = True
     for key, val in metadata1.items():
         if key not in metadata2:
@@ -149,6 +154,7 @@ class BaseTokenizer(PreTrainedTokenizer):
             
     def get_seq_length(self, args: Tuple['FEMRDataset', int, int]) -> List[Tuple[int, int]]:
         """Given a dataset and a range of indices, return the sequence length of each patient in that range"""
+        from hf_ehr.data.datasets import FEMRDataset
         dataset_metadata, start_idx, end_idx = args # type is: FEMRDataset, int, int
         dataset = FEMRDataset(**dataset_metadata)
         results: List[Tuple[int, int]] = []
@@ -729,7 +735,7 @@ if __name__ == '__main__':
         desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased' })
     
     # CLMBR Tokenizer
-    if True:
+    if False:
         print("Loading tokenizer...")
         tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
         
