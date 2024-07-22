@@ -56,7 +56,7 @@ class StartTrainingCheckpoint(ModelCheckpoint):
             self._save_checkpoint(trainer, checkpoint_file)
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
-    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
+    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool = False):
         """
             is_valid_metric_func: Callable
                 Inputs: 
@@ -70,21 +70,36 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         self.metric_name: str = metric_name
         self.is_valid_metric_func: Callable = is_valid_metric_func
         self.dirpath: str = dirpath
+        self.is_run_val = is_run_val
         self.last_ckpt_metric_value: Optional[Any] = None
+        self.is_validating = False
 
     def on_train_batch_end(self, trainer, *args, **kwargs):
         if rank_zero_only.rank != 0:
             return
+        
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
 
-        if metric_value is not None:
+        if metric_value is not None and not self.is_validating:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+            print(self.metric_name)
+            print(f"Current Metric: {metric_value}, Interval: {true_val}, Checkpoint Value: {ckpt_val}")
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
                 trainer.save_checkpoint(filepath)
                 logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
                 self.last_ckpt_metric_value = metric_value
+                if self.is_run_val:
+                    self.is_validating = True
+                    trainer.should_trigger_validation = True  # External flag for validation
+                    logger.info(f"Triggering validation at step {trainer.global_step}")
+
+    def on_validation_end(self, trainer, pl_module):
+        if self.is_validating:
+            self.is_validating = False
+            logger.info(f"Validation completed at step {trainer.global_step}")
+            print(f"Validation completed at step {trainer.global_step}")
     
     @property
     def state_key(self) -> str:
@@ -361,11 +376,13 @@ def main(config: DictConfig) -> None:
     ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens', None) not in [None, "None"]:
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
+        print("Adding MetricBasedCheckpoint for non-PAD tokens...")
         callbacks += [ 
             MetricBasedCheckpoint(
                 dirpath=path_to_ckpt_dir,
                 metric_name="train/tokens/total_nonPAD",
                 is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
+                is_run_val=True
             ),
         ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
@@ -375,8 +392,10 @@ def main(config: DictConfig) -> None:
                 dirpath=path_to_ckpt_dir,
                 metric_name="train/tokens/total_flops",
                 is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
+                is_run_val=True
             ),
         ]
+        
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
     
@@ -384,6 +403,13 @@ def main(config: DictConfig) -> None:
     shutil.copy(path_to_tokenizer_config, path_to_artifacts_dir) # save tokenizer code_2_detail
     with open(os.path.join(path_to_artifacts_dir, 'config.yaml'), 'w') as fd: # save config
         OmegaConf.save(config=config, f=fd)
+
+    # Run validation if flagged
+    def check_and_trigger_validation(trainer):
+        if getattr(trainer, 'should_trigger_validation', False):
+            model = trainer.model.module if hasattr(trainer.model, 'module') else trainer.model
+            trainer.validate(model=model, ckpt_path=None, dataloaders=trainer.val_dataloaders)
+            trainer.should_trigger_validation = False
 
     # Trainer
     trainer = pl.Trainer(
@@ -406,6 +432,25 @@ def main(config: DictConfig) -> None:
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
         use_distributed_sampler=False if getattr(config.data.dataloader, 'mode', 'batch') == 'approx' else True
     )
+
+    try:
+        trainer.fit(model, 
+                    train_dataloaders=dataloaders['train'],
+                    val_dataloaders=dataloaders['val'],
+                    ckpt_path=path_to_resume_ckpt)
+
+        # Check for external validation trigger
+        check_and_trigger_validation(trainer)
+
+    except Exception as e:
+        print("Exception during trainer.fit:")
+        print(e)
+        raise
+
+    # Handle validation trigger from MetricBasedCheckpoint
+    for callback in callbacks:
+        if isinstance(callback, MetricBasedCheckpoint) and callback.is_run_val and callback.is_validating:
+            callback.trigger_validation(trainer)
 
     # Run
     trainer.fit(model, 
