@@ -3,12 +3,12 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/bert_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/bert_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-v100
+#SBATCH --partition=gpu,nigam-v100
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:4
 
-IS_FORCE_REFRESH=false
+IS_FORCE_REFRESH=true
 
 child_pids=()
 stop_child_processes() {
@@ -41,17 +41,17 @@ fi
 for i in "${!RUN_NAMES[@]}"; do
     RUN_NAME=${RUN_NAMES[i]}
     RUN_ARG=${RUN_ARGS[i]}
+    STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.out
+    STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.err
     echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}'"
     
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
         # Overwrite
-        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME}"
+        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/${RUN_NAME}_${SLURM_JOB_ID}/"
         bash $RUN_ARG "${EXTRA}" --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
     else
         # Resume
         EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/${RUN_NAME}/"
-        STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.out
-        STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.err
         bash $RUN_ARG "${EXTRA}" --is_skip_base > $STDOUT 2> $STDERR &
     fi
 

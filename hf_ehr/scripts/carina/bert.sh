@@ -28,7 +28,7 @@ fi
 
 # Partition-specific settings
 MAX_TOKENS=4096
-BATCH_SIZE=4
+BATCH_SIZE=6
 
 if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
@@ -47,9 +47,17 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu
         elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
             MAX_TOKENS=4096
         fi
-        BATCH_SIZE=6 # 31950 / 32768 MB
     elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
+        # ! Context length > 2048 will OOM
+        if [[ "$CONTEXT_LENGTH" == "512" ]]; then
+            MAX_TOKENS=2048
+        elif [[ "$CONTEXT_LENGTH" == "1024" ]]; then
+            MAX_TOKENS=2048
+        elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
+            MAX_TOKENS=2048
+        elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
+            MAX_TOKENS=4096 # ! OOM
+        fi
     fi
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"

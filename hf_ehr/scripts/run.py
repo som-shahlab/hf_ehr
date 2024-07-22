@@ -277,20 +277,20 @@ def main(config: DictConfig) -> None:
         raise ValueError("CookbookTokenizer is not supported in this script yet.")
         logger.info(f"Loading CookbookTokenizer: `{path_to_tokenizer_config}`")
         tokenizer = CookbookTokenizer( path_to_tokenizer_config, metadata=tokenizer_metadata, )
-    logger.info(f"Vocab size: `{tokenizer.vocab_size}`")
+    logger.info(f"Vocab size: all={tokenizer.vocab_size} | non_special_tokens={len(tokenizer.non_special_tokens)} | special_tokens={len(tokenizer.special_tokens)}")
 
     # Model
     logger.info(f"Loading model: `{model_name}`")
     if 'gpt2' in model_name:
-        model = GPTLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = GPTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'bert' in model_name:
-        model = BERTLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = BERTLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'hyena' in model_name:
-        model = HyenaLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'mamba' in model_name:
-        model = MambaLanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
-        model = T5LanguageModel(config, None, tokenizer.vocab_size, tokenizer.pad_token_id)
+        model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
 

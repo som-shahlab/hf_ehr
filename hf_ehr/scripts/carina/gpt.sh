@@ -3,7 +3,7 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt2_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt2_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu
+#SBATCH --partition=nigam-v100,gpu
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:1
@@ -33,7 +33,7 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam
         if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
             MAX_TOKENS=16384
         elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
-            MAX_TOKENS=16384
+            MAX_TOKENS=8192
         elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
             MAX_TOKENS=8192
         elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
@@ -41,9 +41,9 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam
         fi
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
-            :
+            MAX_TOKENS=6144
         elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
-            :
+            MAX_TOKENS=2048
         elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
             :
         elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
@@ -52,14 +52,15 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     if [[ "$MODEL_SIZE" == "base" ]]; then
+        # ! Context length > 4096 will OOM
         if [[ "$CONTEXT_LENGTH" == "1024" ]]; then
             MAX_TOKENS=4096
         elif [[ "$CONTEXT_LENGTH" == "2048" ]]; then
             MAX_TOKENS=2048
         elif [[ "$CONTEXT_LENGTH" == "4096" ]]; then
-            MAX_TOKENS=4096 # OOM
+            MAX_TOKENS=4096
         elif [[ "$CONTEXT_LENGTH" == "8192" ]]; then
-            MAX_TOKENS=8192 # OOM
+            MAX_TOKENS=8192 # ! OOM
         fi
     elif [[ "$MODEL_SIZE" == "large" ]]; then
         :

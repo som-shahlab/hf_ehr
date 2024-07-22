@@ -11,12 +11,12 @@ class T5LanguageModel(BaseModel):
     T5 with a Language Model head.
     """
 
-    def __init__(self, config: DictConfig, tokenizer: Optional, vocab_size: Optional = None, pad_token_id: Optional = None) -> None:
-        super(T5LanguageModel, self).__init__(config, tokenizer, vocab_size, pad_token_id)
+    def __init__(self, config: DictConfig, vocab_size, pad_token_id) -> None:
+        super(T5LanguageModel, self).__init__(config, vocab_size, pad_token_id)
 
         # Model specs
         model_config = AutoConfig.from_pretrained(config.model.hf_name if hasattr(config.model, 'hf_name') else 't5-base')
-        model_config.vocab_size = vocab_size if vocab_size else tokenizer.vocab_size
+        model_config.vocab_size = vocab_size
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {self.model_name} does not have attribute {key}"
             setattr(model_config, key, val)

@@ -28,7 +28,7 @@ callbacks:
     # Save model every N global steps; persists permanently
     every_n_train_steps: 30_000
     # Save model every N nonPAD training tokens seen; persists permanently; defaults to 500 million
-    every_n_train_nonPAD_tokens: 500_000_000
+    every_n_train_nonPAD_tokens: 300_000_000
     # Save model every N FLOPs; defaults to 50 quadrillion FLOPs
     every_n_flops: 50_000_000_000_000_000
 

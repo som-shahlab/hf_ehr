@@ -29,16 +29,22 @@ fi
 MAX_TOKENS=2048
 BATCH_SIZE=2
 if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" || "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
+    if [[ "$MODEL_SIZE" == "tiny" ]]; then
         MAX_TOKENS=16384
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
+    elif [[ "$MODEL_SIZE" == "small" ]]; then
+        MAX_TOKENS=16384
+    elif [[ "$MODEL_SIZE" == "medium" ]]; then
+        MAX_TOKENS=16384
     fi
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" || "$SLURM_JOB_PARTITION" == "gpu" ]]; then
-    if [[ "$MODEL_SIZE" == "base" ]]; then
-        :
-    elif [[ "$MODEL_SIZE" == "large" ]]; then
-        :
+    # ! Context length > 2048 will OOM
+    # ! Not worth running here b/c super slow without conv-1d packages
+    if [[ "$MODEL_SIZE" == "tiny" ]]; then
+        MAX_TOKENS=2048
+    elif [[ "$MODEL_SIZE" == "small" ]]; then
+        MAX_TOKENS=2048
+    elif [[ "$MODEL_SIZE" == "medium" ]]; then
+        MAX_TOKENS=2048
     fi
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"

@@ -40,13 +40,13 @@ class BaseModel(L.LightningModule):
     pad_token_id: int
     flops_per_token: Optional[int] = None
 
-    def __init__(self, config: DictConfig, tokenizer: Optional, vocab_size: Optional = None, pad_token_id: Optional = None) -> None:
+    def __init__(self, config: DictConfig, vocab_size, pad_token_id) -> None:
         super().__init__()
         self.save_hyperparameters('config') #NOTE: Need to exclude `tokenizer` otherwise internal PTL .hparam call later will hang
         self.model_name: str = config.model.name
         self.config = config
-        self.vocab_size: int = vocab_size if vocab_size else tokenizer.vocab_size
-        self.pad_token_id: int = pad_token_id if pad_token_id else tokenizer.pad_token_id
+        self.vocab_size: int = vocab_size
+        self.pad_token_id: int = pad_token_id
         self.flops_per_token = None
         
         # Metrics
@@ -80,7 +80,7 @@ class BaseModel(L.LightningModule):
 
         # Optimizer
         optimizer = optim.Adam(self.parameters(), lr=lr)
-                
+
         # Scheduler
         if self.config.trainer.scheduler:
             scheduler = lr_warmup_with_constant_plateau(optimizer, 
@@ -141,7 +141,27 @@ class BaseModel(L.LightningModule):
             wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
             wandb.run.summary["tokenizer_pad_token_id"] = self.pad_token_id
             wandb.run.summary["model_parameter_count"] = self.get_param_count()
-            
+        
+        # Create a fake full batch and pass through model for early detection of OOM
+        if self.config.data.dataloader.mode == 'approx':
+            fake_batch = {
+                'input_ids' : torch.ones((self.config.data.dataloader.approx_batch_sampler.max_tokens // self.config.data.dataloader.max_length, self.config.data.dataloader.max_length)).long().to(self.device),
+                'attention_mask' : torch.ones((self.config.data.dataloader.approx_batch_sampler.max_tokens // self.config.data.dataloader.max_length, self.config.data.dataloader.max_length)).to(self.device),
+                'labels' : torch.ones((self.config.data.dataloader.approx_batch_sampler.max_tokens // self.config.data.dataloader.max_length, self.config.data.dataloader.max_length)).long().to(self.device),
+            }
+        elif self.config.data.dataloader.mode == 'batch':
+            fake_batch = {
+                'input_ids' : torch.ones((self.config.data.dataloader.batch_size, self.config.data.dataloader.max_length)).long().to(self.device),
+                'attention_mask' : torch.ones((self.config.data.dataloader.batch_size,self.config.data.dataloader.max_length)).to(self.device),
+                'labels' : torch.ones((self.config.data.dataloader.batch_size,self.config.data.dataloader.max_length)).long().to(self.device),
+            }
+        else:
+            raise ValueError(f"Unsupported config.data.dataloader.mode: `{self.config.data.dataloader.mode}`")
+        assert fake_batch['input_ids'].numel() <= self.config.data.dataloader.approx_batch_sampler.max_tokens, f"Fake batch size is larger than max_tokens: {fake_batch['input_ids'].numel()} > {self.config.data.dataloader.approx_batch_sampler.max_tokens}"
+        outputs = self.model(**fake_batch)
+        del outputs
+        del fake_batch
+        
         if self.trainer.global_step > 0:
             # Make ApproxBatchSampler deterministic by looping through dataset until we hit
             # the current step; otherwise, when Lightning restarts from a checkpoint it will

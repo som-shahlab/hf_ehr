@@ -178,7 +178,7 @@ class BaseTokenizer(PreTrainedTokenizer):
         if not is_force_refresh:
             # If NOT force refresh, try to load from cache
             if os.path.exists(path_to_cache_file):
-                print(f"Loading seq_length_per_patient from `{path_to_cache_file}`")
+                print(f"Loading `seq_length_per_patient.json` from `{path_to_cache_file}` for split=`{dataset.split}`")
                 data: TokenizerSeqLengthPerPatientCache = json.load(open(path_to_cache_file, 'r'))
                 seq_lengths: List[int] = data['seq_lengths']
                 if (
@@ -189,7 +189,7 @@ class BaseTokenizer(PreTrainedTokenizer):
                     return seq_lengths
                 print(f"The # of `seq_lengths` in `{path_to_cache_file}` didn't match this dataset's length ({len(seq_lengths)} != {len(dataset)}) or the `metadata` differed for tokenizer ({self.metadata} != {data['tokenizer_metadata']}) or dataset ({dataset.metadata} != {data['dataset_metadata']}), so recreating `seq_length_per_patient.json` from scratch now...")
             else:
-                print(f"No cache file found at `{path_to_cache_file}`. Generating `seq_length_per_patient.json` now...")
+                print(f"No `seq_length_per_patient.json` found at `{path_to_cache_file}` for split=`{dataset.split}`. Generating `seq_length_per_patient.json` now...")
 
         # Calculate seq lengths in parallel
         if n_procs == 1:
