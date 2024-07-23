@@ -447,11 +447,6 @@ def main(config: DictConfig) -> None:
         print(e)
         raise
 
-    # Handle validation trigger from MetricBasedCheckpoint
-    for callback in callbacks:
-        if isinstance(callback, MetricBasedCheckpoint) and callback.is_run_val and callback.is_validating:
-            callback.trigger_validation(trainer)
-
     # Run
     trainer.fit(model, 
                 train_dataloaders=dataloaders['train'],
