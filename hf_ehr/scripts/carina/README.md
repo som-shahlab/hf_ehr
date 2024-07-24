@@ -1,6 +1,6 @@
 # How to Run
 
-Usage: `sbatch gpt2.sh <model_size> <tokenizer> <context_length> <dataloader_mode> [<extra>] [--is_force_refresh] [--is_skip_base]`
+Usage: `sbatch gpt.sh <model_size> <tokenizer> <context_length> <dataloader_mode> [<extra>] [--is_force_refresh] [--is_skip_base]`
 
 where...
 - `<model_size>` is the model size (e.g., `base`, `large`)
@@ -15,13 +15,13 @@ Examples:
 
 ```bash
 # Run GPT-2 base model with CLMBR tokenizer, batch dataloader, and 8192 context length; force train from scratch and not resume prior run (even if exists)
-sbatch gpt2.sh base clmbr 8192 batch --is_force_refresh
+sbatch gpt.sh base clmbr 8192 batch --is_force_refresh
 
 # Run GPT-2 large model with FEMR tokenizer, approxbatchsampler dataloader, and 1024 context length; resume prior run if exists
-sbatch gpt2.sh large femr 1024 approx
+sbatch gpt.sh large femr 1024 approx
 
 # Run GPT-2 large model with FEMR tokenizer, approxbatchsampler dataloader, and 1024 context length; resume prior run if exists; overwrite the default device assignment to GPU 1
-sbatch gpt2.sh large femr 1024 approx "+trainer.devices=[1]"
+sbatch gpt.sh large femr 1024 approx "+trainer.devices=[1]"
 ```
 
 ## Parallel Runs
