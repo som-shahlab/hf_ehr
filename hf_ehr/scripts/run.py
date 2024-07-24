@@ -56,7 +56,7 @@ class StartTrainingCheckpoint(ModelCheckpoint):
             self._save_checkpoint(trainer, checkpoint_file)
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
-    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str):
+    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool):
         """
             is_valid_metric_func: Callable
                 Inputs: 
@@ -71,12 +71,16 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         self.is_valid_metric_func: Callable = is_valid_metric_func
         self.dirpath: str = dirpath
         self.last_ckpt_metric_value: Optional[Any] = None
+        self.is_run_val: bool = is_run_val
 
     def on_train_batch_end(self, trainer, *args, **kwargs):
         if rank_zero_only.rank != 0:
             return
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
+        
+        if self.is_run_val:
+            trainer.run_evaluation(test_mode=False)
 
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
@@ -93,7 +97,7 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         }
         return f"{self.__class__.__qualname__}{repr(kwargs)}"
 
-def train_flops_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
+def train_flops_metric_func(val: int, last_val: Optional[int], config) -> Tuple[bool, int, int]:
     interval: int = int(config.callbacks.model_checkpointing.every_n_flops)
     current: int = int(val // interval)
     if last_val is None:
@@ -102,7 +106,7 @@ def train_flops_metric_func(val: int, last_val: int, config) -> Tuple[bool, int,
         last: int = int(last_val // interval)
         return last < current, int(val), current * interval
 
-def train_token_metric_func(val: int, last_val: int, config) -> Tuple[bool, int, int]:
+def train_token_metric_func(val: int, last_val: Optional[int], config) -> Tuple[bool, int, int]:
     interval: int = int(config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens)
     current: int = int(val // interval)
     if last_val is None:
@@ -265,7 +269,6 @@ def main(config: DictConfig) -> None:
     # Tokenizer
     if config.data.tokenizer.name == 'DescTokenizer':
         # DescEmb
-        raise ValueError("DescTokenizer is not supported in this script yet.")
         logger.info(f"Loading DescTokenizer: `{PATH_TO_TOKENIZER_DESC_v8_CONFIG}` using base tokenizer `{config.data.tokenizer.desc_emb_tokenizer}`")
         tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=tokenizer_metadata)
     elif config.data.tokenizer.name == 'CLMBRTokenizer':
@@ -366,6 +369,7 @@ def main(config: DictConfig) -> None:
                 dirpath=path_to_ckpt_dir,
                 metric_name="train/tokens/total_nonPAD",
                 is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
+                is_run_val=True,
             ),
         ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
@@ -375,6 +379,7 @@ def main(config: DictConfig) -> None:
                 dirpath=path_to_ckpt_dir,
                 metric_name="train/tokens/total_flops",
                 is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
+                is_run_val=True,
             ),
         ]
     if is_log_grad_norm:

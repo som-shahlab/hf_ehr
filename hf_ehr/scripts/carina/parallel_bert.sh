@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=bert_parallel
+#SBATCH --job-name=bert-parallel
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/bert_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/bert_parallel_%A.err
 #SBATCH --time=48:00:00

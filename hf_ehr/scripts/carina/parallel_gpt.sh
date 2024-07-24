@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=gpt_parallel
+#SBATCH --job-name=gpt-parallel
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt_parallel_%A.err
 #SBATCH --time=48:00:00

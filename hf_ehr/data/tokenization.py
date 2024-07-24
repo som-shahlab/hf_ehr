@@ -93,6 +93,24 @@ class BaseTokenizer(PreTrainedTokenizer):
         }, open(os.path.join(self.path_to_tokenizer_version_dir, 'vocab.json'), 'w'), indent=2)
         save_tokenizer_config_to_path(os.path.join(self.path_to_tokenizer_version_dir, 'tokenizer_config_filtered.json'), self.tokenizer_config)
 
+    ########################################################
+    # Tokenization helpers
+    ########################################################
+    def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
+        """Provide default implementation where one Event => one token"""
+        tokens: List[str] = []
+        for e in events:
+            token: Optional[str] = self.convert_event_to_token(e, **kwargs)
+            if token is not None:
+                tokens.append(token)
+        return tokens
+    
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        raise NotImplementedError("Must implement `self.convert_event_to_token()` in child class")
+
+    ########################################################
+    # Caching / versioning
+    ########################################################
     def get_path_to_tokenizer_version_dir(self) -> str:
         """
             Example path: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/versions/2021-08-10_15-00-00/
@@ -168,10 +186,10 @@ class BaseTokenizer(PreTrainedTokenizer):
             Fetch the sequence length of every patient in `dataset`, save to cache, and return the list of lengths.
             If cache exists, then load from cache (unless `is_force_refresh` is set to TRUE).
             If cache doesn't exist or `is_force_refresh` is TRUE, then calculate the lengths in parallel. 
-                For `n_procs=5`, this takes ~5 hrs for 2.5M patients.
-        
+                For CLMBRTokenizer, `n_procs=5`, this takes ~5 hrs for 2.5M patients (train dataset)
+                For DescTokenizer, `n_procs=5`, this takes ~11 hrs for 2.5M patients (train dataset)
         """
-        # Check if cache exists (otherwise takes ~10 mins to iterate over 500k patients)
+        # Check if cache exists
         path_to_dataset_dir: str = self.get_path_to_dataset_dir(dataset)
         path_to_cache_file: str = os.path.join(path_to_dataset_dir, 'seq_length_per_patient.json')
 
@@ -232,18 +250,6 @@ class BaseCodeTokenizer(BaseTokenizer):
             mask_token='[MASK]',
         )
         self.add_tokens(self.non_special_tokens)
-
-    def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
-        """Provide default implementation where one Event => one token"""
-        tokens: List[str] = []
-        for e in events:
-            token: Optional[str] = self.convert_event_to_token(e, **kwargs)
-            if token is not None:
-                tokens.append(token)
-        return tokens
-    
-    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
-        raise NotImplementedError("Must implement `self.convert_event_to_token()` in child class")
 
     def __call__(self, 
                  batch_of_events: Union[List[Event], List[List[Event]]],
@@ -343,9 +349,9 @@ class CookbookTokenizer(BaseCodeTokenizer):
                  metadata: Optional[Dict[str, Any]] = None) -> None:
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        self.metadata: Dict[str, Any] = {} if metadata is None else metadata
 
         # Metadata
-        metadata = {} if metadata is None else metadata
         self.is_remap_numerical_codes_to_quantiles: bool = metadata.get('is_remap_numerical_codes_to_quantiles', False)
         self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
         self.min_code_occurrence_count: Optional[int] = metadata.get('min_code_occurrence_count', None)
@@ -429,6 +435,7 @@ class CLMBRTokenizer(BaseCodeTokenizer):
     def __init__(self, path_to_tokenizer_config: str) -> None:
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        self.metadata: Dict[str, Any] = {}
 
         # Preprocess tokenizer config for quick access
         self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
@@ -445,7 +452,6 @@ class CLMBRTokenizer(BaseCodeTokenizer):
         assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
 
         # Create tokenizer
-        self.metadata = {}
         super().__init__()
 
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
@@ -505,13 +511,15 @@ class DescTokenizer(BaseTokenizer):
     def __init__(self, 
                  path_to_tokenizer_config: str, 
                  metadata: Optional[Dict[str, Any]] = None) -> None:
+        assert metadata is not None, f"ERROR - `metadata` must be provided, but got {metadata}"
         assert 'desc_emb_tokenizer' in metadata, f"ERROR - `metadata` must contain a 'desc_emb_tokenizer' key, but got {metadata}"
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
-        
+        self.metadata: Dict[str, Any] = {} if metadata is None else metadata
+
         # Load underlying textual tokenizer
         self.desc_emb_tokenizer: str = metadata['desc_emb_tokenizer']
-        self.tokenizer = AutoTokenizer.from_pretrained(desc_emb_tokenizer)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.desc_emb_tokenizer)
         self.event_separator: str = ' ' # character that gets inserted between Events when transformed into their textual descriptions
         
         # Metadata
@@ -533,12 +541,12 @@ class DescTokenizer(BaseTokenizer):
                 self.code_2_desc[entry.code] = entry.description
 
         super().__init__(
-            bos_token=tokenizer.bos_token,
-            eos_token=tokenizer.eos_token,
-            unk_token=tokenizer.unk_token,
-            sep_token=tokenizer.sep_token,
-            pad_token=tokenizer.pad_token,
-            cls_token=tokenizer.cls_token
+            bos_token=self.tokenizer.bos_token,
+            eos_token=self.tokenizer.eos_token,
+            unk_token=self.tokenizer.unk_token,
+            sep_token=self.tokenizer.sep_token,
+            pad_token=self.tokenizer.pad_token,
+            cls_token=self.tokenizer.cls_token
         )
     
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
@@ -728,11 +736,20 @@ if __name__ == '__main__':
                         add_special_tokens=True,
                         return_tensors='pt')
         print(tokens)
-        
+    
+    dataset = FEMRDataset(path_to_femr_extract, split='test', is_debug=False)
+    tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased', 'excluded_vocabs' : ['STANFORD_OBS'] })
+    tokenizer.get_seq_length_per_patient(dataset, n_procs=5)
+    exit()
+    
     # Desc Tokenizer
-    if False:
+    if True:
         print("Loading tokenizer...")
-        desc_tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased' })
+        tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased', 'excluded_vocabs' : ['STANFORD_OBS'] })
+        tokenizer.get_seq_length_per_patient(dataset, n_procs=5)
+
+        # Check that initial Event => Token transformation is correct
+        transformed_events = tokenizer.convert_events_to_tokens(dataset[0][1])
     
     # CLMBR Tokenizer
     if False:

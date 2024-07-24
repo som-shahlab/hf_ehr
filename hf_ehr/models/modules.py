@@ -142,6 +142,8 @@ class BaseModel(L.LightningModule):
             wandb.run.summary["tokenizer_pad_token_id"] = self.pad_token_id
             wandb.run.summary["model_parameter_count"] = self.get_param_count()
         
+        ############################
+        # Start of OOM detection
         # Create a fake full batch and pass through model for early detection of OOM
         if self.config.data.dataloader.mode == 'approx':
             fake_batch = {
@@ -158,9 +160,14 @@ class BaseModel(L.LightningModule):
         else:
             raise ValueError(f"Unsupported config.data.dataloader.mode: `{self.config.data.dataloader.mode}`")
         assert fake_batch['input_ids'].numel() <= self.config.data.dataloader.approx_batch_sampler.max_tokens, f"Fake batch size is larger than max_tokens: {fake_batch['input_ids'].numel()} > {self.config.data.dataloader.approx_batch_sampler.max_tokens}"
+        if 'hyena' in self.model_name:
+            # Hyena doesn't support `attention_mask` in the input, so remove it
+            fake_batch.pop('attention_mask')
         outputs = self.model(**fake_batch)
         del outputs
         del fake_batch
+        # End of OOM detection
+        ############################
         
         if self.trainer.global_step > 0:
             # Make ApproxBatchSampler deterministic by looping through dataset until we hit
@@ -205,6 +212,7 @@ class BaseModel(L.LightningModule):
         self.log('train/examples/total', self.sum_metrics['train_total_examples'].compute().to(torch.float32))
 
         if 'hyena' in self.model_name:
+            # Hyena doesn't have `attention_mask` in the input, so manually calculate number of PAD tokens
             pad_token_id = self.pad_token_id
             input_ids = tokens['input_ids']
             train_batch_tokens_PAD = (input_ids == pad_token_id).sum()
@@ -213,10 +221,9 @@ class BaseModel(L.LightningModule):
             train_batch_tokens_PAD: torch.Tensor = (1 - tokens['attention_mask']).sum()
             train_batch_tokens_nonPAD: torch.Tensor = tokens['attention_mask'].sum()
 
-        # Update cumulative metrics for both models
+        # Update cumulative metrics
         self.sum_metrics['train_total_tokens_PAD'].update(train_batch_tokens_PAD)
         self.sum_metrics['train_total_tokens_nonPAD'].update(train_batch_tokens_nonPAD)
-
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
         self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
         self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
