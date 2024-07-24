@@ -15,6 +15,7 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     start_total = time.time()
+    
     # Parse command-line arguments
     args = parse_args()
     os.makedirs(os.path.dirname(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG), exist_ok=True)

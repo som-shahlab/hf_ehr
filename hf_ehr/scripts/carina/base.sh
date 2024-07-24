@@ -66,3 +66,8 @@ fi
 # Install hf_ehr + Python packages
 python -m pip install -r $REQUIREMENTS
 python -m pip install -e ../../../
+
+# Some a100 / h100 specific installs
+if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]] || [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
+    python -m pip install mamba-ssm==2.2.2 causal-conv1d==1.4.0
+fi

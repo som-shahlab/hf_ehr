@@ -14,6 +14,9 @@ from hf_ehr.config import (
 PATH_TO_CLMBR_JSON: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'clmbr_v8_original_dictionary.json')
 
 if __name__ == '__main__':
+    start_total = time.time()
+    
+    # Load original CLMBR dictionary
     clmbr: Dict[str, List] = json.load(open(PATH_TO_CLMBR_JSON))
     path_to_output_dir: str = os.path.dirname(PATH_TO_CLMBR_JSON)
 
@@ -78,3 +81,6 @@ if __name__ == '__main__':
     print("Number of tokens in new CLMBR vocab: ", n_new_tokens)
     print("Number of tokens in old CLMBR vocab: ", n_old_tokens)
     assert n_new_tokens == n_old_tokens, f"ERROR - Mismatch in vocab lengths"
+    
+    print(f"Total time taken: {round(time.time() - start_total, 2)}s")
+    print("Done!")
