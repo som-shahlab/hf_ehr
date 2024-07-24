@@ -26,11 +26,11 @@ sbatch gpt.sh large femr 1024 approx "+trainer.devices=[1] +logging.wandb.name=c
 
 ## Parallel Runs
 
-To run 4 runs in parallel on the same node (each job gets 1 GPU), you must:
+To launch 4 runs of the `{model}` in parallel on the same node (each job gets 1 GPU), you must:
 
-1. Modify `parallel.sh`, specifically `RUN_NAMES` and `RUN_ARGS`.
+1. Modify `parallel_{model}.sh`, specifically `RUN_NAMES` and `RUN_ARGS`.
 2. Run:
 
 ```bash
-sbatch parallel.sh
+sbatch parallel_{model}.sh
 ```
