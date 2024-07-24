@@ -20,8 +20,8 @@ sbatch gpt.sh base clmbr 8192 approx --is_force_refresh
 # Run GPT-2 large model with FEMR tokenizer, ApproxBatchSampler dataloader, and 1024 context length; resume prior run if exists
 sbatch gpt.sh large femr 1024 approx
 
-# Run GPT-2 large model with FEMR tokenizer, ApproxBatchSampler dataloader, and 1024 context length; resume prior run if exists; overwrite the default device assignment to GPU 1
-sbatch gpt.sh large femr 1024 approx "+trainer.devices=[1]"
+# Run GPT-2 large model with FEMR tokenizer, ApproxBatchSampler dataloader, and 1024 context length; resume prior run if exists; overwrite the default device assignment to GPU 1; give wandb run a name of `custom`
+sbatch gpt.sh large femr 1024 approx "+trainer.devices=[1] +logging.wandb.name=custom"
 ```
 
 ## Parallel Runs
