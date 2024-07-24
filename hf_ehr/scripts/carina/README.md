@@ -33,4 +33,16 @@ To launch 4 runs of the `{model}` in parallel on the same node (each job gets 1 
 
 ```bash
 sbatch parallel_{model}.sh
+
+# bert
+sbatch parallel_bert.sh
+
+# gpt
+sbatch parallel_gpt.sh
+
+# mamba
+sbatch parallel_mamba.sh
+
+# hyena
+sbatch parallel_hyena.sh
 ```
