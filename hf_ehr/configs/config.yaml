@@ -19,7 +19,7 @@ callbacks:
     patience: 3
   model_checkpointing:
     # Save the top K best models according to val/loss. If -1, then save all models
-    save_top_k: 1
+    save_top_k_val_loss: 1
     # Save the most recent K models. If -1, then save all models
     save_most_recent_k: 1
     # Save model every N global steps; if NULL, save after every epoch; overwrites previous model
@@ -31,13 +31,10 @@ callbacks:
     every_n_train_nonPAD_tokens: 300_000_000
     # Save model every N FLOPs; defaults to 10 quadrillion FLOPs
     every_n_flops: 10_000_000_000_000_000
+    # If TRUE, then log validation metrics when saving model checkpoints for: every_n_train_nonPAD_tokens, every_n_flops
+    is_run_eval_on_checkpoint: True
 
 data:
-  # Sampling strategy for dataset: "random", "stratified", "skillit"
-  sampling_strat: null
-  sampling_kwargs: null
-  # Min number of tokens required for a patient timeline to be included in the dataset
-  min_token_count: 
   dataset:
     # Path to FEMR extract
     path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes
@@ -46,7 +43,7 @@ data:
     # To avoid changing the config file for each run, specify the mode and keep both batch_size and 
     # approx_batch_sampler
     # Options: batch, approx
-    mode: batch
+    mode: approx
     # # Batch size to be used.  [note: exclusive with `approx_batch_sampler`]
     batch_size: 4
     # Max tokens in batch to allow  [note: exclusive with `batch_size`]
@@ -60,13 +57,7 @@ data:
     # Max number of codes to feed into model at once per patient.
     max_length: 1024
     # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
-    is_truncation_random: True
-  tokenizer:
-    # Path to tokenizer
-    path_to_code_2_detail: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json
-    # Min number of times a code must occur in our FEMR dataset to be included in our tokenizer -- all other codes are dropped from timelines
-    min_code_count: null
-    is_remap_codes_to_desc: False
+    is_truncation_random: true
 
 trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
@@ -76,7 +67,7 @@ trainer:
   # Whether to clip the gradients based on their 'norm' or 'value'
   gradient_clip_algorithm: norm
   # List of devices to run on
-  devices: 0, 1, 2, 3
+  devices: 0,1,2,3
   # Supports: dp, ddp, ddp2, fsdp, deepspeed
   distributed_backend: ddp
   # Limits training to a minimum number of epochs
@@ -88,7 +79,7 @@ trainer:
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`
   limit_val_batches: null
   # How often we check the validation set within an epoch - `int` is every N batches and `float` is a fraction of the training dataset
-  val_check_interval: 0.35
+  val_check_interval: 0.45
   # Log val at end of every epoch
   check_val_every_n_epoch: 1
   # OPTIMIZER

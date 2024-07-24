@@ -42,6 +42,20 @@ class GradNormCallback(Callback):
     def on_before_optimizer_step(self, trainer, model, optimizer):
         model.log("optim/grad_norm_raw", self.gradient_norm(model))
 
+def trigger_validation(trainer):
+    """
+        Helper function to force a validation loop + metrics logging
+        From: https://github.com/Lightning-AI/pytorch-lightning/blob/f91349c961103af48091654775248789b6e03bd1/src/lightning/pytorch/loops/training_epoch_loop.py#L285
+    """
+    trainer.validating = True
+    first_loop_iter = trainer._logger_connector._first_loop_iter
+    if not trainer.fit_loop._should_accumulate():
+        from lightning.pytorch.trainer import call
+        # clear gradients to not leave any unused memory during validation
+        call._call_lightning_module_hook(trainer, "on_validation_model_zero_grad")
+    trainer.validate_loop.run()
+    trainer.training = True
+    trainer._logger_connector._first_loop_iter = first_loop_iter
 
 class StartTrainingCheckpoint(ModelCheckpoint):
     def __init__(self, **kwargs):
@@ -50,10 +64,10 @@ class StartTrainingCheckpoint(ModelCheckpoint):
     def on_train_start(self, trainer, pl_module):
         if rank_zero_only.rank != 0:
             return
-        checkpoint_file = os.path.join(self.dirpath, f"{self.filename}.ckpt")
-        if not os.path.exists(checkpoint_file):
+        filepath = os.path.join(self.dirpath, f"{self.filename}.ckpt")
+        if not os.path.exists(filepath):
             # Save a checkpoint at the beginning of training
-            self._save_checkpoint(trainer, checkpoint_file)
+            trainer.save_checkpoint(filepath)
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool = False):
@@ -73,7 +87,6 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         self.is_run_val = is_run_val
         self.last_ckpt_metric_value: Optional[Any] = None
         self.is_run_val: bool = is_run_val
-        self.is_validating = False # TODO
 
     def on_train_batch_end(self, trainer, *args, **kwargs):
         if rank_zero_only.rank != 0:
@@ -84,14 +97,13 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
-            print(f"Metric: {self.metric_name} | Metric Value: {metric_value}, Interval: {true_val}, Checkpoint Value: {ckpt_val}")
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
                 trainer.save_checkpoint(filepath)
                 logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
                 self.last_ckpt_metric_value = metric_value
                 if self.is_run_val:
-                    logger.info(f"Triggering validation at step {trainer.global_step} due to metric {self.metric_name} with value ckpt_val={ckpt_val}")
+                    logger.info(f"Validation start | Step {trainer.global_step} | Caused by metric `{self.metric_name}` with value: ckpt_val={ckpt_val} (true_val={true_val})")
                     # Synchronize GPUs
                     # torch.cuda.synchronize()
                     # # Pausing other GPUs
@@ -102,13 +114,10 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
                     #         torch.cuda.synchronize()
                     # # Run validation on the primary GPU
                     # torch.cuda.set_device(current_device)
+                    
                     # Run validation
-                    breakpoint()
-                    _first_loop_iter: Optional[bool] = trainer._logger_connector._first_loop_iter
-                    _results = trainer._logger_connector.trainer._results
-                    trainer.validate(model=trainer.model.module, ckpt_path=None, dataloaders=trainer.val_dataloaders)
-                    trainer._logger_connector._first_loop_iter = _first_loop_iter
-                    trainer._logger_connector.trainer._results = _results
+                    trigger_validation(trainer)
+                    
                     # # Resume other GPUs
                     # for i in range(torch.cuda.device_count()):
                     #     if i != current_device:
@@ -117,7 +126,7 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
                     
                     # # Set back to the original device
                     # torch.cuda.set_device(current_device)
-
+        
     @property
     def state_key(self) -> str:
         kwargs = { 
@@ -129,7 +138,8 @@ def train_flops_metric_func(val: int, last_val: Optional[int], config) -> Tuple[
     interval: int = int(config.callbacks.model_checkpointing.every_n_flops)
     current: int = int(val // interval)
     if last_val is None:
-        return True, int(val), current * interval
+        # Don't create initial ckpt b/c already covered by StartTrainingCheckpoint
+        return False, int(val), current * interval
     else:
         last: int = int(last_val // interval)
         return last < current, int(val), current * interval
@@ -138,7 +148,8 @@ def train_token_metric_func(val: int, last_val: Optional[int], config) -> Tuple[
     interval: int = int(config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens)
     current: int = int(val // interval)
     if last_val is None:
-        return True, int(val), current * interval
+        # Don't create initial ckpt b/c already covered by StartTrainingCheckpoint
+        return False, int(val), current * interval
     else:
         last: int = int(last_val // interval)
         return last < current, int(val), current * interval
@@ -346,11 +357,23 @@ def main(config: DictConfig) -> None:
         ModelCheckpoint(
             dirpath=path_to_ckpt_dir,
             filename='{epoch}-{step}-val_loss',
-            save_top_k=config.callbacks.model_checkpointing.save_top_k,
-            every_n_train_steps=config.callbacks.model_checkpointing.most_recent_every_n_train_steps,
+            save_top_k=config.callbacks.model_checkpointing.save_top_k_val_loss,
+            every_n_train_steps=config.callbacks.model_checkpointing.save_most_recent_every_n_train_steps,
             save_weights_only=False, # If False, then save optimizer + scheduler states as well
             monitor='val/loss',
             mode='min',
+            verbose=True,
+        ),
+        # Save most recent `n = save_most_recent_k` checkpoints; overwrites old models
+        ModelCheckpoint(
+            dirpath=path_to_ckpt_dir,
+            filename='{epoch}-{step}-recent',
+            save_top_k=config.callbacks.model_checkpointing.save_most_recent_k,
+            every_n_train_steps=config.callbacks.model_checkpointing.save_most_recent_every_n_train_steps,
+            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
+            save_weights_only=False, # If False, then save optimizer + scheduler states as well
+            monitor='step',
+            mode='max',
             verbose=True,
         ),
         # Save checkpoint at end of every epoch
@@ -371,18 +394,6 @@ def main(config: DictConfig) -> None:
             save_weights_only=False, # If False, then save optimizer + scheduler states as well
             verbose=True,
         ),
-        # Save most recent `n = save_most_recent_k` checkpoints; overwrites old models
-        ModelCheckpoint(
-            dirpath=path_to_ckpt_dir,
-            filename='{epoch}-{step}-recent',
-            save_top_k=config.callbacks.model_checkpointing.save_most_recent_k,
-            every_n_train_steps=config.callbacks.model_checkpointing.most_recent_every_n_train_steps,
-            save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
-            save_weights_only=False, # If False, then save optimizer + scheduler states as well
-            monitor='step',
-            mode='max',
-            verbose=True,
-        ),
         StartTrainingCheckpoint(
             dirpath=path_to_ckpt_dir,
             filename='first',
@@ -398,7 +409,7 @@ def main(config: DictConfig) -> None:
                 dirpath=path_to_ckpt_dir,
                 metric_name="train/tokens/total_nonPAD",
                 is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
-                is_run_val=True,
+                is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
             ),
         ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
@@ -406,9 +417,9 @@ def main(config: DictConfig) -> None:
         callbacks += [ 
             MetricBasedCheckpoint(
                 dirpath=path_to_ckpt_dir,
-                metric_name="train/tokens/total_flops",
+                metric_name="train/total_flops",
                 is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
-                is_run_val=True,
+                is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
             ),
         ]
         

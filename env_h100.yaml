@@ -1,7 +1,0 @@
-name: hf_env
-dependencies:
-  - pip
-  - python=3.10
-  - pip:
-    - -r requirements_h100.txt
-    - -e .

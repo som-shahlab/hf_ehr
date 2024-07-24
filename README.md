@@ -1,80 +1,104 @@
-# Off-the-Shelf HuggingFace Models for EHRs
+# EHR FM Cookbook
 
-Guiding Questions:
-1. Can we use off the shelf HuggingFace models on our structured EHR data?
-2. Can we ablate the specific benefits of each contribution of models like CLMBR, MOTOR, Med-BERT, etc.?
-3. What are "scaling laws" for Foundation Models for EHRs?
+**Goals:**
+1. Build infrastructure to train off-the-shelf HuggingFace models on structured EHR data
+2. Measure how each of these modeling choices impacts model performance:
+    a. Architecture (bert, gpt, mamba, hyena)
+    b. Model size (120M, ...)
+    c. Context window length (1k, 4k, 8k, 16k)
+    d. Vocab size (...)
+    e. Tokenizer choice (DescEmb, CLMBR, Custom)
+    f. Tokens (...)
+3. Measure "scaling laws" for Foundation Models for EHRs
 
-Side Goals:
-1. Develop personal ML skills (PyTorch Lightning, Hydra, multi-GPU training, Wandb, HuggingFace, etc.)
-2. Create Shah lab ML infrastructure akin to HazyResearch's `safari` repo
+**Evaluations:**
+1. Val/PPL on STARR-OMOP held-out 15% dataset split (canonical FEMR split)
+2. AUROC/AUPRC on EHRSHOT benchmark
 
-Plan:
-1. Train several GPT-2 models at different scales, using the simplest possible patient timeline representation (the raw list of all codes in a patient's timeline)
-2. Test each model on EHRSHOT, compare to CLMBR / count-based baselines
+## Installation
 
-## Setup
-
+1. Install packages
 ```bash
-conda env create -f env.yaml
+conda create -n hf_env python=3.10 -y
 conda activate hf_env
+pip install -r requirements.txt
+pip install -e .
 ```
 
-## How to Run
-
-Launch training run:
+2. [Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
 ```bash
-conda activate hf_env && cd /share/pi/nigam/mwornow/hf_ehr/src/hf_ehr/scripts && source base.sh
-python3 run.py \
-    +models=bert \
-    data.dataloader.batch_size=4 \
-    trainer.accumulate_grad_batches=4 \
-    data.dataloader.n_workers=10 \
-    trainer.devices=[0,1,2,3] \
-    model.config_kwargs.num_hidden_layers=2 \
-    model.config_kwargs.num_attention_heads=2 \
-    model.config_kwargs.hidden_size=256 \
-    callbacks.model_checkpointing.every_n_train_steps=100 \
-    trainer.val_check_interval=100 \
-    trainer.limit_val_batches=20 \
+python3 tokenizers/create_clmbr.py
+python3 tokenizers/create_desc.py
+python3 tokenizers/create_cookbook.py
+```
+
+## Quick Start
+
+We use [Hydra](https://github.com/facebookresearch/hydra) to manage our configurations and [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for training. 
+
+You can either overwrite the config files in `configs/` or pass in CLI arguments to override the defaults.
+
+### Training
+
+See [Scripts README](scripts/carina/README.md) for more details.
+
+There are 3 ways to launch a training run. 
+
+**(A) Easy** -- Launch multiple runs in parallel on the same SLURM node using `scripts/carina/parallel_{model}.sh`:
+
+```bash
+cd scripts/carina
+
+# Launch 4 gpt runs in parallel on the same node. See the file for the specific model versions run.
+sbatch parallel_gpt.sh
+
+# Launch 4 bert runs in parallel on the same node. See the file for the specific model versions run.
+sbatch parallel_bert.sh
+
+# Launch 4 hyena runs in parallel on the same node. See the file for the specific model versions run.
+sbatch parallel_hyena.sh
+
+# Launch 4 mamba runs in parallel on the same node. See the file for the specific model versions run.
+sbatch parallel_mamba.sh
+```
+
+**(B) Medium** -- Launch one run on a SLURM node using `scripts/carina/{model}.sh`:
+
+```bash
+cd scripts/carina
+
+# Launch gpt with: size=base, context_length=1024, tokenizer=CLMBRTokenizer, sampler=ApproxBatchSampler
+sbatch gpt.sh base clmbr 1024 approx
+
+# Launch mamba with: size=large, context_length=16384, tokenizer=CookbookTokenizer, sampler=ApproxBatchSampler
+sbatch mamba.sh large cookbook 16384 approx
+
+# Launch bert with: size=large, context_length=4096, tokenizer=DescTokenizer, sampler=ApproxBatchSampler; set CUDA_VISIBLE_DEVICES=2 and set wandb logging name to "test"
+sbatch bert.sh large desc 4096 approx "+trainer.devices=[2] logging.wandb.name=test"
+```
+
+**(C) Advanced** -- Directly call `run.py`, which allows maximum flexibility for configs:
+
+```bash
+cd scripts/carina
+
+# Launch gpt with: size=base, dataset=v8, context_length=2048, tokenizer=CLMBRTokenizer, sampler=ApproxBatchSampler, max_tokens_per_batch=16384, use_cuda_devices=2,3, wandb_logging_name=gpt2-custom-run, force_restart_existing_run=True, save_to_path=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-test/
+python3 ../run.py \
+    +data=v8 \
+    +trainer=single_gpu \
+    +model=gpt2-base \
+    +tokenizer=clmbr \
+    data.dataloader.mode=approx \
+    data.dataloader.approx_batch_sampler.max_tokens=16384 \
+    data.dataloader.max_length=2048 \
+    model.config_kwargs.n_positions=2048 \
+    trainer.devices=[2,3] \
+    logging.wandb.name=gpt2-custom-run \
+    main.is_force_restart=True \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-test/
 ```
 
-With VSCode debugger:
-```bash
-srun --partition=nigam-v100 --mem=200G --gres=gpu:8 --cpus-per-task=20 --time=48:00:00 --pty bash -i
-conda activate hf_env && cd /share/pi/nigam/mwornow/tools/vscode && ./code tunnel --cli-data-dir /share/pi/nigam/mwornow/tools/vscode/tunnel/ 
-```
-
-
-# Stats
-
-GPT-2-342M (12-layer, 12-head, 768 embed) w/ batch size = 4 and 10 num_workers on 4 v100 32GBs:
-* Memory = 25GB / GPU | Model alone = 4 GB / GPU
-* Train time = 20 hrs / epoch
-
-## Initial Setup
-
-To create the simplest EHR tokenizer (every code is its own token):
-```bash
-python3 create_vocab.py
-python3 create_tokenizer.py
-```
-
-You can generate sentences with the model using (you may change the sampling parameters in the `generate` function in `gpt2_lm.py`):
-```bash
-python interact.py --experiment experiments/lightning_logs/version_{date}
-```
-
-
-### Tensorboard:
-
-Launch tensorboard with:
-```bash
-tensorboard --logdir="experiments/lightning_logs/"
-```
-
-## Evaluation
+### Evaluation
 
 1. In `hf_ehr`, run the following to generate patient representations:
 
@@ -103,3 +127,33 @@ bash 7_eval.sh
 ```
 
 4. Run `8_make_results_plots.sh`
+
+## Configurations
+
+See the [Config README](configs/README.md) for details on all config settings.
+
+## Guide
+
+### Create a Model
+
+Let's say we want to create a new model called `{model}` of size `{size}`.
+
+1. Create the Hydra config YAML for your model architecture in `configs/architecture/{model}.yaml`. Copy the contents of `configs/architecture/bert.yaml` and modify as needed. 
+
+2. Create the Hydra config YAML for your model instantiation in `configs/models/{model}-{size}.yaml`. Copy the contents of `configs/models/bert.yaml` and modify as needed.
+
+Second, create the model itself by creating a new file `models/{model}.py`. Copy the contents of `models/bert.py` and modify as needed.
+
+
+### Create a Tokenizer
+
+See the [Tokenizer README](tokenizers/README.md) for details on creating tokenizers and how they are stored on the file system.
+
+## Miscellaneous
+
+### Tensorboard:
+
+Launch tensorboard with:
+```bash
+tensorboard --logdir="experiments/lightning_logs/"
+```

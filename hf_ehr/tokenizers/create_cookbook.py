@@ -53,6 +53,13 @@ def main():
     wrapper_with_logging(remove_codes_belonging_to_vocabs, 'remove_codes_belonging_to_vocabs', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, excluded_vocabs=excluded_vocabs)
 
     # With `n_procs=5`, should take ~XXXX mins
+    wrapper_with_logging(add_categorical_codes, 'add_categorical_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    
+    # With `n_procs=5`, should take ~XXXX mins
+    wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+
+    # With `n_procs=5`, should take ~XXXX mins
+    # TODO -- figure out how to do with tokenizer
     wrapper_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
 
     print(f"Total time taken: {round(time.time() - start_total, 2)}s")

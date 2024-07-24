@@ -1,7 +1,0 @@
-# @package _global_
-
-data:
-  sampling_strat: "random"
-  sampling_kwargs:
-    # For random sampling, the fraction of the dataset to sample
-    percent: 20

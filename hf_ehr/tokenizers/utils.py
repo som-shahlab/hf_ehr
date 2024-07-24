@@ -19,6 +19,7 @@ from hf_ehr.config import (
 ################################################
 def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, category) in dataset."""
+    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
@@ -36,11 +37,44 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
 
 def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
     """Merge results from `calc_categorical_codes`."""
+    # TODO
     merged: Set[Tuple[str, List[str]]] = set()
     for r in tqdm(results, total=len(results), desc='merge_categorical_codes()'):
         merged = merged.union(r)
     return merged
 
+
+
+################################################
+# Get all numerical_range codes in dataset
+################################################
+def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
+    """Return all (code, start_range, end_range) in dataset."""
+    # TODO
+    path_to_femr_db: str = args[0]
+    pids: List[int] = args[1]
+    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
+
+    results: Set[Tuple[str, List[str]]] = set()
+    for pid in pids:
+        for event in femr_db[pid].events:
+            if (
+                event.value is not None # `value` is not None
+                and ( # `value` is numeric
+                    isinstance(event.value, float)
+                    or isinstance(event.value, int)
+                )
+            ):
+                results[event.code].append(event.value)
+    return results
+
+def merge_numerical_range_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
+    """Merge results from `calc_numerical_range_codes`."""
+    # TODO
+    merged: Set[Tuple[str, List[str]]] = set()
+    for r in tqdm(results, total=len(results), desc='merge_numerical_range_codes()'):
+        merged = merged.union(r)
+    return merged
 
 ################################################
 # Get all unique codes in dataset
@@ -98,13 +132,13 @@ def calc_code_2_occurrence_count(args: Tuple) -> Dict:
     """Given a code, count total # of occurrences in dataset."""
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
-    path_to_tokenizer_config = args[2] # TODO -- ned to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
+    path_to_tokenizer_config = args[2] # TODO -- need to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
     tokenizer_config = load_tokenizer_config_from_path(path_to_tokenizer_config)
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
     results: Dict[str, int] = collections.defaultdict(int)
     for pid in pids:
         for event in femr_db[pid].events:
-            results[event.code] += 1
+            results[event.code] += 1 # TODO - prob something like results[tokenizer(event)] += 1
     return dict(results)
 
 def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict:
@@ -168,6 +202,7 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], **kwargs):
     """Add occurrence count to each entry in tokenizer config."""
+    # TODO
     # Run function in parallel    
     results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_femr_db, pids, **kwargs)
 
