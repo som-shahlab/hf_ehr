@@ -9,6 +9,7 @@ from transformers import PreTrainedTokenizer, AutoTokenizer
 from hf_ehr.config import Event, TokenizerConfigEntry, load_tokenizer_config_from_path, save_tokenizer_config_to_path
 import os
 from tqdm import tqdm
+from omegaconf import OmegaConf, DictConfig
 
 class TokenizerSeqLengthPerPatientCache(TypedDict):
     """Typing for `seq_length_per_patient.json` cache file"""
@@ -82,6 +83,9 @@ class BaseTokenizer(PreTrainedTokenizer):
         super().__init__(*args, **kwargs)
         assert self.path_to_tokenizer_config is not None, f"ERROR - `self.path_to_tokenizer_config` must be set on `init()`"
         assert hasattr(self, 'metadata'), f"ERROR - `self.metadata` must be set on `init()`"
+        # Convert DictConfig to a regular dictionary if necessary
+        if isinstance(self.metadata, DictConfig):
+            self.metadata = OmegaConf.to_container(self.metadata, resolve=True)
         assert isinstance(self.metadata, dict), f"ERROR - `self.metadata` must be a dict, but got {type(self.metadata)}"
         self.path_to_tokenizer_version_dir: str = self.get_path_to_tokenizer_version_dir() # trigger creation of version folder if it doesn't exist
         
@@ -550,10 +554,24 @@ class DescTokenizer(BaseTokenizer):
         
         # Preprocess tokenizer config for quick access
         self.code_2_desc: Dict[str, str] = {}
+        # initialize non special tokens list
+        self.non_special_tokens: List[str] = []
         for entry in self.tokenizer_config:
             if entry.description is not None:
                 self.code_2_desc[entry.code] = entry.description
+                self.non_special_tokens.append(entry.description)
 
+        # Define special tokens 
+        self.special_tokens: List[str] = [
+            self.tokenizer.bos_token,
+            self.tokenizer.eos_token,
+            self.tokenizer.unk_token,
+            self.tokenizer.sep_token,
+            self.tokenizer.pad_token,
+            self.tokenizer.cls_token
+        ]
+        
+    
         super().__init__(
             bos_token=self.tokenizer.bos_token,
             eos_token=self.tokenizer.eos_token,
@@ -592,7 +610,9 @@ class DescTokenizer(BaseTokenizer):
 
         # Concatenate all strings together for tokenization by traditional HF tokenizer
         # List[List[str]] => List[str]
-        batch = [ self.event_separator.join(x) for x in batch ] # type: ignore
+        #batch = [ self.event_separator.join(x) for x in batch ] # type: ignore
+        # Ensure proper filtering of None values
+        batch = [self.event_separator.join(filter(None, x)) for x in batch]
 
         if is_truncation_random:
             max_length: int = kwargs.get("max_length")
