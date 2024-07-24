@@ -318,11 +318,11 @@ def main():
     assert label_values.shape == patient_ids.shape, f"Error - label_values and patient_ids have different shapes: {label_values.shape} vs {patient_ids.shape}"
     assert feature_matrix.shape[0] == tokenized_timelines.shape[0], f"Error - feature_matrix and tokenized_timelines have different lengths: {feature_matrix.shape[0]} vs {tokenized_timelines.shape[0]}"
     results = {
-        'data_matrix' : feature_matrix, 
+        'data_matrix' : feature_matrix, # frozen features from model
         'patient_ids' : patient_ids,
         'labeling_time' : label_times,
         'label_values' : label_values,
-        'tokenized_timelines' : tokenized_timelines,
+        'tokenized_timelines' : tokenized_timelines, # tokenized timeline for each patient in EHRSHOT
         'wandb_run_id' : wandb_run_id,
         'path_to_ckpt_ehrshot' : path_to_model_ehrshot_dir,
         'path_to_ckpt_orig' : PATH_TO_MODEL,

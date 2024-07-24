@@ -11,10 +11,10 @@
 # source base.sh
 
 python3 ../run.py \
-    +models=gpt2 \
-    +trainer=single_gpu \
     +data=v8 \
-    +tokenizer=femr \
+    +trainer=single_gpu \
+    +model=gpt2-base \
+    +tokenizer=clmbr \
     data.dataloader.mode=approx \
     data.dataloader.approx_batch_sampler.max_tokens=4000 \
     data.dataloader.approx_batch_sampler.bucket_size=10 \
@@ -25,9 +25,11 @@ python3 ../run.py \
     model.config_kwargs.n_head=2 \
     model.config_kwargs.n_embd=128 \
     trainer.limit_train_batches=50000 \
-    trainer.limit_val_batches=0 \
+    trainer.limit_val_batches=2 \
     trainer.max_epochs=2 \
-    data.dataset.is_debug=False \
+    callbacks.model_checkpointing.every_n_train_nonPAD_tokens=10000 \
+    callbacks.model_checkpointing.every_n_flops=1000000 \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/test/ \
-    main.is_force_restart=False \
-    callbacks.model_checkpointing.most_recent_every_n_train_steps=1000
+    data.dataset.is_debug=True \
+    main.is_force_restart=True \
+    logging.wandb.name=test

@@ -738,7 +738,11 @@ if __name__ == '__main__':
         print(tokens)
     
     dataset = FEMRDataset(path_to_femr_extract, split='test', is_debug=False)
-    tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata={ 'desc_emb_tokenizer' : 'bert-base-uncased', 'excluded_vocabs' : ['STANFORD_OBS'] })
+    tokenizer = DescTokenizer(PATH_TO_TOKENIZER_DESC_v8_CONFIG,
+                              metadata={ 
+                                'desc_emb_tokenizer' : 'bert-base-uncased', 
+                                'excluded_vocabs' : ['STANFORD_OBS'] 
+                              })
     tokenizer.get_seq_length_per_patient(dataset, n_procs=5)
     exit()
     

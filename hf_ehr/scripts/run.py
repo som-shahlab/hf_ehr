@@ -56,7 +56,7 @@ class StartTrainingCheckpoint(ModelCheckpoint):
             self._save_checkpoint(trainer, checkpoint_file)
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
-    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool):
+    def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool = False):
         """
             is_valid_metric_func: Callable
                 Inputs: 
@@ -70,26 +70,54 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         self.metric_name: str = metric_name
         self.is_valid_metric_func: Callable = is_valid_metric_func
         self.dirpath: str = dirpath
+        self.is_run_val = is_run_val
         self.last_ckpt_metric_value: Optional[Any] = None
         self.is_run_val: bool = is_run_val
+        self.is_validating = False # TODO
 
     def on_train_batch_end(self, trainer, *args, **kwargs):
         if rank_zero_only.rank != 0:
             return
+        
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
         
-        if self.is_run_val:
-            trainer.run_evaluation(test_mode=False)
-
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+            print(f"Metric: {self.metric_name} | Metric Value: {metric_value}, Interval: {true_val}, Checkpoint Value: {ckpt_val}")
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
                 trainer.save_checkpoint(filepath)
                 logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
                 self.last_ckpt_metric_value = metric_value
-    
+                if self.is_run_val:
+                    logger.info(f"Triggering validation at step {trainer.global_step} due to metric {self.metric_name} with value ckpt_val={ckpt_val}")
+                    # Synchronize GPUs
+                    # torch.cuda.synchronize()
+                    # # Pausing other GPUs
+                    # current_device = torch.cuda.current_device()
+                    # for i in range(torch.cuda.device_count()):
+                    #     if i != current_device:
+                    #         torch.cuda.set_device(i)
+                    #         torch.cuda.synchronize()
+                    # # Run validation on the primary GPU
+                    # torch.cuda.set_device(current_device)
+                    # Run validation
+                    breakpoint()
+                    _first_loop_iter: Optional[bool] = trainer._logger_connector._first_loop_iter
+                    _results = trainer._logger_connector.trainer._results
+                    trainer.validate(model=trainer.model.module, ckpt_path=None, dataloaders=trainer.val_dataloaders)
+                    trainer._logger_connector._first_loop_iter = _first_loop_iter
+                    trainer._logger_connector.trainer._results = _results
+                    # # Resume other GPUs
+                    # for i in range(torch.cuda.device_count()):
+                    #     if i != current_device:
+                    #         torch.cuda.set_device(i)
+                    #         torch.cuda.synchronize()
+                    
+                    # # Set back to the original device
+                    # torch.cuda.set_device(current_device)
+
     @property
     def state_key(self) -> str:
         kwargs = { 
@@ -364,6 +392,7 @@ def main(config: DictConfig) -> None:
     ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens', None) not in [None, "None"]:
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
+        print("Adding MetricBasedCheckpoint for non-PAD tokens...")
         callbacks += [ 
             MetricBasedCheckpoint(
                 dirpath=path_to_ckpt_dir,
@@ -382,6 +411,7 @@ def main(config: DictConfig) -> None:
                 is_run_val=True,
             ),
         ]
+        
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
     
@@ -413,10 +443,17 @@ def main(config: DictConfig) -> None:
     )
 
     # Run
-    trainer.fit(model, 
-                train_dataloaders=dataloaders['train'],
-                val_dataloaders=dataloaders['val'],
-                ckpt_path=path_to_resume_ckpt)
+    try:
+        trainer.fit(model, 
+                    train_dataloaders=dataloaders['train'],
+                    val_dataloaders=dataloaders['val'],
+                    ckpt_path=path_to_resume_ckpt)
+    except Exception as e:
+        print("Exception during trainer.fit:")
+        print(e)
+        import traceback
+        traceback.print_exc()
+        exit()
     if is_wandb:
         wandb.finish()
 

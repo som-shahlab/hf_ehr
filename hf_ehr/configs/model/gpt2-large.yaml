@@ -9,7 +9,7 @@ data:
 
 model:
   config_kwargs:
-    n_positions: ${model.dataloader.max_length}
+    n_positions: ${data.dataloader.max_length}
     n_layer: 36
     n_head: 20
     n_embd: 1280

@@ -23,12 +23,12 @@ trap 'stop_child_processes' SIGTERM SIGINT
 source base.sh
 
 # Experiment names
-RUN_NAMES=("hyena-medium-1024--clmbr" "hyena-medium-4096--clmbr" "hyena-medium-8192--clmbr" "hyena-medium-16384--clmbr" )
+RUN_NAMES=("hyena-large-1024--clmbr" "hyena-large-4096--clmbr" "hyena-large-8192--clmbr" "hyena-large-16384--clmbr" )
 RUN_ARGS=(
-    "hyena.sh medium clmbr 1024 approx"
-    "hyena.sh medium clmbr 4096 approx"
-    "hyena.sh medium clmbr 8192 approx"
-    "hyena.sh medium clmbr 16384 approx"
+    "hyena.sh large clmbr 1024 approx"
+    "hyena.sh large clmbr 4096 approx"
+    "hyena.sh large clmbr 8192 approx"
+    "hyena.sh large clmbr 16384 approx"
 )
 
 # Ensure that 1 <= len(RUN_ARGS) <= 5
