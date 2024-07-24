@@ -77,3 +77,59 @@ The folder structure is as follows:
 **!!** When loading a tokenizer, we will look for an exact match with that tokenizer + dataset's `metadata` attribute to an existing `metadata.json` file. If no match is found, then the relevant files will be recreated from scratch. 
 
 Note that this can take some time! (e.g. 10+ hrs). However, once it is run, the tokenizer will be saved to disk and can be loaded quickly in the future.
+
+## Tokenizer Config File Format
+
+### `tokenizer_config.json`
+
+The `tokenizer_config.json` file contains the main config with all tokens for this tokenizer. It is a JSON object structured as follows:
+
+* `timestamp` -- str *= datetime.datetime.now().isoformat()* -- An ISO-formatted timestamp of when this config was created
+* `metadata` -- Dict[str, Any] -- Arbitrary metadata about the tokenizer, e.g. remap numerical codes, excluded vocabs, etc.
+* `tokens` -- List[TokenizerConfigEntry] -- A list of `hf_ehr.config.TokenizerConfigEntry` objects. Please see the [Token Config Entry](#token-config-entry) section below for more details.
+
+**Example:** This is from the `clmbr_v8/tokenizer_config.json`:
+
+```json
+{
+  "timestamp": "2024-07-24T09:23:17.613609",
+  "metadata": {},
+  "tokens": [
+    {
+      "code": "SNOMED/3950001",
+      "type": "code",
+      "description": null,
+      "tokenization": {},
+      "stats": [
+        {
+          "type": "count_occurrences",
+          "split": "train",
+          "dataset": "v8",
+          "count": null
+        },
+      ]
+    },
+    {
+      "code": "Domain/OMOP generated",
+      "type": "code",
+      "description": null,
+      "tokenization": {},
+      "stats": [
+        {
+          "type": "count_occurrences",
+          "split": "train",
+          "dataset": "v8",
+          "count": null
+        },
+      ]
+    },
+    ...
+  ]
+}
+```
+
+## `TokenizerConfigEntry`
+
+Each token is stored as a `TokenizerConfigEntry`. It defines how to map a clinical event => a token. 
+
+The definition for this object is in [hf_ehr/config.py](hf_ehr/config.py).

@@ -74,24 +74,24 @@ class TCEStat():
 @dataclass()
 class CountOccurrencesTCEStat(TCEStat):
     # Counts total # of occurrences of token in dataset split
-    split: Optional[str] = None
     dataset: Optional[str] = None
+    split: Optional[str] = None
     count: Optional[str] = None
     type: str = 'count_occurrences'
 
 @dataclass()
 class CountPatientsTCEStat(TCEStat):
     # Counts total # of unique patients with this token in dataset split
-    split: Optional[str] = None
     dataset: Optional[str] = None
+    split: Optional[str] = None
     count: Optional[int] = None
     type: str = 'count_patients'
 
 @dataclass()
 class PPLTCEStat(TCEStat):
     # Record the average perplexity of the token in the dataset split
-    split: Optional[str] = None
     dataset: Optional[str] = None
+    split: Optional[str] = None
     model: Optional[str] = None
     ppl: Optional[float] = None
     type: str = 'ppl'
