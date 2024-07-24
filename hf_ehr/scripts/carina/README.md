@@ -4,8 +4,8 @@ Usage: `sbatch gpt.sh <model_size> <tokenizer> <context_length> <dataloader_mode
 
 where...
 - `<model_size>` is the model size (e.g., `base`, `large`)
-- `<tokenizer>` is the tokenizer to use (e.g., `clmbr`, `femr`)
-- `<context_length>` is the context length (e.g., `1024`, `2048`, `4096`, `8192`)
+- `<tokenizer>` is the tokenizer to use (e.g., `clmbr`, `cookbook`, `desc`)
+- `<context_length>` is the context length (e.g., `1024`, `2048`, `4096`, `8192`, `16384`)
 - `<dataloader_mode>` is the dataloader mode (e.g., `batch`, `approx`)
 - `[<extra>]` is an optional string that will get appended to the end of the `python ../run.py` command verbatim
 - `--is_force_refresh` is an optional flag to force refresh the run (i.e., delete the existing run and start from scratch)
