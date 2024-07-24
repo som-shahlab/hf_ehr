@@ -85,7 +85,6 @@ if __name__ == '__main__':
     reloader = WandbRelogger('hf_ehr', 'ehr-fm')
     new_run = reloader.relog_metrics(ckpt_path, run_log_path)
     print(new_run.id)
-    breakpoint()
     new_run.finish()
     
     # This code loads the model checkpoint and "global_step" contains the int for the current step

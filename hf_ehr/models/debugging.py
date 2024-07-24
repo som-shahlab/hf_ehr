@@ -68,7 +68,6 @@ for i, batch in tqdm(enumerate(train_dataloader), total=batch_index, desc='Loopi
     if i == batch_index:
         print(f"Batch {batch_index} @ idx={i}:\n")
         print(batch)
-        breakpoint()
 
 
 

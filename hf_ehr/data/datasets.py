@@ -116,7 +116,6 @@ if __name__ == '__main__':
     desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
     biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
     pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
-    # breakpoint()
     # Dataset
     train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
     #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
