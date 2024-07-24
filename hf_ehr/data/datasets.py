@@ -7,11 +7,10 @@ import numpy as np
 from jaxtyping import Float
 from transformers import AutoTokenizer
 from hf_ehr.config import GPU_BASE_DIR, Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
-from hf_ehr.data.tokenization import CookbookTokenizer, DescTokenizer
 
 class FEMRDataset(Dataset):
     """Dataset that returns patients in a FEMR extract.
-        Index is a specific patient, so you can only retrieve ONE sample per patient.
+        dataset[idx] = a specific patient, so you can only retrieve ONE sample per patient.
         Note: Takes 1.5 hrs to loop through all event.code of all 3769353 patients in STARR-OMOP-deid-lite.
     """
     def __init__(self, 
@@ -30,6 +29,7 @@ class FEMRDataset(Dataset):
         # Set metadata -- used for tokenizer versioning later
         # ! CAUTION: Essential that this contains all args/kwargs; otherwise get_seq_length_per_patient() in tokenizer breaks!
         self.metadata = {
+            'cls' : 'FEMRDataset',
             'path_to_femr_extract': path_to_femr_extract,
             'split' : split,
             'is_debug' : is_debug,
@@ -54,6 +54,9 @@ class FEMRDataset(Dataset):
             self.val_pids = self.val_pids[:1000]
             self.test_pids = self.test_pids[:1000]
     
+    def get_n_patients(self) -> int:
+        return len(self.get_pids())
+
     def get_pids(self) -> np.ndarray:
         """Return patient ids for this split"""
         if self.split == 'train':
@@ -71,7 +74,6 @@ class FEMRDataset(Dataset):
     
     def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
         """Return all event codes for this patient at `idx` in `self.split`.
-            Does any preprocessing necessary for e.g. converting numerical/desc codes.
         """
         pids: np.ndarray = self.get_pids()
         pid: int = pids[idx]
@@ -89,35 +91,63 @@ class FEMRDataset(Dataset):
 
 class AllTokensFEMRDataset(FEMRDataset):
     """
-        Wrapper around FEMRDataset that inde returns all tokens in the dataset.
-        Index is a specific sequence of tokens, so you can retrieve MULTIPLE samples per patient.
-        Requires you to know the tokenizer up front so that it knows how much to chunk each patient by.
+        Wrapper around FEMRDataset that returns all tokens in the dataset.
+        dataset[idx] = a specific sequence of tokens, so you can retrieve MULTIPLE samples per patient.
+        Requires you to know (a) the tokenizer up front and (b) max_length per example, so that it knows how much to chunk each patient by.
     """
-    def __init__(self, tokenizer, *args, **kwargs):
+    def __init__(self, 
+                 tokenizer, 
+                 max_length: int,
+                 *args, 
+                 **kwargs):
         super().__init__(*args, **kwargs)
+        self.tokenizer = tokenizer
+        self.metadata = {
+            **self.metadata,
+            'tokenizer_metadata' : tokenizer.metadata,
+            'max_length' : max_length, # data.dataloader.max_length -- max length of a single sequence
+            'cls' : 'AllTokensFEMRDataset',
+        }
+        # Number of tokens per patient timeline
+        self.seq_length_per_patient: List[int] = tokenizer.get_seq_length_per_patient(self, n_procs=5)
+        # Number of unique examples that will be extracted per patient by truncating their timeline to `max_length` tokens
+        self.n_examples_per_patient: List[int] = [ int(np.ceil(seq_length / max_length)) for seq_length in self.seq_length_per_patient ]
+
+        # Map [idx] => (pid, start idx in pid's timeline, end idx in pid's timeline)
+        self.idx_to_pid_start_end: List[Tuple[int, int, int]] = [
+            (p_idx, i * max_length, min((i + 1) * max_length, self.seq_length_per_patient[p_idx]))
+            for p_idx, n_examples in enumerate(self.n_examples_per_patient)
+            for i in range(n_examples)
+        ]
+        assert len(self.idx_to_pid_start_end) == sum(self.n_examples_per_patient), f"{len(self.idx_to_pid_start_end)} != {sum(self.n_examples_per_patient)}"
 
     def __len__(self) -> int:
-        pass
+        return len(self.idx_to_pid_start_end)
     
     def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
         """
-            Return all event codes for this patient at `idx` in `self.split`.
-            Does any preprocessing necessary for e.g. converting numerical/desc codes.
+            Return all event codes for this example at `idx` in `self.split`.
+            Maps this `idx` to the proper subsequence of events in this patient's timeline.
         """
-        pass
+        (p_idx, start, end) = self.idx_to_pid_start_end[idx]
+        (pid, events) = super().__getitem__(p_idx) # Fetch all events for this patient
+        tokens = self.tokenizer(tokens)
+        assert len(tokens) <= end, f"len(tokens)={len(tokens)} > end={end}"
+        tokens = tokens[start:end] # Truncate to the proper subsequence for `idx`
+        return (pid, tokens)
 
 if __name__ == '__main__':
-    path_to_femr_extract: str = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes/'.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
-    path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'
-    #path_to_code_2_detail: str = '/share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/code_2_detail.json'.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', GPU_BASE_DIR)
+    from hf_ehr.data.tokenization import CLMBRTokenizer, DescTokenizer
+    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
     
     # Tokenizer
-    tokenizer = CookbookTokenizer(path_to_code_2_detail)
-    desc_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("bert-base-uncased"))
-    biogpt_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("microsoft/biogpt"))
-    pubmed_tokenizer = DescTokenizer(AutoTokenizer.from_pretrained("stanford-crfm/pubmed_gpt_tokenizer"))
+    tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
+
     # Dataset
-    train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
+    train_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='train', is_debug=True)
+    val_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='val', is_debug=True)
+    test_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='test', is_debug=True)
+    # train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
     #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
     #test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
 
@@ -137,49 +167,3 @@ if __name__ == '__main__':
     # # Print average time per event
     # print("Average time per patient: ", (t2 - t1) / 100000)
     # print("Average time per event: ", (t2 - t1) / event_count)
-    """
-    # Dataset with numerical lab remapping
-    train_dataset_numerical = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=True)
-    # Dataset with textual desc code remapping
-    train_dataset_desc = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_codes_to_desc=True)
-    
-    # Check numerical codes
-    breakpoint()
-    print("bert tokenizer")
-    print(train_dataset_desc[-1])
-    print(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
-    print(desc_tokenizer.batch_decode(desc_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    breakpoint()
-    print("pubmed tokenizer")
-    print(train_dataset_desc[-1])
-    print(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
-    print(pubmed_tokenizer.batch_decode(pubmed_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    breakpoint()
-    print("biogpt tokenizer")
-    print(train_dataset_desc[-1])
-    print(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids'])
-    print(biogpt_tokenizer.batch_decode(biogpt_tokenizer(train_dataset_desc[-1:][1])['input_ids']))
-    breakpoint()
-    
-    exit()    
-    train_seq_lengths: List[int] = train_dataset.get_seq_lengths()
-    val_seq_lengths: List[int] = val_dataset.get_seq_lengths()
-    test_seq_lengths: List[int] = test_dataset.get_seq_lengths()
-    assert len(train_seq_lengths) == len(train_dataset)
-    assert len(val_seq_lengths) == len(val_dataset)
-    assert len(test_seq_lengths) == len(test_dataset)
-
-    # Sanity checking
-    print(train_dataset)
-    print(train_dataset[-1])
-    print(tokenizer(train_dataset[-1:][1])['input_ids'])
-    print(tokenizer.batch_decode(tokenizer(train_dataset[-1:][1])['input_ids']))
-    assert tokenizer(train_dataset[-1:][1])['input_ids'] == [[109803, 8187, 8185, 93995, 91564, 95332, 154435, 155073, 91689, 8184, 155175, 49815, 167230]]
-    
-    long_seq = [x for i in range(10) for x in train_dataset[i][1] ]
-    assert len(long_seq) == 2846
-    print(tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'])
-    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=1)['input_ids'] == [[150436, 135719, 147624]]
-    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=2)['input_ids'] == [[91787, 97637, 97429]]
-    assert tokenizer(long_seq, is_truncation_random=True, max_length=3, seed=3)['input_ids'] == [[167230, 98027, 98027]]    
-    """

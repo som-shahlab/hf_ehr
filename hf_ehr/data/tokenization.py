@@ -172,8 +172,13 @@ class BaseTokenizer(PreTrainedTokenizer):
             
     def get_seq_length(self, args: Tuple['FEMRDataset', int, int]) -> List[Tuple[int, int]]:
         """Given a dataset and a range of indices, return the sequence length of each patient in that range"""
-        from hf_ehr.data.datasets import FEMRDataset
+        from hf_ehr.data.datasets import FEMRDataset, AllTokensFEMRDataset
         dataset_metadata, start_idx, end_idx = args # type is: FEMRDataset, int, int
+        
+        # remove extraneous keys so that we can init FEMRDataset() without errors
+        for key in [ 'cls', 'tokenizer_metadata', 'max_length' ]:
+            if key in dataset_metadata: del dataset_metadata[key]
+        
         dataset = FEMRDataset(**dataset_metadata)
         results: List[Tuple[int, int]] = []
         for idx in range(start_idx, end_idx):
@@ -200,22 +205,22 @@ class BaseTokenizer(PreTrainedTokenizer):
                 data: TokenizerSeqLengthPerPatientCache = json.load(open(path_to_cache_file, 'r'))
                 seq_lengths: List[int] = data['seq_lengths']
                 if (
-                    len(seq_lengths) == len(dataset) 
+                    len(seq_lengths) == dataset.get_n_patients() 
                     and is_metadata_equal(self.metadata, data.get('tokenizer_metadata'))
                     and is_metadata_equal(dataset.metadata, data.get('dataset_metadata'))
                 ):
                     return seq_lengths
-                print(f"The # of `seq_lengths` in `{path_to_cache_file}` didn't match this dataset's length ({len(seq_lengths)} != {len(dataset)}) or the `metadata` differed for tokenizer ({self.metadata} != {data['tokenizer_metadata']}) or dataset ({dataset.metadata} != {data['dataset_metadata']}), so recreating `seq_length_per_patient.json` from scratch now...")
+                print(f"The # of `seq_lengths` in `{path_to_cache_file}` didn't match this dataset's length ({len(seq_lengths)} != {dataset.get_n_patients()}) or the `metadata` differed for tokenizer ({self.metadata} != {data['tokenizer_metadata']}) or dataset ({dataset.metadata} != {data['dataset_metadata']}), so recreating `seq_length_per_patient.json` from scratch now...")
             else:
                 print(f"No `seq_length_per_patient.json` found at `{path_to_cache_file}` for split=`{dataset.split}`. Generating `seq_length_per_patient.json` now...")
 
         # Calculate seq lengths in parallel
         if n_procs == 1:
-            tasks: List[Tuple] = [(dataset.metadata, start, min(len(dataset), start + 1),) for start in range(0, len(dataset), 1) ]
+            tasks: List[Tuple] = [(dataset.metadata, start, min(dataset.get_n_patients(), start + 1),) for start in range(0, dataset.get_n_patients(), 1) ]
             results: List[List[Tuple[int,int]]] = [ self.get_seq_length(t) for t in tqdm(tasks, total=len(tasks), desc=f"tokenizer.get_seq_length_per_patient() | n_procs={n_procs}") ]
         else:
             chunk_size: int = 5_000
-            tasks: List[Tuple] = [(dataset.metadata, start, min(len(dataset), start + chunk_size),) for start in range(0, len(dataset), chunk_size) ]
+            tasks: List[Tuple] = [(dataset.metadata, start, min(dataset.get_n_patients(), start + chunk_size),) for start in range(0, dataset.get_n_patients(), chunk_size) ]
             with multiprocessing.Pool(processes=n_procs) as pool:
                 results: List[List[Tuple[int,int]]] = list(tqdm(pool.imap_unordered(self.get_seq_length, tasks), total=len(tasks), desc=f"tokenizer.get_seq_length_per_patient() | n_procs={n_procs}"))
         flattened_results: List[Tuple[int, int]] = [ x for sublist in results for x in sublist ] # type: ignore
@@ -349,7 +354,10 @@ class CookbookTokenizer(BaseCodeTokenizer):
                  metadata: Optional[Dict[str, Any]] = None) -> None:
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        
+        # Set metadata
         self.metadata: Dict[str, Any] = {} if metadata is None else metadata
+        self.metadata['cls'] = 'CookbookTokenizer'
 
         # Metadata
         self.is_remap_numerical_codes_to_quantiles: bool = metadata.get('is_remap_numerical_codes_to_quantiles', False)
@@ -435,7 +443,10 @@ class CLMBRTokenizer(BaseCodeTokenizer):
     def __init__(self, path_to_tokenizer_config: str) -> None:
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        
+        # Set metadata        
         self.metadata: Dict[str, Any] = {}
+        self.metadata['cls'] = 'CLMBRTokenizer'
 
         # Preprocess tokenizer config for quick access
         self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
@@ -506,7 +517,7 @@ class CLMBRTokenizer(BaseCodeTokenizer):
         return None
 
 class DescTokenizer(BaseTokenizer):
-    """Converts codes => textual descriptions, then tokenizes
+    """Converts codes => textual descriptions, then tokenizes using a normal text tokenizer (e.g. BERT)
     """
     def __init__(self, 
                  path_to_tokenizer_config: str, 
@@ -515,7 +526,10 @@ class DescTokenizer(BaseTokenizer):
         assert 'desc_emb_tokenizer' in metadata, f"ERROR - `metadata` must contain a 'desc_emb_tokenizer' key, but got {metadata}"
         self.path_to_tokenizer_config: str = path_to_tokenizer_config
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        
+        # Set metadata
         self.metadata: Dict[str, Any] = {} if metadata is None else metadata
+        self.metadata['cls'] = 'DescTokenizer'
 
         # Load underlying textual tokenizer
         self.desc_emb_tokenizer: str = metadata['desc_emb_tokenizer']

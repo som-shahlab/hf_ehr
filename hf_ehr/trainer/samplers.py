@@ -125,3 +125,74 @@ class ApproxBatchSampler(BatchSampler):
                 max_length = max([self.sample_lengths[i] for i in batch])
         if len(batch) > 0:
             yield batch
+
+
+class ApproxBatchSampler2(BatchSampler):
+    """
+	Parameters:
+	-----------
+	sampler : Pytorch Sampler
+		Choose base sampler class to use for bucketing
+
+	max_tokens : int
+		Maximum number of tokens per batch
+
+	max_examples: int
+		Maximum examples in a single batch
+
+	sample_lengths : array-like
+		List of lengths of sequences in the order of the dataset
+	"""
+
+    def __init__(self, 
+                sample_lengths: List[int], 
+                sampler, 
+                model_context_window: int, 
+                max_tokens: int = 99999999, 
+                max_examples: int = 99999999, 
+                batch_mult: int = 1, 
+                drop_last: bool = True):
+        self.sample_lengths: List[int] = sample_lengths
+        self.sampler = sampler
+        self.model_context_window: int = model_context_window # max size of seq that model can handle, so any seq great than this will get truncated anyway
+        self.max_tokens: int = max_tokens # max tokens per batch
+        self.max_examples: int = max_examples # max examples per batch
+        self.batch_mult: int = batch_mult # make batch sizes a multiple of this
+        self.drop_last: bool = drop_last
+        self.length = None # result of len(self)
+        self.last_length_epoch_calc = None # for tracking self.length caching
+        assert self.max_tokens >= self.model_context_window, f"ERROR: max_tokens ({self.max_tokens}) must be >= model_context_window ({self.model_context_window}). Otherwise, you could get a sequence that is too long to be included in any batch, i.e. len(seq) == model_context_window > max_tokens, which means some batches will return empty which throws an error. It doesn't make sense to limit the batch size to be less than the model context window, b/c then you'll never fully fill the model's context window."
+
+    def __len__(self):
+        if not (self.length and self.last_length_epoch_calc == self.sampler.epoch): 
+            # Calculate length of batch sampler
+            self.last_length_epoch_calc = self.sampler.epoch
+            length = 0
+            for __ in iter(self):
+                length += 1
+            self.length = length
+        return self.length
+
+    def __iter__(self):
+        batch = []
+        max_length: int = 0
+        for idx in self.sampler:
+            # We want to save All Tokens, so split timeline into chunks of `model_context_window` tokens
+            for chunk in range(0, self.sample_lengths[idx], self.model_context_window):
+                this_length: int = min(self.sample_lengths[idx], self.model_context_window)
+                linear = (len(batch) + 1) * max(max_length, this_length)
+                if linear <= self.max_tokens:
+                    batch.append(idx)
+                    max_length = max(max_length, this_length)
+                    if len(batch) == self.max_examples:
+                        yield batch
+                        batch = []
+                        max_length = 0
+                else:
+                    rounded_n = (len(batch) // self.batch_mult) * self.batch_mult
+                    rounded_n = max(1, rounded_n)
+                    yield batch[:rounded_n]
+                    batch = batch[rounded_n:] + [idx]
+                    max_length = max([self.sample_lengths[i] for i in batch])
+        if len(batch) > 0:
+            yield batch
