@@ -1,10 +1,11 @@
 import datetime
 import json
 import os
-from typing import TypedDict, Dict, Optional, List, Any, Literal, Union, Tuple
+from typing import TypedDict, Dict, Optional, List, Any, Literal, Union, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 from loguru import logger
 from dataclasses import dataclass, asdict, field
+import logging
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
@@ -35,6 +36,28 @@ PATH_TO_TOKENIZER_v8_CLMBR_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer
 PATH_TO_TOKENIZER_v9_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v9/')
 PATH_TO_TOKENIZER_v9_LITE_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v9_lite/')
 # TODO - OLD - remove end
+
+def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: Any) -> None:
+    """
+    Wrapper function to log the execution of another function and optionally handle multiprocessing.
+    
+    Parameters:
+    - func: The function to be executed.
+    - func_name: The name of the function, used for logging.
+    - *args, **kwargs: Arguments and keyword arguments for the function.
+    
+    Returns:
+    - None
+    """
+    logging.info(f"Starting {func_name} with args={args} and kwargs={kwargs}...")
+    
+    try:
+        # Call the function directly, let the function itself manage multiprocessing if needed
+        func(*args, **kwargs)
+        logging.info(f"Finished {func_name} successfully.")
+    except Exception as e:
+        logging.error(f"Error in {func_name}: {str(e)}")
+        raise
 
 # TODO - OLD - remove start
 class Detail(TypedDict):

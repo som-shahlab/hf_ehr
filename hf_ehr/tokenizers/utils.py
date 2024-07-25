@@ -32,7 +32,7 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
                 and event.value != '' # `value` is not blank
                 and isinstance(event.value, str) # `value` is textual
             ):
-                results.add((event.code, [ event.value ]))
+                results.add((event.code, (event.value,)))
     return results
 
 def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
@@ -183,15 +183,19 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    existing_entries: Set[Tuple[str, List[str]]] = set([ (t.code, t.tokenization['categories']) for t in tokenizer_config if t.type == 'categorical' ])
+    existing_entries: Set[Tuple[str, Tuple[str, ...]]] = set(
+    (t.code, tuple(t.tokenization['categories'])) for t in tokenizer_config if t.type == 'categorical'
+)
     for (code, categories) in tqdm(results, total=len(results), desc='add_categorical_codes() | Adding entries to tokenizer_config...'):
+        # Convert categories to a tuple to make it hashable
+        categories_tuple = tuple(categories)
         # Skip tokens that already exist
-        if (code, categories) in existing_entries: 
+        if (code, categories_tuple) in existing_entries: 
             continue
         tokenizer_config.append(CategoricalTCE(
             code=code,
             tokenization={
-                'categories' : categories,
+                'categories': categories_tuple,
             }
         ))
     
