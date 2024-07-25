@@ -2,7 +2,7 @@ import os
 import argparse
 import time
 from typing import Any, Callable, Dict, List
-from utils import add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
+from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset
 from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, wrapper_with_logging
 import logging
@@ -60,7 +60,7 @@ def main():
     wrapper_with_logging(add_categorical_codes, 'add_categorical_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
     
     # With `n_procs=5`, should take ~XXXX mins
-    #wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
 
     # With `n_procs=5`, should take ~XXXX mins
     # TODO -- figure out how to do with tokenizer
