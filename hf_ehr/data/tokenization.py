@@ -693,10 +693,17 @@ def torch_mask_tokens(tokenizer: BaseTokenizer,
     probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
     masked_indices = torch.bernoulli(probability_matrix).bool()
     labels[~masked_indices] = -100  # We only compute loss on masked tokens
+    
+    # Check if mask_token is set properly
+    if tokenizer.mask_token is None:
+        raise ValueError("The tokenizer's mask_token is not set.")
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
     indices_replaced = torch.bernoulli(torch.full(labels.shape, 0.8)).bool() & masked_indices
-    inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+    mask_token_id = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
+    if mask_token_id is None:
+        raise ValueError(f"The mask token {tokenizer.mask_token} could not be converted to an ID.")
+    inputs[indices_replaced] = mask_token_id
 
     # 10% of the time, we replace masked input tokens with random word
     indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
