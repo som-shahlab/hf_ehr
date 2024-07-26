@@ -86,7 +86,7 @@ Launch one run on a SLURM node using `hf_ehr/scripts/carina/{model}.sh`:
 cd hf_ehr/scripts/carina
 
 # Launch GPT-2 base model on v8 dataset with CLMBRTokenizer, ApproxBatchSampler dataloader, and 2048 context length; force train from scratch and not resume prior run (even if exists)
-python3 main.py --model gpt --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8 --is_force_refresh
+python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8 --is_force_refresh
 
 # Launch Mamba tiny model on v8 dataset with CookbookTokenizer, ApproxBatchSampler dataloader, and 16384 context length; resume prior run if exists
 python3 main.py --model mamba --size tiny --tokenizer cookbook --context_length 16384 --dataloader approx --dataset v8
@@ -95,7 +95,7 @@ python3 main.py --model mamba --size tiny --tokenizer cookbook --context_length 
 python3 main.py --model bert --size base --tokenizer desc --context_length 4096 --dataloader approx --dataset v8 --extra "+trainer.devices=[1] +logging.wandb.name=custom"
 
 # Launch GPT-2 large model on v8 AllTokens dataset with CLMBRTokenizer, ApproxBatchSampler dataloader, and 1024 context length
-python3 main.py --model gpt --size large --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8-alltokens
+python3 main.py --model gpt2 --size large --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8-alltokens
 ```
 
 General usage:

@@ -2,6 +2,7 @@
 Transforms the original CLMBR dictionary (from FEMRv1) into tokenizer_config.json format
 """
 import json
+import time
 from typing import List, Dict
 import os
 from tqdm import tqdm
