@@ -143,25 +143,50 @@ python3 ../run.py \
 
 ## Evaluation
 
+#### 1. Generate Patient Representations
+This all occurs within the `hf_ehr` repo.
+
 1. Identify the path (`<path_to_ckpt>`) to the model checkpoint you want to evaluate.
 
-2. Generate patient representations with your model.
+2. Generate patient representations with your model. This will create a folder in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models` for this model checkpoint.
+
 
 ```bash
-cd hf_ehr/scripts/eval
+# cd to hf_ehr/ directory
+
+cd hf_ehr/scripts/eval/
 sbatch ehrshot.sh <path_to_ckpt>
 ```
 
-3. In `ehrshot-benchmark`, update `utils.py` so that your model is included in the global constants at the top of the file.
+#### 2. Generate EHRSHOT Results
 
-4. Run `7_eval.sh`
+This all occurs within the `ehrshot-benchmark` repo.
+
+3. In `ehrshot-benchmark`, update `ehrshot/utils.py` so that your model is included in the global constants at the top of the file. Specifically, create a new entry in the `MODEL_2_INFO` dictionary at the top of the file. The **key** should be the name of the folder that's created for your model in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models`, and the **value** should be similar to existing entries.
+
+4. Generate your model's AUROC/AUPRC results by running `7_eval.sh`:
 
 ```bash
+# cd to ehrshot-benchmark/ directory
+
 conda activate EHRSHOT_ENV
+cd ehrshot/bash_scripts/
 bash 7_eval.sh --is_use_slurm
 ```
 
-5. Run `8_make_results_plots.sh`
+#### 3. Generate EHRSHOT Plots
+
+This all occurs within the `ehrshot-benchmark` repo.
+
+5. Generate plots by running: `8_make_results_plots.sh`. You might need to modify the `--model_heads` parameter in the file before running to specify what gets included in your plots.
+
+```bash
+# cd to ehrshot-benchmark/ directory
+
+conda activate EHRSHOT_ENV
+cd ehrshot/bash_scripts/
+bash 8_make_results_plots.sh
+```
 
 ## Configurations
 
