@@ -33,3 +33,23 @@ python3 ../run.py \
     data.dataset.is_debug=True \
     main.is_force_restart=True \
     logging.wandb.name=test
+
+
+python3  ../run.py \
+    +data=v8-alltokens \
+    +trainer=single_gpu \
+    +model=gpt2-base \
+    +tokenizer=clmbr \
+    data.dataloader.mode=approx \
+    data.dataloader.approx_batch_sampler.max_tokens=2048 \
+    data.dataloader.n_workers=0 \
+    trainer.devices=[0] \
+    model.config_kwargs.n_layer=1 \
+    model.config_kwargs.n_head=1 \
+    model.config_kwargs.n_embd=64 \
+    trainer.limit_train_batches=10 \
+    trainer.limit_val_batches=0 \
+    trainer.max_epochs=2 \
+    main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/test/ \
+    main.is_force_restart=True \
+    logging.wandb.name=test

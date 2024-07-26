@@ -25,17 +25,11 @@ source base.sh
 # Experiment names
 RUN_NAMES=( "gpt-base-512--clmbr" "gpt-base-1024--clmbr" "gpt-base-2048--clmbr" "gpt-base-4096--clmbr" )
 RUN_ARGS=(
-    "gpt.sh base clmbr 512 approx"
-    "gpt.sh base clmbr 1024 approx"
-    "gpt.sh base clmbr 2048 approx"
-    "gpt.sh base clmbr 4096 approx"
+    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
 )
-
-# Ensure that 1 <= len(RUN_ARGS) <= 5
-if [ "${#RUN_ARGS[@]}" -le 0 ] || [ "${#RUN_ARGS[@]}" -ge 5 ]; then
-    echo "Error: The length of RUN_ARGS should be between 1 and 4 (inclusive)."
-    exit 1
-fi
 
 # Loop over the RUN_NAMES and args
 for i in "${!RUN_NAMES[@]}"; do
@@ -48,11 +42,11 @@ for i in "${!RUN_NAMES[@]}"; do
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
         # Overwrite
         EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/${RUN_NAME}_${SLURM_JOB_ID}/"
-        bash $RUN_ARG "${EXTRA}" --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
+        bash $RUN_ARG "--extra ${EXTRA}" --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
     else
         # Resume
         EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/${RUN_NAME}/"
-        bash $RUN_ARG "${EXTRA}" --is_skip_base > $STDOUT 2> $STDERR &
+        bash $RUN_ARG "--extra ${EXTRA}" --is_skip_base > $STDOUT 2> $STDERR &
     fi
 
     child_pids+=($!)

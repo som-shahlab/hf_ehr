@@ -10,7 +10,7 @@ from hf_ehr.models.modules import BaseModel
 
 class GPTLanguageModel(BaseModel):
     """
-    GPT2 with a Language Model head.
+    GPT with a Language Model head.
     """
 
     def __init__(self, config: DictConfig, vocab_size, pad_token_id) -> None:

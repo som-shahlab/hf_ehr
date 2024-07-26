@@ -23,9 +23,8 @@ from typing import List, Dict, Tuple, Optional, Any, Set, Union
 from tqdm import tqdm
 from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
-from hf_ehr.data.datasets_old import convert_event_to_token
 from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path, load_tokenizer_from_config
-
+from hf_ehr.config import Event
 
 class CookbookModelWithClassificationHead(torch.nn.Module):
     def __init__(self, model: torch.nn.Module, aggregation_strat: str, n_classes: int):
@@ -104,74 +103,6 @@ def get_ckpt_name(path_to_ckpt: str) -> str:
     base_name = os.path.basename(path_to_ckpt)
     file_name, _ = os.path.splitext(base_name)
     return file_name
-    
-def generate_ehrshot_timelines(database: femr.datasets.PatientDatabase,
-                               config,
-                               labeled_patients: LabeledPatients, 
-                               allowed_pids: Optional[Union[Set[int], List[int]]] = None,
-                               tqdm_desc: str = "Loading EHRSHOT patient timelines") -> Dict[str, Any]:
-    """Generate patient timelines for EHRSHOT task."""
-    # Load config
-    tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
-    tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
-    tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
-    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
-    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
-    tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
-    tokenizer__code_2_detail: Dict[str, str] = json.load(open(tokenizer__path_to_code_2_detail, 'r'))
-
-    tokenizer = load_tokenizer_from_config(config)
-        
-    # Initialize variables for storing patient timelines
-    timeline_starts: Dict[int, List[datetime.datetime]] = {}
-    timeline_tokens: Dict[int, List[int]] = {}
-    timeline_n_dropped_tokens: Dict[int, List[int]] = {} # for tracking the count of dropped tokens at each `timeline_start`
-    
-    vocab = tokenizer.get_vocab()
-    patient_ids, label_values, label_times = [], [], []
-    for patient_id, labels in tqdm(labeled_patients.items(), desc=tqdm_desc):
-        if allowed_pids is not None and patient_id not in allowed_pids:
-            # Skip patients not in `allowed_pids`
-            continue
-        full_timeline: List[Tuple[datetime.datetime, int]] = [
-            (
-                e.start, 
-                convert_event_to_token(e,
-                    tokenizer__code_2_detail, 
-                    excluded_vocabs=tokenizer__excluded_vocabs,
-                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                    is_remap_codes_to_desc=tokenizer__is_remap_codes_to_desc,
-                    min_code_count=tokenizer__min_code_count,
-                    is_clmbr=tokenizer__is_clmbr,
-                )
-            ) for e in database[patient_id].events
-        ]
-
-        # Drop tokens not in vocab
-        timeline_with_valid_tokens = [x for x in full_timeline if x[1] in vocab]
-        timeline_with_invalid_tokens = [x for x in full_timeline if x[1] not in vocab] # for tracking dropped tokens
-
-        # Tokenize timeline and keep track of each token's start time
-        timeline_starts[patient_id] = [x[0] for x in timeline_with_valid_tokens]
-        timeline_tokens[patient_id] = tokenizer([x[1] for x in timeline_with_valid_tokens])['input_ids'][0]
-        timeline_n_dropped_tokens[patient_id] = [ len([ y for y in timeline_with_invalid_tokens if y[0] <= x[0]]) for x in timeline_with_valid_tokens ]
-        assert len(timeline_starts[patient_id]) == len(timeline_tokens[patient_id]), f"Error - timeline_starts and timeline_tokens have different lengths for patient {patient_id}"
-
-        for label in labels:
-            patient_ids.append(patient_id)
-            label_values.append(label.value)
-            label_times.append(label.time)
-
-    return {
-        'tokenizer' : tokenizer,
-        'patient_ids': patient_ids,
-        'label_values': label_values,
-        'label_times': label_times,
-        'timeline_starts': timeline_starts,
-        'timeline_tokens': timeline_tokens,
-        'timeline_n_dropped_tokens': timeline_n_dropped_tokens
-    }
-
 
 def main():
     args = parse_args()
@@ -224,47 +155,58 @@ def main():
     else:
         allowed_pids = allowed_pids
 
-    # Get patient timelines
-    logger.info("Generating patient timelines")
-    ehrshot = generate_ehrshot_timelines(database, config, labeled_patients, allowed_pids=allowed_pids)
-    patient_ids = ehrshot['patient_ids']
-    label_values = ehrshot['label_values']
-    label_times = ehrshot['label_times']
-    timeline_starts = ehrshot['timeline_starts']
-    timeline_tokens = ehrshot['timeline_tokens']
-    timeline_n_dropped_tokens = ehrshot['timeline_n_dropped_tokens'] # TODO - track this
-    
+    # Load all labels
+    patient_ids, label_values, label_times = [], [], []
+    for patient_id, labels in tqdm(labeled_patients.items(), desc=''):
+        if allowed_pids is not None and patient_id not in allowed_pids:
+            # Skip patients not in `allowed_pids`
+            continue
+        for label in labels:
+            patient_ids.append(patient_id)
+            label_values.append(label.value)
+            label_times.append(label.time)
+
     # Generate patient representations
     feature_matrix, tokenized_timelines = [], []
     max_length: int = model.config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
+
     with torch.no_grad():
         for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
             pids = patient_ids[batch_start:batch_start + batch_size]
-            values = label_values[batch_start:batch_start + batch_size]
             times = label_times[batch_start:batch_start + batch_size]
-            timelines = []
 
-            for pid, l_value, l_time in zip(pids, values, times):
-                timeline_starts_for_pid = timeline_starts[pid]
-                timeline_tokens_for_pid = timeline_tokens[pid]
-                timeline = [token for start, token in zip(timeline_starts_for_pid, timeline_tokens_for_pid) if start <= l_time]
-                timelines.append(timeline)
+            ########################
+            # Tokenize patient timeline
+            ########################
+            batch_tokenized_timelines: List[List[int]] = []
+            for pid, l_time in zip(pids, times):
+                # Create patient timeline
+                valid_events: List[Event] = []
+                for e in database[pid].events:
+                    # Ignore events that occur after the label's time
+                    if e.start > l_time:
+                        break
+                    valid_events.append(Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table))
+                # Tokenize timeline
+                batch_tokenized_timelines.append(tokenizer(valid_events, add_special_tokens=True)['input_ids'][0][:-1]) # [-1] drops final [EOS] token
             
             # Determine how timelines longer than max-length will be chunked
             if CHUNK_STRAT == 'last':
-                timelines = [x[-max_length:] for x in timelines]
+                batch_tokenized_timelines = [x[-max_length:] for x in batch_tokenized_timelines]
             else:
                 raise ValueError(f"Chunk strategy `{CHUNK_STRAT}` not supported.")
 
             # Save tokenized version of timelines
-            tokenized_timelines.extend([[pad_token_id] * (max_length - len(x)) + x for x in timelines]) # left padding)
+            tokenized_timelines.extend([[pad_token_id] * (max_length - len(x)) + x for x in batch_tokenized_timelines]) # left padding
 
+            ########################
             # Create batch
-            max_timeline_length = max(len(x) for x in timelines)
-            timelines_w_pad = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in timelines] # left padding
-            input_ids = torch.stack([torch.tensor(x, device=device) for x in timelines_w_pad])
-            attention_mask = (input_ids != pad_token_id).int()
+            ########################
+            max_timeline_length: int = max(len(x) for x in batch_tokenized_timelines)
+            batch_tokenized_timelines_w_pad: List[List[int]] = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in batch_tokenized_timelines] # left padding
+            input_ids: Float[torch.Tensor, 'B max_timeline_length'] = torch.stack([torch.tensor(x, device=device) for x in batch_tokenized_timelines_w_pad])
+            attention_mask: Float[torch.Tensor, 'B max_timeline_length'] = (input_ids != pad_token_id).int()
             batch = {
                 'input_ids': input_ids,
                 'attention_mask': attention_mask if "hyena" not in config['model']['name'] else None
@@ -273,10 +215,16 @@ def main():
             if 'hyena' in config['model']['name']:
                 batch.pop('attention_mask')
 
-            # Run model inference
+            ########################
+            # Run model
+            ########################
             results = model.model(**batch, output_hidden_states=True)
             hidden_states = results.hidden_states[-1]
 
+
+            ########################
+            # Save generated reprs
+            ########################
             for idx in range(len(pids)):
                 if EMBED_STRAT == 'last':
                     patient_rep = hidden_states[idx, -1, :].cpu().numpy()

@@ -31,13 +31,14 @@ Default settings for all Hydra configs. Anything in this file can be overridden 
         * `is_run_eval_on_checkpoint`: bool *= True* -- If TRUE, then log validation metrics when saving model checkpoints for: `every_n_train_nonPAD_tokens`, `every_n_flops`; Note that this slows things down a bit but is good for clean wandb logging plots
 * `data`
     * `dataset`
+        * `name`: str *=FEMRDataset* -- Name of class of dataset from [hf_ehr/data/datasets.py](../data/datasets.py) that this dataset is initialized from
         * `path_to_femr_extract`: str *=/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes* -- Path to FEMR extract
         * `is_debug`: bool *= False*-- If True, use a small subset of the data for debugging
     * `dataloader`
         * `mode`: str *= approx* -- To avoid changing the config file for each run, specify the mode and keep both batch_size and approx_batch_sampler
-        * `batch_size`: int *= 4* -- Batch size to be used.  [note: ignored if `data.dataloader.mode=approx`]
+        * `batch_size`: int *= 4* -- Batch size to be used. [note: ignored if `data.dataloader.mode=approx`]
         * `approx_batch_sampler`
-            * `max_tokens`: int *= 4_096* -- Max tokens in batch to allow  [note: ignored if `data.dataloader.mode=batch`]
+            * `max_tokens`: int *= 4_096* -- Max tokens in batch to allow [note: ignored if `data.dataloader.mode=batch`]
             * `bucket_size`: int *= 100* -- Bucket size
             * `is_random_shuffle_across_buckets`: bool *= True* -- If TRUE, then shuffle buckets
             * `is_random_shuffle_within_buckets`: bool *= True* -- If TRUE, then shuffle within buckets
@@ -99,6 +100,19 @@ Model architecture definitions
     
     * `data`
         * `mlm_prob`: Optional[float] -- Probability of masking tokens for MLM training
+
+## `data`
+
+Dataset configurations
+
+**Example:** `configs/data/v8.yaml` contains the Hydra config for the v8 `FEMRDataset`.
+
+**Arguments:**
+* `data`
+    * `dataset`
+        * `name`: str -- Name of class of dataset from [hf_ehr/data/datasets.py](../data/datasets.py) that this dataset is initialized from
+        * `path_to_femr_extract`: str -- Path to FEMR extract
+        * `is_debug`: bool *= False*-- If True, use a small subset of the data for debugging
 
 ## `model`
 

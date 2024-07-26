@@ -18,6 +18,7 @@ BATCH_SIZE=$3
 # PATIENT_IDX_START=$4
 # PATIENT_IDX_END=$5
 
+echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../../eval/ehrshot.py \
     --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
     --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \

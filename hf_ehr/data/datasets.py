@@ -8,7 +8,10 @@ from jaxtyping import Float
 from transformers import AutoTokenizer
 from hf_ehr.config import GPU_BASE_DIR, Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
 
-class FEMRDataset(Dataset):
+class BaseDataset(Dataset):
+    pass
+
+class FEMRDataset(BaseDataset):
     """Dataset that returns patients in a FEMR extract.
         dataset[idx] = a specific patient, so you can only retrieve ONE sample per patient.
         Note: Takes 1.5 hrs to loop through all event.code of all 3769353 patients in STARR-OMOP-deid-lite.
@@ -113,28 +116,29 @@ class AllTokensFEMRDataset(FEMRDataset):
         # Number of unique examples that will be extracted per patient by truncating their timeline to `max_length` tokens
         self.n_examples_per_patient: List[int] = [ int(np.ceil(seq_length / max_length)) for seq_length in self.seq_length_per_patient ]
 
-        # Map [idx] => (pid, start idx in pid's timeline, end idx in pid's timeline)
-        self.idx_to_pid_start_end: List[Tuple[int, int, int]] = [
+        # Map [idx] => (p_idx, start idx in p_idx's timeline, end idx in p_idx's timeline)
+        self.idx_to_pidx_start_end: List[Tuple[int, int, int]] = [
             (p_idx, i * max_length, min((i + 1) * max_length, self.seq_length_per_patient[p_idx]))
             for p_idx, n_examples in enumerate(self.n_examples_per_patient)
             for i in range(n_examples)
         ]
-        assert len(self.idx_to_pid_start_end) == sum(self.n_examples_per_patient), f"{len(self.idx_to_pid_start_end)} != {sum(self.n_examples_per_patient)}"
+        assert len(self.idx_to_pidx_start_end) == sum(self.n_examples_per_patient), f"{len(self.idx_to_pidx_start_end)} != {sum(self.n_examples_per_patient)}"
+        # Number of tokens per example in this dataset
+        self.idx_to_seq_length: List[int] = [ end - start for (p_idx, start, end) in self.idx_to_pidx_start_end ]
 
     def __len__(self) -> int:
-        return len(self.idx_to_pid_start_end)
+        return len(self.idx_to_pidx_start_end)
     
-    def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
+    def __getitem__(self, idx: int) -> Tuple[int, List[Event], int, int]:
         """
             Return all event codes for this example at `idx` in `self.split`.
             Maps this `idx` to the proper subsequence of events in this patient's timeline.
+                Returns `start_token_idx` and `end_token_idx` to indicate the start and end of 
+                the subsequence within this patient's timeline that corresponds to `idx` in our dataset
         """
-        (p_idx, start, end) = self.idx_to_pid_start_end[idx]
+        (p_idx, start_token_idx, end_token_idx) = self.idx_to_pidx_start_end[idx]
         (pid, events) = super().__getitem__(p_idx) # Fetch all events for this patient
-        tokens = self.tokenizer(tokens)
-        assert len(tokens) <= end, f"len(tokens)={len(tokens)} > end={end}"
-        tokens = tokens[start:end] # Truncate to the proper subsequence for `idx`
-        return (pid, tokens)
+        return (pid, events, start_token_idx, end_token_idx)
 
 if __name__ == '__main__':
     from hf_ehr.data.tokenization import CLMBRTokenizer, DescTokenizer
@@ -143,19 +147,29 @@ if __name__ == '__main__':
     # Tokenizer
     tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
 
-    # Dataset
+    # AllTokensFEMRDataset
     train_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='train', is_debug=True)
     val_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='val', is_debug=True)
     test_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='test', is_debug=True)
+    assert len(train_dataset) == 1081
+    assert len(train_dataset.get_pids()) == 1000
+    assert len(train_dataset[-3][1]) == 2326 # raw FEMR events
+    assert train_dataset[-3][2] == 1024 # start token idx
+    assert train_dataset[-3][3] == 1858 # end token idx
+    assert train_dataset.idx_to_pidx_start_end[-3] == (997, 1024, 1858)
+    assert train_dataset.idx_to_seq_length[-3] == 1858 - 1024
+    assert train_dataset.seq_length_per_patient[997] == 1858
+    print('train', len(train_dataset))
+    print('val', len(val_dataset))
+    print('test', len(test_dataset))
+    print(train_dataset[0])
+    print(train_dataset[-1])
+    breakpoint()
+
+    # FEMRDataset
     # train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
     #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
     #test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
-
-    # Stats
-    print('train', len(train_dataset))
-    #print('val', len(val_dataset))
-    #print('test', len(test_dataset))
-
     # t1 = time.time()
     # event_count = 0
     # for pid in tqdm(train_dataset.get_pids()[:100000]):

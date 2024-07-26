@@ -109,6 +109,15 @@ class BaseTokenizer(PreTrainedTokenizer):
                 tokens.append(token)
         return tokens
     
+    def convert_events_to_non_tokenized_events(self, events: List[Event], **kwargs) -> List[Event]:
+        """Returns all events that don't get mapped to tokens"""
+        non_tokenized_events: List[Event] = []
+        for e in events:
+            token: Optional[str] = self.convert_event_to_token(e, **kwargs)
+            if token is None:
+                non_tokenized_events.append(e)
+        return non_tokenized_events
+    
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
         raise NotImplementedError("Must implement `self.convert_event_to_token()` in child class")
 
@@ -173,7 +182,7 @@ class BaseTokenizer(PreTrainedTokenizer):
         json.dump(dataset.metadata, open(os.path.join(path_to_new_folder, 'metadata.json'), 'w'), indent=2)
         print(f"Creating new folder for this dataset of this version of the tokenizer at `{path_to_new_folder}` with metadata={dataset.metadata}")
         return path_to_new_folder
-            
+
     def get_seq_length(self, args: Tuple['FEMRDataset', int, int]) -> List[Tuple[int, int]]:
         """Given a dataset and a range of indices, return the sequence length of each patient in that range"""
         from hf_ehr.data.datasets import FEMRDataset, AllTokensFEMRDataset
@@ -360,7 +369,7 @@ class CookbookTokenizer(BaseCodeTokenizer):
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
         
         # Set metadata
-        self.metadata: Dict[str, Any] = {} if metadata is None else metadata
+        self.metadata: Dict[str, Any] = {} if metadata is None else dict(metadata)
         self.metadata['cls'] = 'CookbookTokenizer'
 
         # Metadata
@@ -532,7 +541,7 @@ class DescTokenizer(BaseTokenizer):
         self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
         
         # Set metadata
-        self.metadata: Dict[str, Any] = {} if metadata is None else metadata
+        self.metadata: Dict[str, Any] = {} if metadata is None else dict(metadata)
         self.metadata['cls'] = 'DescTokenizer'
 
         # Load underlying textual tokenizer
@@ -568,17 +577,18 @@ class DescTokenizer(BaseTokenizer):
             self.tokenizer.unk_token,
             self.tokenizer.sep_token,
             self.tokenizer.pad_token,
-            self.tokenizer.cls_token
+            self.tokenizer.cls_token,
+            self.tokenizer.mask_token,
         ]
         
-    
         super().__init__(
             bos_token=self.tokenizer.bos_token,
             eos_token=self.tokenizer.eos_token,
             unk_token=self.tokenizer.unk_token,
             sep_token=self.tokenizer.sep_token,
             pad_token=self.tokenizer.pad_token,
-            cls_token=self.tokenizer.cls_token
+            cls_token=self.tokenizer.cls_token,
+            mask_token=self.tokenizer.mask_token
         )
     
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
@@ -706,8 +716,12 @@ def torch_mask_tokens(tokenizer: BaseTokenizer,
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
     return inputs, labels
 
-def collate_femr_timelines(batch: List[Tuple[int, List[Event]]], 
+def collate_femr_timelines(batch: Union[
+                                List[Tuple[int, List[Event]]],  # if dataset == FEMRDataset
+                                List[Tuple[int, List[Event], int, int]],  # if dataset == AllTokensFEMRDataset
+                            ],
                              tokenizer: BaseTokenizer, 
+                             dataset_name: str, # 'FEMRDataset' or 'AllTokensFEMRDataset'
                              max_length: int,
                              is_truncation_random: bool = False,
                              is_mlm: bool = False,
@@ -717,9 +731,27 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
         Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     """
-
-    # Otherwise, truncate on right hand side of sequence
-    tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
+    if dataset_name == 'AllTokensFEMRDataset':
+        assert len(batch[0]) == 4, f"ERROR - Expected 4 elements in each batch element, but got {len(batch[0])}"
+        # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
+        tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
+                                                                            truncation=False, 
+                                                                            padding=True,
+                                                                            seed=seed, 
+                                                                            add_special_tokens=True,
+                                                                            return_tensors='pt')
+        # Truncate `tokens` to the specified (start, end) idx's
+        start_idxs: List[int] = [ x[2] for x in batch ]
+        end_idxs: List[int] = [ x[3] for x in batch ]
+        for key in tokens.keys():
+            tokens[key] = torch.stack([
+                tokens[key][i, start_idxs[i]:end_idxs[i]] 
+                for i in range(tokens[key].shape[0])
+            ])
+    elif dataset_name == 'FEMRDataset':
+        assert len(batch[0]) == 2, f"ERROR - Expected 2 elements in each batch element, but got {len(batch[0])}"
+        # For FEMRDataset, truncate timeline per usual
+        tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
                                                                         truncation=True, 
                                                                         padding=True, 
                                                                         max_length=max_length,
@@ -727,6 +759,8 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
                                                                         seed=seed, 
                                                                         add_special_tokens=True,
                                                                         return_tensors='pt')
+    else:
+        raise ValueError(f"ERROR - Unsupported 'dataset_name' of: `{dataset_name}`")
     
     # Set labels
     if is_mlm:

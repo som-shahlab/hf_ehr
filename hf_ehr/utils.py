@@ -3,6 +3,7 @@ from typing import List, Tuple, Any, Dict, Optional
 import torch
 import uuid
 import hashlib
+from hf_ehr.config import PATH_TO_TOKENIZER_CLMBR_v8_CONFIG
 
 def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float, float]], is_tokenize_out_of_range: bool = False) -> Optional[str]:
     # Given a list of ranges (i.e. tuples of [start, end] values), remaps the code to the index in the `ranges` array corresponds
@@ -154,16 +155,14 @@ def load_tokenizer_from_config(config):
     # Load config
     name = config.data.tokenizer.name
     path_to_config: str = config.data.tokenizer.path_to_config
-    tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
+    tokenizer__excluded_vocabs: Optional[List[str]] = getattr(config.data.tokenizer, 'excluded_vocabs', [])
     tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
     tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
-    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
-    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
     tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
 
     if name == 'CLMBRTokenizer':
         # CLMBR
-        tokenizer = CLMBRTokenizer(path_to_config)
+        tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
     elif name == 'DescTokenizer':
         # DescTokenizer
         tokenizer = DescTokenizer(path_to_config, AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
@@ -222,7 +221,7 @@ def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
     if not model_class: raise ValueError(f"Model `{model_name}` not supported.")
 
     # Load model
-    model = model_class(**ckpt['hyper_parameters'], tokenizer=tokenizer)
+    model = model_class(**ckpt['hyper_parameters'], vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id)
     model.load_state_dict(ckpt['state_dict'])
     return model
 
@@ -255,6 +254,6 @@ def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     if not model_class: raise ValueError(f"Model `{model_name}` not supported.")
 
     # Load model
-    model = model_class(**ckpt['hyper_parameters'], tokenizer=tokenizer)
+    model = model_class(**ckpt['hyper_parameters'], vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id)
     model.load_state_dict(ckpt['state_dict'])
     return model

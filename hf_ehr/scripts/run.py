@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
 from transformers import  AutoTokenizer
-from hf_ehr.data.datasets import FEMRDataset
+from hf_ehr.data.datasets import BaseDataset
 from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
@@ -303,7 +303,7 @@ def main(config: DictConfig) -> None:
             run.define_metric('val/loss', summary='min')
 
     logger.info("========================== Starting main ==========================")
-    logger.info(f">>>> Resuming from CHECKPOINT | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
+    logger.info(f">>>> Resuming from CHECKPOINT | Wandb run ID: {wandb_run_id} | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
 
     # Tokenizer
     if config.data.tokenizer.name == 'DescTokenizer':
@@ -340,14 +340,14 @@ def main(config: DictConfig) -> None:
     logger.info(f"Parameter count of model = {model.get_param_count()}")
     
     # Datasets
-    logger.info(f"Loading FEMR datasets...")
-    datasets: Dict[str, FEMRDataset] = load_datasets(config)
+    logger.info(f"Loading `{config.data.dataset.name}` datasets...")
+    datasets: Dict[str, BaseDataset] = load_datasets(config, tokenizer)
 
     for key, val in datasets.items():
         logger.info(f"{key} dataset size: {len(val)}")
     
     # Dataloaders
-    logger.info(f"Loading FEMR dataloaders...")
+    logger.info(f"Loading dataloaders...")
     dataloaders: Dict[str, DataLoader] = load_dataloaders(config, datasets, tokenizer)
 
     # Callbacks

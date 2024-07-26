@@ -52,8 +52,8 @@ class Event():
     code: str # LOINC/1234
     value: Optional[Any] = None # 123.45 or 'YES' or None
     unit: Optional[str] = None # mg/dL or None
-    start: Optional[str] = None # 2023-08-13
-    end: Optional[str] = None # 2023-08-13
+    start: Optional[datetime.datetime] = None # 2023-08-13
+    end: Optional[datetime.datetime] = None # 2023-08-13
     omop_table: Optional[str] = None  # 'measurement' or 'observation' or None
     
     def to_dict(self):
