@@ -3,7 +3,7 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/ehrshot-eval_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/ehrshot-eval_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-a100,nigam-h100
+#SBATCH --partition=nigam-h100,nigam-a100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=5
 #SBATCH --gres=gpu:1
@@ -20,9 +20,9 @@ BATCH_SIZE=$3
 
 echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../../eval/ehrshot.py \
-    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_database /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_labels_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
+    --path_to_features_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model $PATH_TO_CKPT \
     --model_name $MODEL_NAME \
     --batch_size $BATCH_SIZE \

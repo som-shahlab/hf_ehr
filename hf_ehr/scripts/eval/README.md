@@ -5,7 +5,23 @@ Usage: `sbatch ehrshot.sh <path_to_ckpt>`
 where...
 - `<path_to_ckpt>` is the path to the checkpoint to load
 
-Examples:
+### V100/GPU
+
+```sh
+# bert-base - V100/GPU
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-512--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600002304-ckpt_val=600000000-persist.ckpt bert-base-512--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600004480-ckpt_val=600000000-persist.ckpt bert-base-1024--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600003136-ckpt_val=600000000-persist.ckpt bert-base-2048--clmbr 16
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist.ckpt bert-base-4096--clmbr 4
+
+# gpt2-base - V100/GPU
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-512--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000896-ckpt_val=600000000-persist.ckpt gpt2-base-512--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist.ckpt gpt2-base-1024--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist.ckpt gpt2-base-2048--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist.ckpt gpt2-base-4096--clmbr 4
+```
+
+### A100/H100
 
 ```sh
 # bert-base - A100/H100

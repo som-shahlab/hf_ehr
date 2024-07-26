@@ -10,6 +10,7 @@ python3 ehrshot.py \
 """
 
 import argparse
+import collections
 import datetime
 import os
 import json
@@ -170,6 +171,14 @@ def main():
     feature_matrix, tokenized_timelines = [], []
     max_length: int = model.config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
+    
+    # Cache events for patient
+    patient_id_2_events: Dict[str, List[Event]] = collections.defaultdict(list)
+    for pid in tqdm(list(set(patient_ids)), desc='Caching patient events', total=len(set(patient_ids))):
+        if pid in patient_id_2_events: 
+            continue
+        for e in database[pid].events:
+            patient_id_2_events[pid].append(Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table))
 
     with torch.no_grad():
         for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
@@ -183,11 +192,11 @@ def main():
             for pid, l_time in zip(pids, times):
                 # Create patient timeline
                 valid_events: List[Event] = []
-                for e in database[pid].events:
+                for e in patient_id_2_events[pid]:
                     # Ignore events that occur after the label's time
                     if e.start > l_time:
                         break
-                    valid_events.append(Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table))
+                    valid_events.append(e)
                 # Tokenize timeline
                 batch_tokenized_timelines.append(tokenizer(valid_events, add_special_tokens=True)['input_ids'][0][:-1]) # [-1] drops final [EOS] token
             
@@ -220,7 +229,6 @@ def main():
             ########################
             results = model.model(**batch, output_hidden_states=True)
             hidden_states = results.hidden_states[-1]
-
 
             ########################
             # Save generated reprs
