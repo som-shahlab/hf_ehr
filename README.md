@@ -157,7 +157,7 @@ sbatch ehrshot.sh <path_to_ckpt>
 
 3. In `ehrshot-benchmark`, update `ehrshot/utils.py` so that your model is included in the global constants at the top of the file. Specifically, create a new entry in the `MODEL_2_INFO` dictionary at the top of the file. The **key** should be the name of the folder that's created for your model in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models`, and the **value** should be similar to existing entries.
 
-4. Run `7_eval.sh`
+4. Generate your model's AUROC/AUPRC results by running `7_eval.sh`:
 
 ```bash
 # cd to ehrshot-benchmark/ directory
@@ -167,7 +167,15 @@ cd ehrshot/bash_scripts/
 bash 7_eval.sh --is_use_slurm
 ```
 
-5. Run `8_make_results_plots.sh`
+5. Generate plots by running: `8_make_results_plots.sh`. You might need to modify the `--model_heads` parameter in the file before running to specify what gets included in your plots.
+
+```bash
+# cd to ehrshot-benchmark/ directory
+
+conda activate EHRSHOT_ENV
+cd ehrshot/bash_scripts/
+bash 8_make_results_plots.sh
+```
 
 ## Configurations
 
