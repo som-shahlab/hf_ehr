@@ -2,9 +2,12 @@ import os
 import argparse
 import time
 from typing import Any, Callable, Dict, List
-from hf_ehr.scripts.create_vocab.utils import add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs
+from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset
 from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, wrapper_with_logging
+import logging
+from typing import Callable, Any
+from multiprocessing import Pool
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Generate statistics about dataset')
@@ -37,7 +40,7 @@ def main():
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
     else:
         raise ValueError(f'Invalid FEMR dataset: {args.dataset}')
-    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
+    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=True)
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
@@ -54,14 +57,14 @@ def main():
     wrapper_with_logging(remove_codes_belonging_to_vocabs, 'remove_codes_belonging_to_vocabs', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, excluded_vocabs=excluded_vocabs)
 
     # With `n_procs=5`, should take ~XXXX mins
-    wrapper_with_logging(add_categorical_codes, 'add_categorical_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    wrapper_with_logging(add_categorical_codes, 'add_categorical_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
     
     # With `n_procs=5`, should take ~XXXX mins
-    wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
 
     # With `n_procs=5`, should take ~XXXX mins
     # TODO -- figure out how to do with tokenizer
-    wrapper_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
+    #wrapper_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
 
     print(f"Total time taken: {round(time.time() - start_total, 2)}s")
     print("Done!")

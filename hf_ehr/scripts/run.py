@@ -308,8 +308,12 @@ def main(config: DictConfig) -> None:
     # Tokenizer
     if config.data.tokenizer.name == 'DescTokenizer':
         # DescEmb
+        metadata = OmegaConf.to_container(tokenizer_metadata, resolve=True, enum_to_str=True)
+        metadata = dict(metadata)  # Ensure it is a regular dictionary
+        metadata['cls'] = 'DescTokenizer'  # Set the 'cls' key
         logger.info(f"Loading DescTokenizer: `{PATH_TO_TOKENIZER_DESC_v8_CONFIG}` using base tokenizer `{config.data.tokenizer.metadata.desc_emb_tokenizer}`")
-        tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=tokenizer_metadata)
+        tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=metadata)
+        
     elif config.data.tokenizer.name == 'CLMBRTokenizer':
         # CLMBR
         logger.info(f"Loading CLMBRTokenizer: `{PATH_TO_TOKENIZER_CLMBR_v8_CONFIG}`")
