@@ -2,6 +2,7 @@ wandb/
 cache/
 logs/
 slurm_logs/
+slurm_scripts/
 *.npy
 *.pkl
 *.csv

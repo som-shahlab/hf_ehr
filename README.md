@@ -85,30 +85,36 @@ Launch one run on a SLURM node using `hf_ehr/scripts/carina/{model}.sh`:
 ```bash
 cd hf_ehr/scripts/carina
 
-# Launch GPT-2 base model with CLMBRTokenizer, ApproxBatchSampler dataloader, and 2048 context length; force train from scratch and not resume prior run (even if exists)
-sbatch gpt.sh base clmbr 2048 approx --is_force_refresh
+# Launch GPT-2 base model on v8 dataset with CLMBRTokenizer, ApproxBatchSampler dataloader, and 2048 context length; force train from scratch and not resume prior run (even if exists)
+python3 main.py --model gpt --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8 --is_force_refresh
 
-# Launch Mamba tiny model with CookbookTokenizer, ApproxBatchSampler dataloader, and 16384 context length; resume prior run if exists
-sbatch mamba.sh tiny cookbook 16384 approx
+# Launch Mamba tiny model on v8 dataset with CookbookTokenizer, ApproxBatchSampler dataloader, and 16384 context length; resume prior run if exists
+python3 main.py --model mamba --size tiny --tokenizer cookbook --context_length 16384 --dataloader approx --dataset v8
 
-# Run BERT-base model with DescTokenizer, ApproxBatchSampler dataloader, and 4096 context length; resume prior run if exists; overwrite the default device assignment to GPU 1; give wandb run a name of `custom`
-sbatch bert.sh base desc 4096 approx "+trainer.devices=[1] +logging.wandb.name=custom"
+# Run BERT-base model on v8 dataset with DescTokenizer, ApproxBatchSampler dataloader, and 4096 context length; resume prior run if exists; overwrite the default device assignment to GPU 1; give wandb run a name of `custom`
+python3 main.py --model bert --size base --tokenizer desc --context_length 4096 --dataloader approx --dataset v8 --extra "+trainer.devices=[1] +logging.wandb.name=custom"
+
+# Launch GPT-2 large model on v8 AllTokens dataset with CLMBRTokenizer, ApproxBatchSampler dataloader, and 1024 context length
+python3 main.py --model gpt --size large --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8-alltokens
 ```
 
 General usage:
 ```bash
-sbatch {model}.sh <model_size> <tokenizer> <context_length> <dataloader_mode> [<extra>] [--is_force_refresh] [--is_skip_base]`
+python3 main.py --model <model> --size <size> --tokenizer <tokenizer> --context_length <context_length> --dataloader <dataloader> --dataset <dataset> [--extra <extra>] [--partitions <partitions>] [--is_force_refresh] [--is_skip_base] [--is_run_local]
 ```
 
 where...
-- `{model}`: str -- Architecture (e.g., `gpt`, `bert`, `mamba`, `hyena`)
-- `<model_size>`: str -- Model size (e.g., `base`, `large`, `tiny`, `medium`)
-- `<tokenizer>`: str -- Tokenizer to use (e.g., `clmbr`, `cookbook`, `desc`)
-- `<context_length>`: int -- Context length (e.g., `1024`, `2048`, `4096`, `8192`, `16384`)
-- `<dataloader_mode>`: str -- Dataloader mode (e.g., `batch`, `approx`)
-- `[<extra>]`: Optional[str] -- An optional string that will get appended to the end of the `python ../run.py` command verbatim
+- `<model>`: str -- Architecture to use. Choices are `gpt`, `bert`, `hyena`, `mamba`
+- `<size>`: str -- Model size to use. Choices are `tiny`, `small`, `base`, `medium`, `large`, `huge`
+- `<tokenizer>`: str -- Tokenizer to use. Choices are `clmbr`, `desc`, `cookbook`
+- `<context_length>`: int -- Context length to use
+- `<dataloader>`: str -- Dataloader to use. Choices are `approx`, `exact`
+- `<dataset>`: str -- Dataset to use. Choices are `v8`, `v8-alltokens`, `v8-ehrshot`, `v8-ehrshot-alltokens`
+- `[--extra <extra>]`: Optional[str] -- An optional string that will get appended to the end of the `python ../run.py` command verbatim
+- `[--partitions <partitions>]`: Optional[str] -- An optional string that specifies the partitions to use. Defaults to `nigam-v100,gpu` for gpt2 and BERT, and `nigam-h100,nigam-a100` for HYENA and MAMBA
 - `[--is_force_refresh]`: Optional -- An optional flag that triggers a force refresh of the run (i.e., delete the existing run and start from scratch)
 - `[--is_skip_base]`: Optional -- An optional flag that skips running `source base.sh`. Useful when running `parallel.sh` and we don't want to reinit the conda environment multiple times
+- `[--is_run_local]`: Optional -- An optional flag that runs the script locally as `python run.py` instead of as a SLURM `sbatch` command
 
 ### Advanced
 
