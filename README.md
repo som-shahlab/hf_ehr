@@ -145,19 +145,25 @@ python3 ../run.py \
 
 1. Identify the path (`<path_to_ckpt>`) to the model checkpoint you want to evaluate.
 
-2. Generate patient representations with your model.
+2. Generate patient representations with your model. This will create a folder in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models` for this model checkpoint.
+
 
 ```bash
-cd hf_ehr/scripts/eval
+# cd to hf_ehr/ directory
+
+cd hf_ehr/scripts/eval/
 sbatch ehrshot.sh <path_to_ckpt>
 ```
 
-3. In `ehrshot-benchmark`, update `utils.py` so that your model is included in the global constants at the top of the file.
+3. In `ehrshot-benchmark`, update `ehrshot/utils.py` so that your model is included in the global constants at the top of the file. Specifically, create a new entry in the `MODEL_2_INFO` dictionary at the top of the file. The **key** should be the name of the folder that's created for your model in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models`, and the **value** should be similar to existing entries.
 
 4. Run `7_eval.sh`
 
 ```bash
+# cd to ehrshot-benchmark/ directory
+
 conda activate EHRSHOT_ENV
+cd ehrshot/bash_scripts/
 bash 7_eval.sh --is_use_slurm
 ```
 
