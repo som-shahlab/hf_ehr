@@ -2,12 +2,14 @@ import collections
 import datetime
 import multiprocessing
 import time
+import numpy as np
 from tqdm import tqdm
 from typing import Callable, List, Dict, Optional, Set, Tuple
 import femr.datasets
 from hf_ehr.config import (
     CodeTCE, 
-    CategoricalTCE, 
+    CategoricalTCE,
+    CountOccurrencesTCEStat, 
     NumericalRangeTCE,
     TokenizerConfigEntry, 
     load_tokenizer_config_and_metadata_from_path,
@@ -82,8 +84,8 @@ def merge_numerical_range_codes(results: List[Set[Tuple[str, List[str]]]]) -> Se
             merged[code].extend(values)
     return merged
 
-def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], **kwargs):
-    """For each unique (code, numerical range) in dataset, add a NumericalRangeTCE to tokenizer config."""
+def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], N: int, **kwargs):
+    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
     # Step 1: Collect all numerical values for each code
     code_values = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, **kwargs)
 
@@ -94,26 +96,43 @@ def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: st
     for code, values in tqdm(code_values.items(), total=len(code_values), desc='add_numerical_range_codes() | Calculating ranges and adding to tokenizer_config...'):
         if not values:
             continue  # Skip if no values are present
-        range_min = min(values)
-        range_max = max(values)
-        # Skip codes that already exist
-        if code in existing_entries:
-            continue
-        tokenizer_config.append(NumericalRangeTCE(
-            code=code,
-            tokenization={
-                "unit": "None",  # Replace with actual unit if available
-                "range_start": range_min,
-                "range_end": range_max
-            }
-        ))
-    
+
+        # Step 3: Calculate percentiles for bucketing
+        percentiles = np.percentile(values, np.linspace(0, 100, N + 1)[1:-1])
+
+        # Step 4: Create NumericalRangeTCE for each quantile range
+        previous_bound = min(values)  # Set the first lower bound as the smallest value
+        for i, bound in enumerate(percentiles):
+            range_code = f"{code}_quantile_{i+1}"
+            if range_code in existing_entries:
+                continue
+            tokenizer_config.append(NumericalRangeTCE(
+                code=range_code,
+                tokenization={
+                    "unit": "None",  # Replace with actual unit if available
+                    "range_start": previous_bound,
+                    "range_end": bound
+                }
+            ))
+            previous_bound = bound
+        
+        # Final bucket to include the largest value
+        range_code = f"{code}_quantile_{N}"
+        if range_code not in existing_entries:
+            tokenizer_config.append(NumericalRangeTCE(
+                code=range_code,
+                tokenization={
+                    "unit": "None",
+                    "range_start": previous_bound,
+                    "range_end": max(values)  # Set the last upper bound as the largest value
+                }
+            ))
+
     # Save updated tokenizer config
-    if 'is_already_run' not in metadata: 
+    if 'is_already_run' not in metadata:
         metadata['is_already_run'] = {}
     metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
-
 
 ################################################
 # Get all unique codes in dataset
@@ -171,12 +190,13 @@ def calc_code_2_occurrence_count(args: Tuple) -> Dict:
     """Given a code, count total # of occurrences in dataset."""
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
-    path_to_tokenizer_config = args[2] # TODO -- need to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
-    tokenizer_config = load_tokenizer_config_from_path(path_to_tokenizer_config)
+    #path_to_tokenizer_config = args[2] # TODO -- need to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
+    #tokenizer_config = load_tokenizer_config_from_path(path_to_tokenizer_config)
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
     results: Dict[str, int] = collections.defaultdict(int)
     for pid in pids:
         for event in femr_db[pid].events:
+            # Directly use the event code as the key
             results[event.code] += 1 # TODO - prob something like results[tokenizer(event)] += 1
     return dict(results)
 
@@ -243,7 +263,7 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
     metadata['is_already_run']['add_categorical_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], **kwargs):
+def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     """Add occurrence count to each entry in tokenizer config."""
     # TODO
     # Run function in parallel    
@@ -252,13 +272,20 @@ def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db
     # Add stats to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     # Map each code => idx in tokenizer_config
-    for (code, categories) in tqdm(results, total=len(results), desc='add_categorical_codes() | Adding entries to tokenizer_config...'):
-        # Skip tokens that already exist
-        tokenizer_config.append(CountOccurrencesTCEStat(
-            split=None,
-            dataset=None,
-            count=None,
-        ))
+    # Update each code's occurrence count in the tokenizer config
+    for token in tokenizer_config:
+        if token.code in results:
+            count = results[token.code]
+            occurrence_stat = CountOccurrencesTCEStat(
+                type="count_occurrences",
+                dataset=dataset,
+                split=split,
+                count=count
+            )
+            if hasattr(token, 'stats') and isinstance(token.stats, list):
+                token.stats.append(occurrence_stat)
+            else:
+                token.stats = [occurrence_stat]
     
     # Save updated tokenizer config
     if 'is_already_run' not in metadata: metadata['is_already_run'] = {}

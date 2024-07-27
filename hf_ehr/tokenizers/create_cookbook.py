@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable, Dict, List
 from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, wrapper_with_logging
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, wrapper_with_logging
 import logging
 from typing import Callable, Any
 from multiprocessing import Pool
@@ -13,9 +13,35 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Generate statistics about dataset')
     parser.add_argument('--dataset', choices=['v8', 'v9'], default='v8', help='FEMR dataset version to use: v8 or v9')
     parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
-    parser.add_argument('--is_force_refresh', action='store_true', default=False, help='If specified, will force refresh the tokenizer config')
+    parser.add_argument('--is_force_refresh', action='store_true', default=True, help='If specified, will force refresh the tokenizer config')
     return parser.parse_args()
 
+def check_add_unique_codes(tokenizer_config):
+    unique_codes = {entry.code for entry in tokenizer_config if entry.type == 'code'}
+    assert len(unique_codes) > 0, "No unique codes were added."
+    print(f"Check passed: {len(unique_codes)} unique codes added.")
+
+def check_remove_codes_belonging_to_vocabs(tokenizer_config, excluded_vocabs):
+    for entry in tokenizer_config:
+        if entry.code.split("/")[0].lower() in excluded_vocabs:
+            raise AssertionError(f"Code from excluded vocab '{entry.code}' found in tokenizer config.")
+    print("Check passed: No codes from excluded vocabularies are present.")
+
+def check_add_categorical_codes(tokenizer_config):
+    categorical_codes = [entry for entry in tokenizer_config if entry.type == 'categorical']
+    assert len(categorical_codes) > 0, "No categorical codes were added."
+    print(f"Check passed: {len(categorical_codes)} categorical codes added.")
+
+def check_add_numerical_range_codes(tokenizer_config):
+    numerical_ranges = [entry for entry in tokenizer_config if entry.type == 'numerical_range']
+    assert len(numerical_ranges) > 0, "No numerical range codes were added."
+    print(f"Check passed: {len(numerical_ranges)} numerical range codes added.")
+
+def check_add_occurrence_count_to_codes(tokenizer_config):
+    codes_with_counts = [entry for entry in tokenizer_config if any(stat.type == 'count_occurrences' for stat in getattr(entry, 'stats', []))]
+    assert len(codes_with_counts) > 0, "No occurrence counts were added."
+    print(f"Check passed: Occurrence counts added to {len(codes_with_counts)} codes.")
+    
 def main():
     start_total = time.time()
     
@@ -52,20 +78,30 @@ def main():
 
     # With `n_procs=5`, should take ~20 mins
     wrapper_with_logging(add_unique_codes, 'add_unique_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
-
-    # With `n_procs=5`, should take ~XXXX mins
-    wrapper_with_logging(remove_codes_belonging_to_vocabs, 'remove_codes_belonging_to_vocabs', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, excluded_vocabs=excluded_vocabs)
-
-    # With `n_procs=5`, should take ~XXXX mins
-    wrapper_with_logging(add_categorical_codes, 'add_categorical_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
+    tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    check_add_unique_codes(tokenizer_config)
     
     # With `n_procs=5`, should take ~XXXX mins
-    wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
-
+    wrapper_with_logging(add_categorical_codes, 'add_categorical_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids)
+    tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    check_add_categorical_codes(tokenizer_config)
+    
+    # With `n_procs=5`, should take ~XXXX mins
+    wrapper_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_db=path_to_femr_extract, pids=pids, N=10)
+    tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    check_add_numerical_range_codes(tokenizer_config)
+    
+    # With `n_procs=5`, should take ~XXXX mins
+    wrapper_with_logging(remove_codes_belonging_to_vocabs, 'remove_codes_belonging_to_vocabs', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, excluded_vocabs=excluded_vocabs)
+    tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    check_remove_codes_belonging_to_vocabs(tokenizer_config, excluded_vocabs)
+    
     # With `n_procs=5`, should take ~XXXX mins
     # TODO -- figure out how to do with tokenizer
-    #wrapper_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
-
+    wrapper_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
+    tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
+    check_add_occurrence_count_to_codes(tokenizer_config)
+    
     print(f"Total time taken: {round(time.time() - start_total, 2)}s")
     print("Done!")
 
