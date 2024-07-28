@@ -1,12 +1,10 @@
-from typing import Dict, List, Optional, Set, Tuple, Union, Any, TypedDict
-import torch
-from torch.utils.data import Dataset
-import femr.datasets
 import os
 import numpy as np
-from jaxtyping import Float
-from transformers import AutoTokenizer
-from hf_ehr.config import GPU_BASE_DIR, Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
+import femr.datasets
+from typing import Dict, List, Tuple
+from torch.utils.data import Dataset
+from hf_ehr.config import Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
+from hf_ehr.data.tokenization import DescTokenizer
 
 class BaseDataset(Dataset):
     pass
@@ -78,6 +76,8 @@ class FEMRDataset(BaseDataset):
     def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
         """Return all event codes for this patient at `idx` in `self.split`.
         """
+        import time
+        start = time.time()
         pids: np.ndarray = self.get_pids()
         pid: int = pids[idx]
 
@@ -90,6 +90,7 @@ class FEMRDataset(BaseDataset):
             Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table)
             for e in self.femr_db[pid].events
         ]
+        # print("Time to fetch events: ", time.time() - start)
         return (pid, events)
 
 class AllTokensFEMRDataset(FEMRDataset):
@@ -104,6 +105,8 @@ class AllTokensFEMRDataset(FEMRDataset):
                  *args, 
                  **kwargs):
         super().__init__(*args, **kwargs)
+        if isinstance(tokenizer, DescTokenizer):
+            raise ValueError("DescTokenizer not supported for AllTokensFEMRDataset")
         self.tokenizer = tokenizer
         self.metadata = {
             **self.metadata,
@@ -126,19 +129,47 @@ class AllTokensFEMRDataset(FEMRDataset):
         # Number of tokens per example in this dataset
         self.idx_to_seq_length: List[int] = [ end - start for (p_idx, start, end) in self.idx_to_pidx_start_end ]
 
+        self.cache: Dict[int, Tuple[int, int, List[Event]]] = {} # Cache for last 1000 patients' timelines; [key] = p_idx, [value] = Tuple[idx, pid, events]
+
     def __len__(self) -> int:
         return len(self.idx_to_pidx_start_end)
     
-    def __getitem__(self, idx: int) -> Tuple[int, List[Event], int, int]:
+    def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
         """
             Return all event codes for this example at `idx` in `self.split`.
             Maps this `idx` to the proper subsequence of events in this patient's timeline.
                 Returns `start_token_idx` and `end_token_idx` to indicate the start and end of 
                 the subsequence within this patient's timeline that corresponds to `idx` in our dataset
+            
+            ! NOTE: This relies on the assumption that there is a one-to-one map between Event => Token;
+                otherwise the indexing will be incorrect
         """
         (p_idx, start_token_idx, end_token_idx) = self.idx_to_pidx_start_end[idx]
+    
+        # Cache hit
+        if p_idx in self.cache:
+            pid: int = self.cache[p_idx][1]
+            tokenizable_events: List[Event] = self.cache[p_idx][2][start_token_idx:end_token_idx]
+            return (pid, tokenizable_events)
+        
+        # Cache miss
         (pid, events) = super().__getitem__(p_idx) # Fetch all events for this patient
-        return (pid, events, start_token_idx, end_token_idx)
+        # Filter out events that don't have a corresponding token, then return the subsequence
+        tokenizable_events: List[Event] = []
+        idx: int = 0
+        while idx < len(events):
+            if self.tokenizer.convert_event_to_token(events[idx]) is not None:
+                tokenizable_events.append(events[idx])
+            idx += 1
+        
+        # Update cache
+        self.cache[p_idx] = (idx, pid, tokenizable_events)
+        if len(self.cache) > 1_000:
+            # Find minimal `idx` in cache, then delete it
+            min_p_idx: int = min(self.cache, key=lambda x: self.cache[x][0])
+            del self.cache[min_p_idx]
+
+        return (pid, tokenizable_events[start_token_idx:end_token_idx])
 
 if __name__ == '__main__':
     from hf_ehr.data.tokenization import CLMBRTokenizer, DescTokenizer

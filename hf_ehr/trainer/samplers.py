@@ -1,5 +1,5 @@
 """Credit: https://github.com/microsoft/protein-sequence-models/blob/main/sequence_models/samplers.py"""
-from typing import List, Tuple, Generator
+from typing import List, Tuple, Generator, Optional
 import math
 import numpy as np
 import torch
@@ -15,16 +15,20 @@ class SortishSampler(Sampler):
                  bucket_size: int, 
                  is_random_shuffle_across_buckets: bool = False, 
                  is_random_shuffle_within_buckets: bool = False,
-                 num_replicas: int = 1):
-        self.data: np.ndarray = np.argsort(-1 * np.array(sequence_lengths)) # sort longest -> shortest; NOTE: keep so that if we blow out memory, we do so earlier rather than later
-        self.num_replicas: int = num_replicas
-        self.num_samples: int = int(math.ceil(len(self.data) * 1.0 / self.num_replicas))
+                 secondary_sort_key: Optional[List[int]] = None,
+                 n_replicas: int = 1):
+        if secondary_sort_key is not None:
+            self.data: np.ndarray = np.lexsort((np.array(secondary_sort_key), -1 * np.array(sequence_lengths))) # sort longest -> shortest; break ties by considering `secondary_sort_key`; useful if `secondary_sort_key` is patient_id for the AllTokensFEMRDataset so that we keep all subsequences from the same patient together
+        else:
+            self.data: np.ndarray = np.argsort(-1 * np.array(sequence_lengths)) # sort longest -> shortest; NOTE: keep so that if we blow out memory, we do so earlier rather than later
+        self.n_replicas: int = n_replicas
+        self.num_samples: int = int(math.ceil(len(self.data) * 1.0 / self.n_replicas))
         self.bucket_size: int = bucket_size
         n_buckets: int = int(np.ceil(len(self.data) / self.bucket_size))
         self.data = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
         self.epoch: int = 0
         self.current_iter: int = 0
-        self.total_size: int = self.num_samples * self.num_replicas
+        self.total_size: int = self.num_samples * self.n_replicas
         self.is_random_shuffle_across_buckets: bool = is_random_shuffle_across_buckets
         self.is_random_shuffle_within_buckets: bool = is_random_shuffle_within_buckets
 
@@ -121,38 +125,6 @@ class ApproxBatchSampler(BatchSampler):
                 rounded_n = max(1, rounded_n)
                 yield batch[:rounded_n]
                 batch = batch[rounded_n:] + [idx]
-                max_length = max([self.sample_lengths[i] for i in batch])
-        if len(batch) > 0:
-            yield batch
-
-
-class AllTokensApproxBatchSampler(ApproxBatchSampler):
-    """
-	Same as ApproxBatchSampler, but for AllTokensFEMRDataset, i.e. it returns all tokens 
-    in each patient's timeline (i.e. generates multiple examples per patient) instead 
-    of just one example per patient.
-	-----------
-	"""
-    def __iter__(self) -> Generator[List[Tuple[int, int, int]], None, None]:
-        batch: List[Tuple[int, int, int]] = [] # List of (patient idx, start idx in patient timeline, end idx in patient timeline) included in this batch
-        max_length: int = 0
-        for idx in self.sampler:
-            # We want to save All Tokens, so split timeline into chunks of `model_context_window` tokens
-            for chunk_idx, chunk_start in enumerate(range(0, self.sample_lengths[idx], self.model_context_window)):
-                this_length: int = min(self.sample_lengths[idx] - chunk_start, self.model_context_window)
-                linear = (len(batch) + 1) * max(max_length, this_length)
-                if linear <= self.max_tokens:
-                    batch.append(idx + chunk_idx)
-                    max_length = max(max_length, this_length)
-                    if len(batch) == self.max_examples:
-                        yield batch
-                        batch = []
-                        max_length = 0
-                else:
-                    rounded_n = (len(batch) // self.batch_mult) * self.batch_mult
-                    rounded_n = max(1, rounded_n)
-                    yield batch[:rounded_n]
-                    batch = batch[rounded_n:] + [ (idx, chunk_start, chunk_start + this_length) ]
-                    max_length = max([chunk_end - chunk_start for (p_idx, chunk_start, chunk_end) in batch])
+                max_length = max([min(self.sample_lengths[i], self.model_context_window) for i in batch])
         if len(batch) > 0:
             yield batch

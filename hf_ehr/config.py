@@ -160,7 +160,9 @@ class CodeTCE(TokenizerConfigEntry):
 @dataclass()
 class NumericalRangeTCE(TokenizerConfigEntry):
     type: str = 'numerical_range'
-    tokenization: Dict[str, Any] = field(default_factory=lambda: {'unit' : None, 'range_start': None, 'range_end' : None, })
+    tokenization: Dict[str, Any] = field(default_factory=lambda: {
+        'unit' : None, 'range_start': None, 'range_end' : None, 
+    })
     
     def to_token(self)-> str:
         # LOINC/1234 || mg/dL || 0.0 - 100.0
@@ -169,8 +171,10 @@ class NumericalRangeTCE(TokenizerConfigEntry):
 @dataclass()
 class CategoricalTCE(TokenizerConfigEntry):
     type: str = 'categorical'
-    tokenization: Dict[str, Any] = field(default_factory=lambda: {'categories': [] })
-    
+    tokenization: Dict[str, Any] = field(default_factory=lambda: {
+        'categories': [] 
+    })
+
     def to_token(self)-> str:
         # LOINC/1234 || category1,category2,category3
         return f"{self.code} || {','.join(self.tokenization['categories'])}"

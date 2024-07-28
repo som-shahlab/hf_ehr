@@ -58,13 +58,18 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
         elif "nigam-v100" in partitions or "gpu" in partitions:
             if size == "base":
                 if context_length == 1024:
-                    max_tokens = 4096
+                    max_tokens = 8192
                 elif context_length == 2048:
                     max_tokens = 2048
                 elif context_length == 4096:
                     max_tokens = 4096
                 elif context_length == 8192:
                     max_tokens = 8192
+            elif size == "large":
+                if context_length == 1024:
+                    max_tokens = 1024
+                elif context_length == 2048:
+                    max_tokens = 2048
         else:
             raise ValueError(f"Unknown SLURM partition: {partitions}")
     # BERT
@@ -107,7 +112,7 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
             elif size == "medium":
                 max_tokens = 16384
             elif size == "large":
-                pass
+                max_tokens = 8192
         elif "nigam-v100" in partitions or "gpu" in partitions:
             if size == "tiny":
                 pass
@@ -180,8 +185,10 @@ def main():
         f"data.dataloader.approx_batch_sampler.max_tokens={max_tokens}",
         f"data.dataloader.max_length={args.context_length}",
         f"logging.wandb.name={args.model}-{args.size}-{args.context_length}--{args.tokenizer}",
-        f"main.path_to_output_dir=/share/pi/nigam/{os.environ['USER']}/hf_ehr/cache/runs/{args.model}-{args.size}-{args.context_length}--{args.tokenizer}" if not args.is_force_refresh else "",
     ]
+    
+    if not args.is_force_refresh:
+        command.append(f"main.path_to_output_dir=/share/pi/nigam/{os.environ['USER']}/hf_ehr/cache/runs/{args.model}-{args.size}-{args.context_length}--{args.tokenizer}")
 
     # Add model-specific args
     if args.model == 'gpt2':
@@ -204,7 +211,7 @@ def main():
 
     # Add extra args
     if args.extra:
-        command.append(args.extra)
+        command.extend(args.extra.split(" "))
     print(f"\nPython command:\n```\n{' '.join(command)}\n```\n")
     
     # If run local, then immediately execute `command` for run.py

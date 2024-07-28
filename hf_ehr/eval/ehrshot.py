@@ -31,20 +31,23 @@ class CookbookModelWithClassificationHead(torch.nn.Module):
     def __init__(self, model: torch.nn.Module, aggregation_strat: str, n_classes: int):
         super().__init__()
         self.n_classes: int = n_classes
-        self.hidden_dim: int = model.model.lm_head.in_features
 
         # Base model
         if model.model.__class__.__name__ == 'MambaForCausalLM':
+            self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.backbone
             self.base_model_name = 'mamba'
         elif model.model.__class__.__name__ == 'GPT2LMHeadModel':
+            self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.transformer
             self.base_model_name = 'gpt2'
         elif model.model.__class__.__name__ == 'HyenaForCausalLM':
+            self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.hyena.backbone
             self.base_model_name = 'hyena'
         elif model.model.__class__.__name__ == 'BertForMaskedLM':
-            self.base_model = model.model.bert.encoder
+            self.hidden_dim: int = model.model.cls.predictions.transform.dense.in_features
+            self.base_model = model.model.bert
             self.base_model_name = 'bert'
         else:
             raise ValueError("Model must be a MambaForCausalLM")

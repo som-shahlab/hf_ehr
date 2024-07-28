@@ -109,8 +109,17 @@ class BaseTokenizer(PreTrainedTokenizer):
                 tokens.append(token)
         return tokens
     
+    def convert_events_to_tokenized_events(self, events: List[Event], **kwargs) -> List[Event]:
+        """Returns all events that DO get mapped to tokens"""
+        tokenized_events: List[Event] = []
+        for e in events:
+            token: Optional[str] = self.convert_event_to_token(e, **kwargs)
+            if token is not None:
+                tokenized_events.append(e)
+        return tokenized_events
+    
     def convert_events_to_non_tokenized_events(self, events: List[Event], **kwargs) -> List[Event]:
-        """Returns all events that don't get mapped to tokens"""
+        """Returns all events that DO NOT get mapped to tokens"""
         non_tokenized_events: List[Event] = []
         for e in events:
             token: Optional[str] = self.convert_event_to_token(e, **kwargs)
@@ -185,13 +194,13 @@ class BaseTokenizer(PreTrainedTokenizer):
 
     def get_seq_length(self, args: Tuple['FEMRDataset', int, int]) -> List[Tuple[int, int]]:
         """Given a dataset and a range of indices, return the sequence length of each patient in that range"""
-        from hf_ehr.data.datasets import FEMRDataset, AllTokensFEMRDataset
+        from hf_ehr.data.datasets import FEMRDataset
         dataset_metadata, start_idx, end_idx = args # type is: FEMRDataset, int, int
         
         # remove extraneous keys so that we can init FEMRDataset() without errors
         for key in [ 'cls', 'tokenizer_metadata', 'max_length' ]:
             if key in dataset_metadata: del dataset_metadata[key]
-        
+
         dataset = FEMRDataset(**dataset_metadata)
         results: List[Tuple[int, int]] = []
         for idx in range(start_idx, end_idx):
@@ -287,7 +296,7 @@ class BaseCodeTokenizer(BaseTokenizer):
         
         # First, convert all Events => ProtoTokens
         batch: List[List[str]] = [ self.convert_events_to_tokens(x) for x in batch_of_events ]
-        
+
         # Second, add special tokens (if applicable)
         if kwargs.get("add_special_tokens", False):
             batch = [ [ self.cls_token, self.bos_token ] + x + [ self.eos_token ] for x in batch ]
@@ -326,7 +335,10 @@ class BaseCodeTokenizer(BaseTokenizer):
                 else:
                     tokenized_batch[key] = truncated_batch
         else:
-            tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
+            try:
+                tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
+            except Exception as e:
+                breakpoint()
 
         return tokenized_batch
 
@@ -723,10 +735,7 @@ def torch_mask_tokens(tokenizer: BaseTokenizer,
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged
     return inputs, labels
 
-def collate_femr_timelines(batch: Union[
-                                List[Tuple[int, List[Event]]],  # if dataset == FEMRDataset
-                                List[Tuple[int, List[Event], int, int]],  # if dataset == AllTokensFEMRDataset
-                            ],
+def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
                              tokenizer: BaseTokenizer, 
                              dataset_name: str, # 'FEMRDataset' or 'AllTokensFEMRDataset'
                              max_length: int,
@@ -738,34 +747,61 @@ def collate_femr_timelines(batch: Union[
         Collate function for FEMR timelines
         Truncate or pad to max length in batch.
     """
+    timelines: List[List[Event]] = [ x[1] for x in batch if len(x[1]) > 0 ] # remove empty timelines
     if dataset_name == 'AllTokensFEMRDataset':
-        assert len(batch[0]) == 4, f"ERROR - Expected 4 elements in each batch element, but got {len(batch[0])}"
-        # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
-        tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
-                                                                            truncation=False, 
+        # # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
+        tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 
+                                                                            truncation=True, 
                                                                             padding=True,
+                                                                            max_length=max_length,
+                                                                            is_truncation_random=False,
+                                                                            add_special_tokens=False,
                                                                             seed=seed, 
-                                                                            add_special_tokens=True,
                                                                             return_tensors='pt')
+        # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
+        # tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 
+        #                                                                     truncation=True, 
+        #                                                                     padding=True,
+        #                                                                     add_special_tokens=False,
+        #                                                                     is_truncation_random=False,
+        #                                                                     return_tensors='pt')
         # Truncate `tokens` to the specified (start, end) idx's
-        start_idxs: List[int] = [ x[2] for x in batch ]
-        end_idxs: List[int] = [ x[3] for x in batch ]
-        for key in tokens.keys():
-            tokens[key] = torch.stack([
-                tokens[key][i, start_idxs[i]:end_idxs[i]] 
-                for i in range(tokens[key].shape[0])
-            ])
+        # breakpoint()
+        # start_idxs: List[int] = [ x[2] for x in batch ]
+        # end_idxs: List[int] = [ x[3] for x in batch ]
+        # NOTE: If we naively do tokens[key][i, start_idxs[i]:end_idxs[i]], then we'll get a ragged tensor b/c some timelines are shorter than others
+        # Thus, we need to manually pad the shorter timelines to the `max_length_in_batch`
+        # max_length_in_batch: int = max([ end_idxs[i] - start_idxs[i] for i in range(len(start_idxs)) ])
+        # for key in tokens.keys():
+            # Pad token depends on the key
+            # if key == 'input_ids':
+            #     pad_token = tokenizer.pad_token_id
+            # elif key == 'attention_mask':
+            #     pad_token = 0
+            # elif key == 'token_type_ids':
+            #     pad_token = 0
+            # elif key == 'labels':
+            #     pad_token = -100
+            # else:
+            #     raise ValueError(f"ERROR - Unsupported 'key' of: `{key}`")
+            # tokens[key] = tokens[key][:,:max_length]
+            # tokens[key] = torch.stack([
+            #     tokens[key][i, start_idxs[i]:end_idxs[i]]
+            #     for i in range(tokens[key].shape[0])
+            # ])
+            # torch.nn.functional.pad(tokens[key][i, start_idxs[i]:end_idxs[i]], (max_length_in_batch - (end_idxs[i] - start_idxs[i]), 0), mode='constant', value=pad_token)
+            # for key in tokens.keys():
+            #     assert tokens[key].shape == (len(batch), max_length_in_batch), f"ERROR - Expected tokens[{key}].shape = ({len(batch)}, {max_length_in_batch}), but got {tokens[key].shape}"
     elif dataset_name == 'FEMRDataset':
-        assert len(batch[0]) == 2, f"ERROR - Expected 2 elements in each batch element, but got {len(batch[0])}"
         # For FEMRDataset, truncate timeline per usual
-        tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ x[1] for x in batch ], 
-                                                                        truncation=True, 
-                                                                        padding=True, 
-                                                                        max_length=max_length,
-                                                                        is_truncation_random=is_truncation_random,
-                                                                        seed=seed, 
-                                                                        add_special_tokens=True,
-                                                                        return_tensors='pt')
+        tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 
+                                                                            truncation=True, 
+                                                                            padding=True, 
+                                                                            max_length=max_length,
+                                                                            is_truncation_random=is_truncation_random,
+                                                                            add_special_tokens=False,
+                                                                            seed=seed, 
+                                                                            return_tensors='pt')
     else:
         raise ValueError(f"ERROR - Unsupported 'dataset_name' of: `{dataset_name}`")
     

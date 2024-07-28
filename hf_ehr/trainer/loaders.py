@@ -28,6 +28,11 @@ def load_dataloaders(config: DictConfig,
     # Samplers
     if dataloader_mode == 'approx':
         logger.info("====> Loading ApproxBatchSampler")
+        train_bucket_size = approx_batch_sampler.bucket_size
+        batch_max_tokens = approx_batch_sampler.max_tokens
+        is_random_shuffle_across_buckets = approx_batch_sampler.is_random_shuffle_across_buckets
+        is_random_shuffle_within_buckets = approx_batch_sampler.is_random_shuffle_within_buckets
+        secondary_sort_key = None
 
         # Get sequence lengths for each example in dataset
         if dataset_name == 'FEMRDataset':
@@ -40,28 +45,27 @@ def load_dataloaders(config: DictConfig,
             train_idx_to_seq_length: List[int] = datasets['train'].idx_to_seq_length
             val_idx_to_seq_length: List[int] = datasets['val'].idx_to_seq_length
             test_idx_to_seq_length: List[int] = datasets['test'].idx_to_seq_length
+            is_random_shuffle_within_buckets = False # for more cache hits since we will repeatedly query the same patient for subsets of their timeline
+            secondary_sort_key = [ x[0] for x in datasets['train'].idx_to_pidx_start_end ] # get patient id's to serve as a secondary sort key
         else:
             raise ValueError(f"Unknown dataset_name: {dataset_name}")
         
         # Train -- randomize (if desired) within/across batch sequence ordering
-        train_bucket_size = approx_batch_sampler.bucket_size
-        batch_max_tokens = approx_batch_sampler.max_tokens
-        is_random_shuffle_across_buckets = approx_batch_sampler.is_random_shuffle_across_buckets
-        is_random_shuffle_within_buckets = approx_batch_sampler.is_random_shuffle_within_buckets
         train_sort_sampler = SortishSampler(train_idx_to_seq_length, 
                                             train_bucket_size, 
-                                            is_random_shuffle_across_buckets, 
-                                            is_random_shuffle_within_buckets,
-                                            n_replicas)
+                                            is_random_shuffle_across_buckets=is_random_shuffle_across_buckets, 
+                                            is_random_shuffle_within_buckets=is_random_shuffle_within_buckets,
+                                            secondary_sort_key=secondary_sort_key,
+                                            n_replicas=n_replicas)
         train_batch_sampler = ApproxBatchSampler( train_idx_to_seq_length, train_sort_sampler, max_length, batch_max_tokens, )
         train_batch_sampler_kwargs = { 'batch_sampler' : train_batch_sampler, }
         # For val / test -- always sort by length, then execute in fixed sequence
         ## Val
-        val_sort_sampler = SortishSampler( val_idx_to_seq_length, 1, False, False, n_replicas)
+        val_sort_sampler = SortishSampler( val_idx_to_seq_length, 1, is_random_shuffle_across_buckets=False, is_random_shuffle_within_buckets=False, n_replicas=n_replicas)
         val_batch_sampler = ApproxBatchSampler( val_idx_to_seq_length, val_sort_sampler, max_length, batch_max_tokens, )
         val_batch_sampler_kwargs = { 'batch_sampler' : val_batch_sampler, }
         ## Test
-        test_sort_sampler = SortishSampler( test_idx_to_seq_length, 1, False, False, n_replicas)
+        test_sort_sampler = SortishSampler( test_idx_to_seq_length, 1, is_random_shuffle_across_buckets=False, is_random_shuffle_within_buckets=False, n_replicas=n_replicas)
         test_batch_sampler = ApproxBatchSampler( test_idx_to_seq_length, test_sort_sampler, max_length, batch_max_tokens, )
         test_batch_sampler_kwargs = { 'batch_sampler' : test_batch_sampler, }
     else:
