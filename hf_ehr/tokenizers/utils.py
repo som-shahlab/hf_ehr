@@ -22,7 +22,6 @@ from hf_ehr.config import (
 ################################################
 def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, category) in dataset."""
-    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
@@ -40,25 +39,22 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
 
 def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
     """Merge results from `calc_categorical_codes`."""
-    # TODO
     merged: Set[Tuple[str, List[str]]] = set()
     for r in tqdm(results, total=len(results), desc='merge_categorical_codes()'):
         merged = merged.union(r)
     return merged
 
 
-
 ################################################
 # Get all numerical_range codes in dataset
 ################################################
-def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
+def calc_numerical_range_codes(args: Tuple) -> Dict[Tuple[str, str], List[str]]:
     """Return all (code, start_range, end_range) in dataset."""
-    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
 
-    results: Dict[str, List[float]] = {}
+    results: Dict[Tuple[str,str], List[float]] = {}
     for pid in pids:
         for event in femr_db[pid].events:
             if (
@@ -68,71 +64,21 @@ def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
                     or isinstance(event.value, int)
                 )
             ):
-                if event.code not in results:
-                    results[event.code] = []
-                results[event.code].append(float(event.value))  # Ensure values are stored as float
+                unit = event.unit if event.unit is not None else "None"
+                if (event.code, unit) not in results:
+                    results[(event.code, unit)] = []
+                results[(event.code, unit)].append(float(event.value))  # Ensure values are stored as float
     return results
 
-def merge_numerical_range_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
+def merge_numerical_range_codes(results: List[Dict[Tuple[str, str] List[str]]]) -> Dict[Tuple[str, List[str]]]:
     """Merge results from `calc_numerical_range_codes`."""
-    # TODO
-    merged: Dict[str, List[float]] = {}
+    merged: Dict[Tuple[str, str], List[float]] = {}
     for r in tqdm(results, total=len(results), desc='merge_numerical_range_codes()'):
-        for code, values in r.items():
-            if code not in merged:
-                merged[code] = []
-            merged[code].extend(values)
+        for (code, unit), values in r.items():
+            if (code, unit) not in merged:
+                merged[(code, unit)] = []
+            merged[(code, unit)].extend(values)
     return merged
-
-def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], N: int, **kwargs):
-    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
-    # Step 1: Collect all numerical values for each code
-    code_values = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, **kwargs)
-
-    # Step 2: Calculate the range for each code and update the tokenizer config
-    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    existing_entries: Set[str] = set(t.code for t in tokenizer_config if t.type == 'numerical_range')
-
-    for code, values in tqdm(code_values.items(), total=len(code_values), desc='add_numerical_range_codes() | Calculating ranges and adding to tokenizer_config...'):
-        if not values:
-            continue  # Skip if no values are present
-
-        # Step 3: Calculate percentiles for bucketing
-        percentiles = np.percentile(values, np.linspace(0, 100, N + 1)[1:-1])
-
-        # Step 4: Create NumericalRangeTCE for each quantile range
-        previous_bound = min(values)  # Set the first lower bound as the smallest value
-        for i, bound in enumerate(percentiles):
-            range_code = f"{code}_quantile_{i+1}"
-            if range_code in existing_entries:
-                continue
-            tokenizer_config.append(NumericalRangeTCE(
-                code=range_code,
-                tokenization={
-                    "unit": "None",  # Replace with actual unit if available
-                    "range_start": previous_bound,
-                    "range_end": bound
-                }
-            ))
-            previous_bound = bound
-        
-        # Final bucket to include the largest value
-        range_code = f"{code}_quantile_{N}"
-        if range_code not in existing_entries:
-            tokenizer_config.append(NumericalRangeTCE(
-                code=range_code,
-                tokenization={
-                    "unit": "None",
-                    "range_start": previous_bound,
-                    "range_end": max(values)  # Set the last upper bound as the largest value
-                }
-            ))
-
-    # Save updated tokenizer config
-    if 'is_already_run' not in metadata:
-        metadata['is_already_run'] = {}
-    metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
 ################################################
 # Get all unique codes in dataset
@@ -242,9 +188,11 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    existing_entries: Set[Tuple[str, Tuple[str, ...]]] = set(
-    (t.code, tuple(t.tokenization['categories'])) for t in tokenizer_config if t.type == 'categorical'
-)
+    existing_entries: Set[Tuple[str, Tuple[str, ...]]] = set([
+        (t.code, tuple(t.tokenization['categories'])) 
+        for t in tokenizer_config 
+        if t.type == 'categorical'
+    ])
     for (code, categories) in tqdm(results, total=len(results), desc='add_categorical_codes() | Adding entries to tokenizer_config...'):
         # Convert categories to a tuple to make it hashable
         categories_tuple = tuple(categories)
@@ -254,7 +202,7 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
         tokenizer_config.append(CategoricalTCE(
             code=code,
             tokenization={
-                'categories': categories_tuple,
+                'categories': list(categories_tuple),
             }
         ))
     
@@ -262,6 +210,40 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
     if 'is_already_run' not in metadata: metadata['is_already_run'] = {}
     metadata['is_already_run']['add_categorical_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
+
+def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], N: int, **kwargs):
+    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
+    # Step 1: Collect all numerical values for each code
+    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, **kwargs)
+
+    # Step 2: Calculate the range for each code and update the tokenizer config
+    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
+    existing_entries: Set[str] = set([
+        (t.code, t.unit) 
+        for t in tokenizer_config 
+        if t.type == 'numerical_range'
+    ])
+
+    for (code, unit), values in tqdm(results.items(), total=len(results), desc='add_numerical_range_codes() | Calculating ranges and adding to tokenizer_config...'):
+        # Step 3: Calculate percentiles for bucketing
+        percentiles = np.percentile(values, np.linspace(0, 100, N + 1))
+
+        # Step 4: Create NumericalRangeTCE for each quantile range
+        for idx in range(len(percentiles) - 1):
+            tokenizer_config.append(NumericalRangeTCE(
+                code=code,
+                tokenization={
+                    "unit": unit,  # Replace with actual unit if available
+                    "range_start": percentiles[idx],
+                    "range_end": percentiles[idx + 1],
+                }
+            ))
+
+    # Save updated tokenizer config
+    if 'is_already_run' not in metadata: metadata['is_already_run'] = {}
+    metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
+
 
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     """Add occurrence count to each entry in tokenizer config."""

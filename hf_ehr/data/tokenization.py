@@ -259,16 +259,7 @@ class BaseCodeTokenizer(BaseTokenizer):
 
     def __init__(self) -> None:
         # Create vocab
-        #self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
-        self.special_tokens: List[str] = [
-            self.tokenizer.bos_token,
-            self.tokenizer.eos_token,
-            self.tokenizer.unk_token,
-            self.tokenizer.sep_token,
-            self.tokenizer.pad_token,
-            self.tokenizer.cls_token,
-            self.tokenizer.mask_token,
-        ]
+        self.special_tokens = [ '[BOS]', '[EOS]', '[UNK]', '[SEP]', '[PAD]', '[CLS]', '[MASK]']
         self.vocab = self.special_tokens + self.non_special_tokens
 
         # Map tokens -> idxs
