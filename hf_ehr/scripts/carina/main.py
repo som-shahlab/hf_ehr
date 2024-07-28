@@ -76,7 +76,10 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
     elif model == 'bert':
         if "nigam-h100" in partitions or "nigam-a100" in partitions:
             if size == "base":
-                pass
+                if context_length == 512:
+                    max_tokens = 16384
+                elif context_length == 1024:
+                    max_tokens = 16384
             elif size == "large":
                 pass
         elif "nigam-v100" in partitions or "gpu" in partitions:
