@@ -141,7 +141,7 @@ class BaseModel(L.LightningModule):
             wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
             wandb.run.summary["tokenizer_pad_token_id"] = self.pad_token_id
             wandb.run.summary["model_parameter_count"] = self.get_param_count()
-        
+
         ############################
         # Start of OOM detection
         # Create a fake full batch and pass through model for early detection of OOM
