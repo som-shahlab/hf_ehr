@@ -3,6 +3,7 @@ import shutil
 import hydra
 import wandb
 import torch
+import datetime
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Callback
@@ -62,12 +63,14 @@ class StartTrainingCheckpoint(ModelCheckpoint):
         super().__init__(**kwargs)
 
     def on_train_start(self, trainer, pl_module):
-        if rank_zero_only.rank != 0:
-            return
-        filepath = os.path.join(self.dirpath, f"{self.filename}.ckpt")
-        if not os.path.exists(filepath):
-            # Save a checkpoint at the beginning of training
-            trainer.save_checkpoint(filepath)
+        if rank_zero_only.rank == 0:
+            filepath = os.path.join(self.dirpath, f"{self.filename}.ckpt")
+            if not os.path.exists(filepath):
+                # Save a checkpoint at the beginning of training
+                trainer.save_checkpoint(filepath)
+                logger.info(f"Checkpoint saved at {filepath} with for `StartTrainingCheckpoint`")
+        torch.distributed.monitored_barrier(timeout=datetime.timedelta(minutes=1))
+        # TODO - Move all above into if rank = 0: then write ckpt, followed by a: dist.barrer()
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool = False):
@@ -430,6 +433,8 @@ def main(config: DictConfig) -> None:
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
     
+    callbacks = []
+
     # Copy artifacts into output directory for reproducibility
     shutil.copy(path_to_tokenizer_config, path_to_artifacts_dir) # save tokenizer code_2_detail
     with open(os.path.join(path_to_artifacts_dir, 'config.yaml'), 'w') as fd: # save config
@@ -442,6 +447,7 @@ def main(config: DictConfig) -> None:
         callbacks=callbacks,
         accelerator='gpu',
         devices=config.trainer.devices,
+        # num_sanity_val_steps=0,
         strategy=config.trainer.distributed_backend,
         limit_train_batches=config.trainer.limit_train_batches,
         limit_val_batches=config.trainer.limit_val_batches,
@@ -454,7 +460,7 @@ def main(config: DictConfig) -> None:
         accumulate_grad_batches=config.trainer.accumulate_grad_batches,
         gradient_clip_val=config.trainer.gradient_clip_value,
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
-        use_distributed_sampler=False if getattr(config.data.dataloader, 'mode', 'batch') == 'approx' else True
+        # use_distributed_sampler=False if getattr(config.data.dataloader, 'mode', 'batch') == 'approx' else True
     )
 
     # Run
