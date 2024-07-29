@@ -460,7 +460,7 @@ def main(config: DictConfig) -> None:
         accumulate_grad_batches=config.trainer.accumulate_grad_batches,
         gradient_clip_val=config.trainer.gradient_clip_value,
         gradient_clip_algorithm=config.trainer.gradient_clip_algorithm,
-        # use_distributed_sampler=False if getattr(config.data.dataloader, 'mode', 'batch') == 'approx' else True
+        use_distributed_sampler=False if getattr(config.data.dataloader, 'mode', 'batch') == 'approx' else True
     )
 
     # Run
