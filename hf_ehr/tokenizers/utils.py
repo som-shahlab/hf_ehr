@@ -16,12 +16,14 @@ from hf_ehr.config import (
     load_tokenizer_config_from_path, 
     save_tokenizer_config_to_path
 )
+from hf_ehr.data.tokenization import CookbookTokenizer
 
 ################################################
 # Get all categorical codes in dataset
 ################################################
 def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, category) in dataset."""
+    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
@@ -39,22 +41,25 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
 
 def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
     """Merge results from `calc_categorical_codes`."""
+    # TODO
     merged: Set[Tuple[str, List[str]]] = set()
     for r in tqdm(results, total=len(results), desc='merge_categorical_codes()'):
         merged = merged.union(r)
     return merged
 
 
+
 ################################################
 # Get all numerical_range codes in dataset
 ################################################
-def calc_numerical_range_codes(args: Tuple) -> Dict[Tuple[str, str], List[str]]:
+def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, start_range, end_range) in dataset."""
+    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
 
-    results: Dict[Tuple[str,str], List[float]] = {}
+    results: Dict[str, List[float]] = {}
     for pid in pids:
         for event in femr_db[pid].events:
             if (
@@ -65,20 +70,58 @@ def calc_numerical_range_codes(args: Tuple) -> Dict[Tuple[str, str], List[str]]:
                 )
             ):
                 unit = event.unit if event.unit is not None else "None"
-                if (event.code, unit) not in results:
-                    results[(event.code, unit)] = []
-                results[(event.code, unit)].append(float(event.value))  # Ensure values are stored as float
+                key = (event.code, unit)
+                if key not in results:
+                    results[key] = []
+                results[key].append(float(event.value))  # Ensure values are stored as float
     return results
 
-def merge_numerical_range_codes(results: List[Dict[Tuple[str, str] List[str]]]) -> Dict[Tuple[str, List[str]]]:
+def merge_numerical_range_codes(results: List[Dict[Tuple[str, str], List[float]]]) -> Dict[Tuple[str, str], List[float]]:
     """Merge results from `calc_numerical_range_codes`."""
     merged: Dict[Tuple[str, str], List[float]] = {}
     for r in tqdm(results, total=len(results), desc='merge_numerical_range_codes()'):
-        for (code, unit), values in r.items():
-            if (code, unit) not in merged:
-                merged[(code, unit)] = []
-            merged[(code, unit)].extend(values)
+        for key, values in r.items():
+            if key not in merged:
+                merged[key] = []
+            merged[key].extend(values)
     return merged
+
+def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], N: int, **kwargs):
+    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
+    # Step 1: Collect all numerical values for each code
+    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, **kwargs)
+
+    # Step 2: Calculate the range for each code and update the tokenizer config
+    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
+    existing_entries: Set[str] = set([
+        (t.code, t.unit) 
+        for t in tokenizer_config 
+        if t.type == 'numerical_range'
+    ])
+
+    for (code, unit), values in tqdm(results.items(), total=len(results), desc='add_numerical_range_codes() | Calculating ranges and adding to tokenizer_config...'):
+        # Step 3: Calculate percentiles for bucketing
+        percentiles = np.percentile(values, np.linspace(0, 100, N + 1))
+
+        # Step 4: Create NumericalRangeTCE for each quantile range
+        for idx in range(len(percentiles) - 1):
+            if (code, unit) in existing_entries:
+                continue
+            tokenizer_config.append(NumericalRangeTCE(
+                code=code,
+                tokenization={
+                    "unit": unit,  # Replace with actual unit if available
+                    "range_start": percentiles[idx],
+                    "range_end": percentiles[idx + 1],
+                }
+            ))
+
+    # Save updated tokenizer config
+    if 'is_already_run' not in metadata:
+        metadata['is_already_run'] = {}
+    metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
+
 
 ################################################
 # Get all unique codes in dataset
@@ -132,28 +175,31 @@ def merge_code_2_unique_patient_count(results: List[Dict[str, int]]) -> Dict:
 ################################################
 # Code occurrence count
 ################################################
-def calc_code_2_occurrence_count(args: Tuple) -> Dict:
-    """Given a code, count total # of occurrences in dataset."""
+
+def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
+    """Given a list of patient IDs, count the occurrences of each token using CookbookTokenizer."""
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
-    #path_to_tokenizer_config = args[2] # TODO -- need to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
-    #tokenizer_config = load_tokenizer_config_from_path(path_to_tokenizer_config)
+    path_to_tokenizer_config = args[2]
+    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
+    tokenizer = CookbookTokenizer(path_to_tokenizer_config, metadata=metadata)
+    
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
     results: Dict[str, int] = collections.defaultdict(int)
     for pid in pids:
         for event in femr_db[pid].events:
-            # Directly use the event code as the key
-            results[event.code] += 1 # TODO - prob something like results[tokenizer(event)] += 1
+            token = tokenizer.convert_event_to_token(event)
+            if token is not None:
+                results[token] += 1
     return dict(results)
 
-def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict:
+def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict[str, int]:
     """Merge results from `calc_code_2_occurrence_count`."""
     merged: Dict[str, int] = collections.defaultdict(int)
     for r in results:
-        for code, count in r.items():
-            merged[code] += count
+        for token, count in r.items():
+            merged[token] += count
     return dict(merged)
-
 
 ################################################
 #
@@ -188,11 +234,9 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    existing_entries: Set[Tuple[str, Tuple[str, ...]]] = set([
-        (t.code, tuple(t.tokenization['categories'])) 
-        for t in tokenizer_config 
-        if t.type == 'categorical'
-    ])
+    existing_entries: Set[Tuple[str, Tuple[str, ...]]] = set(
+    (t.code, tuple(t.tokenization['categories'])) for t in tokenizer_config if t.type == 'categorical'
+)
     for (code, categories) in tqdm(results, total=len(results), desc='add_categorical_codes() | Adding entries to tokenizer_config...'):
         # Convert categories to a tuple to make it hashable
         categories_tuple = tuple(categories)
@@ -202,7 +246,7 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
         tokenizer_config.append(CategoricalTCE(
             code=code,
             tokenization={
-                'categories': list(categories_tuple),
+                'categories': categories_tuple,
             }
         ))
     
@@ -211,53 +255,18 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
     metadata['is_already_run']['add_categorical_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], N: int, **kwargs):
-    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
-    # Step 1: Collect all numerical values for each code
-    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, **kwargs)
-
-    # Step 2: Calculate the range for each code and update the tokenizer config
-    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    existing_entries: Set[str] = set([
-        (t.code, t.unit) 
-        for t in tokenizer_config 
-        if t.type == 'numerical_range'
-    ])
-
-    for (code, unit), values in tqdm(results.items(), total=len(results), desc='add_numerical_range_codes() | Calculating ranges and adding to tokenizer_config...'):
-        # Step 3: Calculate percentiles for bucketing
-        percentiles = np.percentile(values, np.linspace(0, 100, N + 1))
-
-        # Step 4: Create NumericalRangeTCE for each quantile range
-        for idx in range(len(percentiles) - 1):
-            tokenizer_config.append(NumericalRangeTCE(
-                code=code,
-                tokenization={
-                    "unit": unit,  # Replace with actual unit if available
-                    "range_start": percentiles[idx],
-                    "range_end": percentiles[idx + 1],
-                }
-            ))
-
-    # Save updated tokenizer config
-    if 'is_already_run' not in metadata: metadata['is_already_run'] = {}
-    metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
-
-
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     """Add occurrence count to each entry in tokenizer config."""
-    # TODO
     # Run function in parallel    
-    results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_femr_db, pids, **kwargs)
+    results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_femr_db, pids, additional_args=(path_to_tokenizer_config,), **kwargs)
 
     # Add stats to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     # Map each code => idx in tokenizer_config
     # Update each code's occurrence count in the tokenizer config
     for token in tokenizer_config:
-        if token.code in results:
-            count = results[token.code]
+        if token.to_token() in results:
+            count = results[token.to_token()]
             occurrence_stat = CountOccurrencesTCEStat(
                 type="count_occurrences",
                 dataset=dataset,
@@ -271,7 +280,7 @@ def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db
     
     # Save updated tokenizer config
     if 'is_already_run' not in metadata: metadata['is_already_run'] = {}
-    metadata['is_already_run']['add_categorical_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    metadata['is_already_run']['add_occurrence_count_to_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
     
 def add_description_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, **kwargs):
@@ -313,10 +322,10 @@ def remove_codes_belonging_to_vocabs(path_to_tokenizer_config: str, excluded_voc
 #
 ################################################
 
-def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pids: List[int], n_procs: int = 5, chunk_size: int = 1_000):
+def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pids: List[int], n_procs: int = 5, chunk_size: int = 1_000, additional_args: Tuple = ()):
     # Set up parallel tasks
-    tasks = [(path_to_femr_db, pids[start:start+chunk_size]) for start in range(0, len(pids), chunk_size)]
-    
+    tasks = [(path_to_femr_db, pids[start:start+chunk_size]) + additional_args for start in range(0, len(pids), chunk_size)]
+
     # Debugging info
     print(f"calc_parallelize: {len(tasks)} tasks created")
 
@@ -329,13 +338,14 @@ def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pid
 
     return merger(results)
 
-def run_helper(calc_func: Callable, merge_func: Callable, path_to_femr_db: str, pids: List[int], **kwargs):
+def run_helper(calc_func: Callable, merge_func: Callable, path_to_femr_db: str, pids: List[int], additional_args: Tuple = (), **kwargs):
     print(f"Running {calc_func.__name__} for {len(pids)} patients")
     results = calc_parallelize(path_to_femr_db, 
-                                calc_func, 
-                                merge_func, 
-                                pids=pids,
-                                **kwargs)
+                               calc_func, 
+                               merge_func, 
+                               pids=pids,
+                               additional_args=additional_args,
+                               **kwargs)
     return results
 
 ##########################################
