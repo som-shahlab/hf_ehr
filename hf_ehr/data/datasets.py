@@ -111,9 +111,12 @@ class AllTokensFEMRDataset(FEMRDataset):
         self.metadata = {
             **self.metadata,
             'tokenizer_metadata' : tokenizer.metadata,
-            'max_length' : max_length, # data.dataloader.max_length -- max length of a single sequence
             'cls' : 'AllTokensFEMRDataset',
         }
+        
+        # ! Keep out of `metadata` b/c we want to treat all versions of the AllTokensDataset the same regardless of their `max_length`
+        self.max_length: int = max_length # data.dataloader.max_length -- max length of a single sequence
+
         # Number of tokens per patient timeline
         self.seq_length_per_patient: List[int] = tokenizer.get_seq_length_per_patient(self, n_procs=5)
         # Number of unique examples that will be extracted per patient by truncating their timeline to `max_length` tokens
