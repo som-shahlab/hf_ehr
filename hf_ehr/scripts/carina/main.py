@@ -1,3 +1,4 @@
+import datetime
 import random
 import sys
 import argparse
@@ -190,7 +191,10 @@ def main():
         f"logging.wandb.name={args.model}-{args.size}-{args.context_length}--{args.tokenizer}",
     ]
     
-    if not args.is_force_refresh:
+    if args.is_force_refresh:
+        now: str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        command.append(f"main.path_to_output_dir=/share/pi/nigam/{os.environ['USER']}/hf_ehr/cache/runs/{now}")
+    else:
         command.append(f"main.path_to_output_dir=/share/pi/nigam/{os.environ['USER']}/hf_ehr/cache/runs/{args.model}-{args.size}-{args.context_length}--{args.tokenizer}")
 
     # Add model-specific args

@@ -136,7 +136,6 @@ class BaseModel(L.LightningModule):
         self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
 
     def on_train_start(self):
-        print("ON TRAIN START")
         if rank_zero_only.rank == 0 and wandb and wandb.run:
             wandb.run.summary["flops_per_token"] = self.flops_per_token
             wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
@@ -186,25 +185,21 @@ class BaseModel(L.LightningModule):
                     if idx >= self.trainer.global_step - 1:
                         break
         torch.distributed.barrier()
-        print("ON TRAIN START FINISH")
 
     def log_validation_step(self, loss: torch.Tensor):
-        print("VAL STEP LOG START", torch.cuda.current_device())
         ppl: torch.Tensor = torch.exp(loss)
-        self.log('val/loss', loss, prog_bar=True, on_epoch=True, sync_dist=True)
-        self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
-        self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32), on_epoch=True, sync_dist=True)
-        self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), on_epoch=True, sync_dist=True)
-        self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), on_epoch=True, sync_dist=True)
+        self.log('val/loss', loss, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
+        self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
         if self.flops_per_token is not None:
-            self.log('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token, on_epoch=True, sync_dist=True)
-        print("LOG VAL FINISH", torch.cuda.current_device())
+            self.log('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token, on_step=False, on_epoch=True, sync_dist=True)
 
     def log_training_step(self, loss: torch.Tensor, B: int, tokens: Dict[str, Any], lr: float):
         """
             B: batch size
         """
-        print("TRAIN STEP LOG START", loss, torch.cuda.current_device())
         loss = loss.detach()
         ppl: torch.Tensor = torch.exp(loss)
 
@@ -229,11 +224,8 @@ class BaseModel(L.LightningModule):
             train_batch_tokens_nonPAD: torch.Tensor = tokens['attention_mask'].sum()
 
         # Update cumulative metrics
-        print("TRAIN STEP LOG 4", loss, torch.cuda.current_device())
         self.sum_metrics['train_total_tokens_PAD'].update(train_batch_tokens_PAD)
-        print("TRAIN STEP LOG 5", loss, torch.cuda.current_device())
         self.sum_metrics['train_total_tokens_nonPAD'].update(train_batch_tokens_nonPAD)
-        print("TRAIN STEP LOG 6", loss, torch.cuda.current_device())
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
         self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
         self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
@@ -243,4 +235,3 @@ class BaseModel(L.LightningModule):
         
         if self.flops_per_token is not None:
             self.log('train/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)
-        print("TRAIN STEP LOG FINISH", loss, torch.cuda.current_device())

@@ -1,4 +1,6 @@
 from functools import partial
+import os
+from pathlib import Path
 from typing import List, Tuple, Any, Dict, Optional
 import torch
 import uuid
@@ -257,3 +259,21 @@ def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     model = model_class(**ckpt['hyper_parameters'], vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id)
     model.load_state_dict(ckpt['state_dict'])
     return model
+
+def get_most_recent_ckpt_from_output_dir(path_to_output_dir: str) -> Optional[str]:
+    """NOTE: Not used currently, but could be a useful helper function"""
+    path_to_ckpts = os.path.join(path_to_output_dir, 'ckpts')
+    if os.path.exists(path_to_ckpts):
+        # Loop through all ckpt files, choose most recent one
+        ckpt_files: List = list(Path(path_to_ckpts).glob('*.ckpt'))
+        if ckpt_files is not None and len(ckpt_files) > 0:
+            max_ckpt, max_tokens = None, None
+            for ckpt_file in ckpt_files:
+                path_to_ckpt = os.path.join(path_to_ckpts, ckpt_file)
+                ckpt = torch.load(path_to_ckpt, map_location='cpu')
+                if max_tokens is None or ckpt['train_total_tokens_nonPAD'] > max_tokens:
+                    max_ckpt = path_to_ckpt
+                    max_tokens = ckpt['train_total_tokens_nonPAD']
+            assert max_ckpt is not None, f"Error -- max_ckpt is None. Couldn't find most recent ckpt."
+            return max_ckpt
+    return None

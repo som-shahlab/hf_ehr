@@ -35,17 +35,11 @@ class GPTLanguageModel(BaseModel):
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
-        print("TRAINING STEP 1", batch_idx, torch.cuda.current_device())
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
-        print("TRAINING STEP 2", batch_idx, torch.cuda.current_device())
         B: int = tokens['input_ids'].shape[0]
-        print("TRAINING STEP 3", batch_idx, torch.cuda.current_device())
 
-        print("TRAINING STEP RUN MODEL", batch_idx, tokens['input_ids'].shape, torch.cuda.current_device())
         outputs = self.model(**tokens)
-        print("MODEL DONE", batch_idx, torch.cuda.current_device())
         loss: torch.Tensor = outputs.loss
-        print("LOSS", loss, torch.cuda.current_device())
         
         # Check if loss is NaN and handle it
         # Check if loss is NaN and synchronize this information across processes
@@ -54,9 +48,7 @@ class GPTLanguageModel(BaseModel):
         else:
             nan_detected = torch.tensor([0.0], device=self.device)
 
-        print("START ALL REDUCE", torch.cuda.current_device())
         dist.all_reduce(nan_detected, op=dist.ReduceOp.MAX)
-        print("END ALL REDUCE", torch.cuda.current_device())
 
         if nan_detected.item() == 1:
             print("NaN detected in loss, skipping this batch across all processes.")
@@ -70,6 +62,5 @@ class GPTLanguageModel(BaseModel):
         
         # Logging + Metrics
         self.log_training_step(loss.detach(), B, tokens, lr)
-        print("TRAINING STEP LOSS", batch_idx, loss)
 
         return loss

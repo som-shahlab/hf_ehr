@@ -63,14 +63,14 @@ class StartTrainingCheckpoint(ModelCheckpoint):
         super().__init__(**kwargs)
 
     def on_train_start(self, trainer, pl_module):
-        if rank_zero_only.rank == 0:
-            filepath = os.path.join(self.dirpath, f"{self.filename}.ckpt")
-            if not os.path.exists(filepath):
-                # Save a checkpoint at the beginning of training
-                trainer.save_checkpoint(filepath)
-                logger.info(f"Checkpoint saved at {filepath} with for `StartTrainingCheckpoint`")
-        torch.distributed.monitored_barrier(timeout=datetime.timedelta(minutes=1))
-        # TODO - Move all above into if rank = 0: then write ckpt, followed by a: dist.barrer()
+        # ! WARNING: Do not add a dist.barrier or rank_zero_only check here, or it will break DDP
+        # sicne `trainer.save_checkpoint()`` handles this automatically
+        filepath = os.path.join(self.dirpath, f"{self.filename}.ckpt")
+        if not os.path.exists(filepath):
+            # Save a checkpoint at the beginning of training
+            logger.info(f"Checkpoint starting to save at {filepath} with for `StartTrainingCheckpoint`")
+            trainer.save_checkpoint(filepath)
+            logger.info(f"Checkpoint saved at {filepath} with for `StartTrainingCheckpoint`")
 
 class MetricBasedCheckpoint(pl.callbacks.Callback):
     def __init__(self, metric_name: str, is_valid_metric_func: Callable, dirpath: str, is_run_val: bool = False):
@@ -92,19 +92,17 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         self.is_run_val: bool = is_run_val
 
     def on_train_batch_end(self, trainer, *args, **kwargs):
-        if rank_zero_only.rank != 0:
-            return
-        
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
         
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
+            self.last_ckpt_metric_value = metric_value
             if is_ckpt:
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
+                logger.info(f"Checkpoint starting to save at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
                 trainer.save_checkpoint(filepath)
-                logger.info(f"Checkpoint saved at {filepath} with {self.metric_name}={metric_value}")
-                self.last_ckpt_metric_value = metric_value
+                logger.info(f"Checkpoint saved at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
                 if self.is_run_val:
                     logger.info(f"Validation start | Step {trainer.global_step} | Caused by metric `{self.metric_name}` with value: ckpt_val={ckpt_val} (true_val={true_val})")
                     # Synchronize GPUs
@@ -138,24 +136,22 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
         return f"{self.__class__.__qualname__}{repr(kwargs)}"
 
 def train_flops_metric_func(val: int, last_val: Optional[int], config) -> Tuple[bool, int, int]:
+    if last_val is None:
+        # Default to 0
+        last_val = 0
     interval: int = int(config.callbacks.model_checkpointing.every_n_flops)
     current: int = int(val // interval)
-    if last_val is None:
-        # Don't create initial ckpt b/c already covered by StartTrainingCheckpoint
-        return False, int(val), current * interval
-    else:
-        last: int = int(last_val // interval)
-        return last < current, int(val), current * interval
+    last: int = int(last_val // interval)
+    return last < current, int(val), current * interval
 
 def train_token_metric_func(val: int, last_val: Optional[int], config) -> Tuple[bool, int, int]:
+    if last_val is None:
+        # Default to 0
+        last_val = 0
     interval: int = int(config.callbacks.model_checkpointing.every_n_train_nonPAD_tokens)
     current: int = int(val // interval)
-    if last_val is None:
-        # Don't create initial ckpt b/c already covered by StartTrainingCheckpoint
-        return False, int(val), current * interval
-    else:
-        last: int = int(last_val // interval)
-        return last < current, int(val), current * interval
+    last: int = int(last_val // interval)
+    return last < current, int(val), current * interval
 
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
@@ -180,23 +176,24 @@ def main(config: DictConfig) -> None:
     # Check if resuming from checkpoint
     is_resume_from_ckpt: bool = os.path.exists(os.path.join(path_to_output_dir, 'ckpts/last.ckpt'))
     path_to_resume_ckpt: Optional[str] = os.path.join(path_to_output_dir, 'ckpts/last.ckpt') if is_resume_from_ckpt else None
-    if is_force_restart:
-        print("====================================")
-        print("====================================")
-        print("!!!! Force restart !!!!")
-        print(f"!!!! Deleting folder at `{path_to_output_dir}` !!!!")
-        print("====================================")
-        print("====================================")
-        is_resume_from_ckpt = False
-        path_to_resume_ckpt = None
-        if os.path.exists(path_to_output_dir):
-            shutil.rmtree(path_to_output_dir)
+    if rank_zero_only.rank == 0:
+        if is_force_restart:
+            print("====================================")
+            print("====================================")
+            print("!!!! Force restart !!!!")
+            print(f"!!!! Deleting folder at `{path_to_output_dir}` !!!!")
+            print("====================================")
+            print("====================================")
+            is_resume_from_ckpt = False
+            path_to_resume_ckpt = None
+            if os.path.exists(path_to_output_dir):
+                shutil.rmtree(path_to_output_dir)
 
-    # Paths
-    path_to_log_dir: str = os.path.join(path_to_output_dir, 'logs/')
-    path_to_ckpt_dir: str = os.path.join(path_to_output_dir, 'ckpts/')
+    # Paths 
+    path_to_log_dir: str = os.path.join(path_to_output_dir, f'logs/' if rank_zero_only.rank == 0 else f'logs-{rank_zero_only.rank}/')
+    path_to_ckpt_dir: str = os.path.join(path_to_output_dir, f'ckpts/' if rank_zero_only.rank == 0 else f'ckpts-{rank_zero_only.rank}/')
+    path_to_artifacts_dir: str = os.path.join(path_to_log_dir, f'artifacts/')
     path_to_log_file: str = os.path.join(path_to_log_dir, 'info.log')
-    path_to_artifacts_dir: str = os.path.join(path_to_log_dir, 'artifacts/')
     os.makedirs(path_to_output_dir, exist_ok=True)
     os.makedirs(path_to_log_dir, exist_ok=True)
     os.makedirs(path_to_ckpt_dir, exist_ok=True)
@@ -249,15 +246,15 @@ def main(config: DictConfig) -> None:
     run = None
     if is_wandb:
         if is_resume_from_ckpt:
-            # Load existing wandb run ID
-            with open(os.path.join(path_to_log_dir, 'wandb_run_id.txt'), 'r') as f:
+            # Load existing wandb run ID -- make sure we pull from the official `/logs/` directory rather than a GPU-specific version (`/logs-{rank}/`) if using DDP
+            with open(os.path.join(path_to_log_dir.replace(f'-{rank_zero_only.rank}', ''), 'wandb_run_id.txt'), 'r') as f:
                 wandb_run_id: str = f.read()
                 
             logger.info(f"Found existing wandb run: `{wandb_run_id}`")
 
             if rank_zero_only.rank == 0:
                 if config.logging.wandb.is_force_create_wandb_run_from_scratch:
-                    logger.info(f"Creating new wandb run from scratch")
+                    logger.critical(f"Creating new wandb run from scratch")
                     run = wandb.init(
                         entity='ehr-fm',
                         project='hf_ehr', 
@@ -267,7 +264,7 @@ def main(config: DictConfig) -> None:
                     )
                     wandb_run_id = run.id
                 else:
-                    logger.info(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
+                    logger.critical(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
                     wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
                     run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
                     wandb_run_id = run.id
@@ -288,10 +285,10 @@ def main(config: DictConfig) -> None:
                     name=config.logging.wandb.name
                 )
             loggers += [ 
-                        WandbLogger(project='hf_ehr',
-                                    log_model=False,
-                                    save_dir=path_to_log_dir,
-                                    name=config.logging.wandb.name)
+                WandbLogger(project='hf_ehr',
+                            log_model=False,
+                            save_dir=path_to_log_dir,
+                            name=config.logging.wandb.name)
             ]
             if rank_zero_only.rank == 0:
                 # Save wandb run ID
@@ -305,15 +302,13 @@ def main(config: DictConfig) -> None:
             run.define_metric('train/loss', summary='min')
             run.define_metric('val/loss', summary='min')
 
-    logger.info("========================== Starting main ==========================")
-    logger.info(f">>>> Resuming from CHECKPOINT | Wandb run ID: {wandb_run_id} | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
+    logger.critical("========================== Starting main ==========================")
+    logger.critical(f">>>> RESUMING from CHECKPOINT | Wandb run ID: {wandb_run_id} | Loading from: `{path_to_resume_ckpt}` <<<<" if is_resume_from_ckpt else f">>>> Training from SCRATCH | Saving to: `{path_to_output_dir}` <<<<")
 
     # Tokenizer
     if config.data.tokenizer.name == 'DescTokenizer':
         # DescEmb
         metadata = OmegaConf.to_container(tokenizer_metadata, resolve=True, enum_to_str=True)
-        metadata = dict(metadata)  # Ensure it is a regular dictionary
-        metadata['cls'] = 'DescTokenizer'  # Set the 'cls' key
         logger.info(f"Loading DescTokenizer: `{PATH_TO_TOKENIZER_DESC_v8_CONFIG}` using base tokenizer `{config.data.tokenizer.metadata.desc_emb_tokenizer}`")
         tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=metadata)
         
@@ -410,7 +405,7 @@ def main(config: DictConfig) -> None:
     ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens', None) not in [None, "None"]:
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
-        print("Adding MetricBasedCheckpoint for non-PAD tokens...")
+        logger.critical("Adding MetricBasedCheckpoint for non-PAD tokens...")
         callbacks += [ 
             MetricBasedCheckpoint(
                 dirpath=path_to_ckpt_dir,
@@ -422,19 +417,17 @@ def main(config: DictConfig) -> None:
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
         # Save checkpoint every `every_n_flops` FLOPs; persists all models
         callbacks += [ 
-            MetricBasedCheckpoint(
-                dirpath=path_to_ckpt_dir,
-                metric_name="train/total_flops",
-                is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
-                is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
-            ),
+            # MetricBasedCheckpoint(
+            #     dirpath=path_to_ckpt_dir,
+            #     metric_name="train/total_flops",
+            #     is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
+            #     is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
+            # ),
         ]
         
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
     
-    callbacks = []
-
     # Copy artifacts into output directory for reproducibility
     shutil.copy(path_to_tokenizer_config, path_to_artifacts_dir) # save tokenizer code_2_detail
     with open(os.path.join(path_to_artifacts_dir, 'config.yaml'), 'w') as fd: # save config
@@ -447,7 +440,6 @@ def main(config: DictConfig) -> None:
         callbacks=callbacks,
         accelerator='gpu',
         devices=config.trainer.devices,
-        # num_sanity_val_steps=0,
         strategy=config.trainer.distributed_backend,
         limit_train_batches=config.trainer.limit_train_batches,
         limit_val_batches=config.trainer.limit_val_batches,
