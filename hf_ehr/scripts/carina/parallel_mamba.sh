@@ -42,11 +42,11 @@ for i in "${!RUN_NAMES[@]}"; do
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
         # Overwrite
         EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/${RUN_NAME}_${SLURM_JOB_ID}/"
-        bash $RUN_ARG "--extra ${EXTRA}" --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
+        $RUN_ARG --extra "${EXTRA}" --is_run_local --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
     else
         # Resume
         EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/$USER/hf_ehr/cache/runs/${RUN_NAME}/"
-        bash $RUN_ARG "--extra ${EXTRA}" --is_skip_base > $STDOUT 2> $STDERR &
+        $RUN_ARG --extra '${EXTRA}" --is_run_local --is_skip_base > $STDOUT 2> $STDERR &
     fi
 
     child_pids+=($!)

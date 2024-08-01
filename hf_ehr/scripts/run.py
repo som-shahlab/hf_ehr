@@ -247,7 +247,7 @@ def main(config: DictConfig) -> None:
     if is_wandb:
         if is_resume_from_ckpt:
             # Load existing wandb run ID -- make sure we pull from the official `/logs/` directory rather than a GPU-specific version (`/logs-{rank}/`) if using DDP
-            with open(os.path.join(path_to_log_dir.replace(f'-{rank_zero_only.rank}', ''), 'wandb_run_id.txt'), 'r') as f:
+            with open(os.path.join(path_to_log_dir.replace(f'logs-{rank_zero_only.rank}', 'logs'), 'wandb_run_id.txt'), 'r') as f:
                 wandb_run_id: str = f.read()
                 
             logger.info(f"Found existing wandb run: `{wandb_run_id}`")
@@ -417,12 +417,12 @@ def main(config: DictConfig) -> None:
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
         # Save checkpoint every `every_n_flops` FLOPs; persists all models
         callbacks += [ 
-            # MetricBasedCheckpoint(
-            #     dirpath=path_to_ckpt_dir,
-            #     metric_name="train/total_flops",
-            #     is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
-            #     is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
-            # ),
+            MetricBasedCheckpoint(
+                dirpath=path_to_ckpt_dir,
+                metric_name="train/total_flops",
+                is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
+                is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
+            ),
         ]
         
     if is_log_grad_norm:
@@ -435,7 +435,6 @@ def main(config: DictConfig) -> None:
 
     # Trainer
     trainer = pl.Trainer(
-        # profiler='advanced',
         logger=loggers,
         callbacks=callbacks,
         accelerator='gpu',
@@ -467,6 +466,7 @@ def main(config: DictConfig) -> None:
         import traceback
         traceback.print_exc()
         exit()
+
     if is_wandb:
         wandb.finish()
 
