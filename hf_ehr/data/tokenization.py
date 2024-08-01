@@ -338,7 +338,8 @@ class BaseCodeTokenizer(BaseTokenizer):
             try:
                 tokenized_batch: Dict[str, torch.Tensor] = super().__call__(batch, **kwargs, is_split_into_words=True)
             except Exception as e:
-                breakpoint()
+                print("Exception in BaseCodeTokenizer.__call__():", e)
+                raise e
 
         return tokenized_batch
 
@@ -749,7 +750,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
     """
     timelines: List[List[Event]] = [ x[1] for x in batch if len(x[1]) > 0 ] # remove empty timelines
     if dataset_name == 'AllTokensFEMRDataset':
-        # # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
+        # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
         tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 
                                                                             truncation=True, 
                                                                             padding=True,
@@ -758,40 +759,6 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
                                                                             add_special_tokens=False,
                                                                             seed=seed, 
                                                                             return_tensors='pt')
-        # For AllTokensFEMRDataset, we are given explicit (start, end) idx's to subselect from each patient's timeline
-        # tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 
-        #                                                                     truncation=True, 
-        #                                                                     padding=True,
-        #                                                                     add_special_tokens=False,
-        #                                                                     is_truncation_random=False,
-        #                                                                     return_tensors='pt')
-        # Truncate `tokens` to the specified (start, end) idx's
-        # breakpoint()
-        # start_idxs: List[int] = [ x[2] for x in batch ]
-        # end_idxs: List[int] = [ x[3] for x in batch ]
-        # NOTE: If we naively do tokens[key][i, start_idxs[i]:end_idxs[i]], then we'll get a ragged tensor b/c some timelines are shorter than others
-        # Thus, we need to manually pad the shorter timelines to the `max_length_in_batch`
-        # max_length_in_batch: int = max([ end_idxs[i] - start_idxs[i] for i in range(len(start_idxs)) ])
-        # for key in tokens.keys():
-            # Pad token depends on the key
-            # if key == 'input_ids':
-            #     pad_token = tokenizer.pad_token_id
-            # elif key == 'attention_mask':
-            #     pad_token = 0
-            # elif key == 'token_type_ids':
-            #     pad_token = 0
-            # elif key == 'labels':
-            #     pad_token = -100
-            # else:
-            #     raise ValueError(f"ERROR - Unsupported 'key' of: `{key}`")
-            # tokens[key] = tokens[key][:,:max_length]
-            # tokens[key] = torch.stack([
-            #     tokens[key][i, start_idxs[i]:end_idxs[i]]
-            #     for i in range(tokens[key].shape[0])
-            # ])
-            # torch.nn.functional.pad(tokens[key][i, start_idxs[i]:end_idxs[i]], (max_length_in_batch - (end_idxs[i] - start_idxs[i]), 0), mode='constant', value=pad_token)
-            # for key in tokens.keys():
-            #     assert tokens[key].shape == (len(batch), max_length_in_batch), f"ERROR - Expected tokens[{key}].shape = ({len(batch)}, {max_length_in_batch}), but got {tokens[key].shape}"
     elif dataset_name == 'FEMRDataset':
         # For FEMRDataset, truncate timeline per usual
         tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 

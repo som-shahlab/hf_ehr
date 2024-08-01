@@ -25,10 +25,10 @@ source base.sh
 # Experiment names
 RUN_NAMES=( "gpt-base-512--clmbr" "gpt-base-1024--clmbr" "gpt-base-2048--clmbr" "gpt-base-4096--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
-    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
-    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8"
-    "python3 main.py --model gpt --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
 )
 
 # Loop over the RUN_NAMES and args
@@ -37,7 +37,7 @@ for i in "${!RUN_NAMES[@]}"; do
     RUN_ARG=${RUN_ARGS[i]}
     STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.out
     STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.err
-    echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}'"
+    echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}' with slurm job id '${SLURM_JOB_ID}'"
     
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
         # Overwrite

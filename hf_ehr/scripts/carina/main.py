@@ -132,7 +132,14 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                 elif context_length == 16384:
                     pass
             elif size == "large":
-                pass
+                if context_length == 1024:
+                    max_tokens = 16384
+                elif context_length == 4096:
+                    max_tokens = 16384
+                elif context_length == 8192:
+                    max_tokens = 16384
+                elif context_length == 16384:
+                    max_tokens = 16384
         else:
             raise ValueError(f"Unknown SLURM partition: {partitions}")
     # MAMBA
@@ -170,6 +177,9 @@ def main():
 
     # Partition-specific settings
     partitions: str = args.partitions if args.partitions is not None else DEFAULT_PARTITIONS[args.model]
+    if os.environ.get('SLURM_JOB_PARTITION') and args.is_run_local:
+        # If we're running locally on a SLURM node, then just use that partition
+        partitions = os.environ['SLURM_JOB_PARTITION']
     max_tokens, batch_size = map_model_partition_to_batch_size(partitions, args.model, args.size, args.context_length)
     print(f"Stats: partitions={partitions} | max_tokens: {max_tokens} | batch_size: {batch_size}")
     

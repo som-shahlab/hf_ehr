@@ -11,6 +11,7 @@ from calflops import calculate_flops
 import wandb
 from lightning.pytorch.utilities import rank_zero_only
 from hf_ehr.utils import lr_warmup_with_constant_plateau
+from loguru import logger
 
 def calculate_flops_per_token(model, vocab_size: int) -> int:
     """Returns FLOPs per token for model."""
@@ -59,9 +60,11 @@ class BaseModel(L.LightningModule):
     def post_init(self):
         """Post-initialization method to be called by subclass."""
         # Calculate FLOPs per token
-        print("Start | Calculating FLOPs per token...")
+        logger.info("Start | Calculating FLOPs per token...")
         self.flops_per_token = calculate_flops_per_token(self.model, self.vocab_size)
-        print("End | Calculating FLOPs per token...")
+        logger.info("End | Calculating FLOPs per token...")
+        # Track batch_idx
+        self.batch_idx: int = 0
 
     def parameters(self) -> List:
         params = []
@@ -98,13 +101,16 @@ class BaseModel(L.LightningModule):
         """Save each metric's state in the checkpoint."""
         for key, metric in self.sum_metrics.items():
             checkpoint[key] = metric.compute()
+        checkpoint['batch_idx'] = self.batch_idx
 
     def on_load_checkpoint(self, checkpoint):
         """Restore each metric's state from the checkpoint."""
         super().on_load_checkpoint(checkpoint)
         for key, metric in self.sum_metrics.items():
             self.sum_metrics[key].update(checkpoint[key])
-            print(f"Loaded metric `{key}` from chekpoint with value: `{self.sum_metrics[key].cuda().compute()}`")
+            logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.sum_metrics[key].cuda().compute()}`")
+        self.batch_idx: int = checkpoint.get('batch_idx', 0)
+        logger.info(f"Loaded `batch_idx` from checkpoint with value: `{self.batch_idx}`")
 
     def validation_step(self, 
                         batch: Dict[str, Any],
@@ -133,7 +139,7 @@ class BaseModel(L.LightningModule):
 
     def on_train_epoch_end(self):
         # Needed for ApproxBatchSampler to reset random seed after every epoch
-        self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.current_epoch + 1)
+        self.trainer.train_dataloader.batch_sampler.set_epoch(self.current_epoch + 1)
 
     def on_train_start(self):
         if rank_zero_only.rank == 0 and wandb and wandb.run:
@@ -168,22 +174,15 @@ class BaseModel(L.LightningModule):
         del fake_batch
         # End of OOM detection
         ############################
-        
+
         if self.trainer.global_step > 0:
-            # Make ApproxBatchSampler deterministic by looping through dataset until we hit
-            # the current step; otherwise, when Lightning restarts from a checkpoint it will
-            # reset np.random.seed(0) in ApproxBatchSampler. We need to "turn the crank" on this PRNG
-            # by repeatedly calling __iter__() until we hit our current step in order to recreate the
-            # last actual state of the PRNG corresponding to this checkpoint
+            # If we're loading from a checkpoint, then we need to adjust ApproxBatchSampler
+            # so that the next batch we sample isa ctually the next batch that this checkpoint
+            # would have sampled (and not restart at batch_idx=0 each time)
             if self.config.data.dataloader.mode == 'approx':
                 self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.trainer.current_epoch)
-                # TODO - just change `current_iter`
-                # self.trainer.train_dataloader.batch_sampler.sampler.current_iter = self.trainer.global_step
-                print(f"We are resuming from a checkpoint that used `ApproxBatchSampler`, so iterate through training dataloader until it matches the checkpoint's current step")
-                self.trainer.train_dataloader.batch_sampler.sampler.set_epoch(self.trainer.current_epoch)
-                for idx, __ in tqdm(enumerate(self.trainer.train_dataloader), total=self.trainer.global_step, desc='Iterating thru train DataLoader to align `ApproxBatchSampler` with ckpt\'s current step...'):
-                    if idx >= self.trainer.global_step - 1:
-                        break
+                self.trainer.train_dataloader.batch_sampler.start_batch_idx = self.batch_idx if self.batch_idx > 0 else self.trainer.global_step
+                logger.success(f"We are resuming from a checkpoint that used `ApproxBatchSampler`, so set: `epoch={self.trainer.current_epoch}` and `start_batch_idx={self.trainer.train_dataloader.batch_sampler.start_batch_idx}`")
         torch.distributed.barrier()
 
     def log_validation_step(self, loss: torch.Tensor):
@@ -210,7 +209,6 @@ class BaseModel(L.LightningModule):
         self.log('train/loss', loss, prog_bar=True)
         self.log('train/ppl', torch.clamp(ppl, max=100).to(torch.float32))  # artificially cap to 100 so that charts look prettier
         self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
-        # TODO - problem is this line
         self.log('train/examples/total', self.sum_metrics['train_total_examples'].compute().to(torch.float32), sync_dist=True)
 
         if 'hyena' in self.model_name:

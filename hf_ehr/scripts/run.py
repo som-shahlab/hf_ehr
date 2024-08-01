@@ -6,7 +6,7 @@ import torch
 import datetime
 import lightning.pytorch as pl
 from lightning.pytorch.loggers import WandbLogger, TensorBoardLogger, MLFlowLogger
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback
 from lightning.pytorch.utilities import rank_zero_only
 
 from loguru import logger
@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader
 from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
-from transformers import  AutoTokenizer
 from hf_ehr.data.datasets import BaseDataset
 from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
@@ -374,8 +373,6 @@ def main(config: DictConfig) -> None:
             every_n_train_steps=config.callbacks.model_checkpointing.save_most_recent_every_n_train_steps,
             save_last=True, # When True, saves an exact copy of the checkpoint to a file last.ckpt whenever a checkpoint file gets saved.
             save_weights_only=False, # If False, then save optimizer + scheduler states as well
-            monitor='step',
-            mode='max',
             verbose=True,
         ),
         # Save checkpoint at end of every epoch

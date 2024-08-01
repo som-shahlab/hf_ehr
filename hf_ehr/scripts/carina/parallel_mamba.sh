@@ -37,7 +37,7 @@ for i in "${!RUN_NAMES[@]}"; do
     RUN_ARG=${RUN_ARGS[i]}
     STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.out
     STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.err
-    echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}'"
+    echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}' with slurm job id '${SLURM_JOB_ID}'"
     
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
         # Overwrite

@@ -27,13 +27,13 @@ class SortishSampler(Sampler):
         n_buckets: int = int(np.ceil(len(self.data) / self.bucket_size))
         self.data = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
         self.epoch: int = 0
-        self.current_iter: int = 0
         self.total_size: int = self.num_samples * self.n_replicas
         self.is_random_shuffle_across_buckets: bool = is_random_shuffle_across_buckets
         self.is_random_shuffle_within_buckets: bool = is_random_shuffle_within_buckets
 
     def __iter__(self):
-        np.random.seed(self.epoch * 10_000_000 + self.current_iter)
+        """This gets called once at the start of every epoch."""
+        np.random.seed(self.epoch)
         self.rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
         if self.is_random_shuffle_within_buckets:
             for bucket in self.data:
@@ -47,7 +47,6 @@ class SortishSampler(Sampler):
         start = self.rank * self.num_samples
         end = start + self.num_samples
         indices = indices[start:end]
-        self.current_iter += 1
         assert len(indices) == self.num_samples
         return iter(indices)
 
@@ -55,10 +54,9 @@ class SortishSampler(Sampler):
         return self.num_samples
 
     def set_epoch(self, epoch: int):
-        # Different shuffling for each epoch
+        """Ensures different shuffling for each epoch"""
         # ! Be sure to add a call to this function to PyTorch Lightning hook on epoch_end()
         self.epoch: int = epoch
-        self.current_iter: int = 0
 
 
 class ApproxBatchSampler(BatchSampler):
@@ -95,6 +93,7 @@ class ApproxBatchSampler(BatchSampler):
         self.drop_last: bool = drop_last
         self.length = None # result of len(self)
         self.last_length_epoch_calc = None # for tracking self.length caching
+        self.start_batch_idx: int = 0 # batch idx to start yielding at;used for resuming samping from the last index saved in a checkpoint
         assert self.max_tokens >= self.model_context_window, f"ERROR: max_tokens ({self.max_tokens}) must be >= model_context_window ({self.model_context_window}). Otherwise, you could get a sequence that is too long to be included in any batch, i.e. len(seq) == model_context_window > max_tokens, which means some batches will return empty which throws an error. It doesn't make sense to limit the batch size to be less than the model context window, b/c then you'll never fully fill the model's context window."
 
     def __len__(self):
@@ -110,21 +109,88 @@ class ApproxBatchSampler(BatchSampler):
     def __iter__(self) -> Generator[List[int], None, None]:
         batch: List[int] = [] # list of patient idx's in dataset included in this batch
         max_length: int = 0
-        for idx in self.sampler:
-            this_length: int = min(self.sample_lengths[idx], self.model_context_window) # min() b/c seq will get truncated to fit into context window anyway
+        batch_counter: int = 0 # count number of batches we've yielded so far
+        for sampler_idx in self.sampler:
+            this_length: int = min(self.sample_lengths[sampler_idx], self.model_context_window) # min() b/c seq will get truncated to fit into context window anyway
             linear = (len(batch) + 1) * max(max_length, this_length)
             if linear <= self.max_tokens:
-                batch.append(idx)
+                batch.append(sampler_idx)
                 max_length = max(max_length, this_length)
                 if len(batch) == self.max_examples:
-                    yield batch
+                    if batch_counter >= self.start_batch_idx:
+                        # Only yield an actual batch if we've reached the `start_batch_idx`
+                        yield batch
                     batch = []
                     max_length = 0
+                    batch_counter += 1
             else:
                 rounded_n = (len(batch) // self.batch_mult) * self.batch_mult
                 rounded_n = max(1, rounded_n)
-                yield batch[:rounded_n]
-                batch = batch[rounded_n:] + [idx]
+                if batch_counter >= self.start_batch_idx:
+                    # Only yield an actual batch if we've reached the `start_batch_idx`
+                    yield batch[:rounded_n]
+                batch = batch[rounded_n:] + [sampler_idx]
                 max_length = max([min(self.sample_lengths[i], self.model_context_window) for i in batch])
+                batch_counter += 1
         if len(batch) > 0:
             yield batch
+
+    def set_epoch(self, epoch: int):
+        """Ensures different shuffling for each epoch"""
+        # ! Be sure to add a call to this function to PyTorch Lightning hook on epoch_end()
+        self.sampler.set_epoch(epoch)
+        self.start_batch_idx = 0 # Reset starting batch idx b/c new epoch
+
+if __name__ == '__main__':
+    sequence_lengths = [ # NOTE: Sort descending, so we batch in reverse order (i.e. starting from bottom)
+        4, 4,           # 0,1
+        5, 5, 6, 7,     # 2,3,4,5
+        10, 13,         # 6,7
+        14, 14,         # 8,9
+        14, 15,         # 10,11
+        20,             # 12
+        22,             # 13 
+        30,             # 14
+    ]
+    sampler = SortishSampler(sequence_lengths,
+                             10,
+                            False,
+                            False,
+                            None,
+                            1)
+    # Confirm buckets of size 10 are sorted properly
+    assert all(sampler.data[0] == [ 14, 13, 12, 11, 9, 8, 10, 7, 6, 5, ])
+    assert all(sampler.data[1] == [ 4, 2, 3, 0, 1 ])
+    print("Buckets:", sampler.data)
+    
+    approx = ApproxBatchSampler(sequence_lengths,
+                                sampler, 
+                                30, 
+                                30, 
+                                99999999, 
+                                1, 
+                                True)
+    batches = [ x for x in approx ]
+    # Confirm batching is correct
+    assert batches == [
+        [14],
+        [13],
+        [12],
+        [11, 9],
+        [8, 10],
+        [7, 6],
+        [5, 4, 2, 3],
+        [0, 1],
+    ]
+    print("Batches:", batches)
+    
+    # Confirm can restart batching at specific point
+    approx.start_batch_idx = 4 # start at 4th batch_idx
+    batches_2 = [ x for x in approx ]
+    assert batches_2 == [
+        [8, 10],
+        [7, 6],
+        [5, 4, 2, 3],
+        [0, 1],
+    ]
+    print("Batches starting with 4th idx:", batches_2)
