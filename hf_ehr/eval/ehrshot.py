@@ -41,7 +41,7 @@ class CookbookModelWithClassificationHead(torch.nn.Module):
             self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.transformer
             self.base_model_name = 'gpt2'
-        elif model.model.__class__.__name__ == 'HyenaForCausalLM':
+        elif model.model.__class__.__name__ in ['HyenaForCausalLM', 'HyenaDNAForCausalLM']:
             self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.hyena.backbone
             self.base_model_name = 'hyena'
@@ -50,7 +50,7 @@ class CookbookModelWithClassificationHead(torch.nn.Module):
             self.base_model = model.model.bert
             self.base_model_name = 'bert'
         else:
-            raise ValueError("Model must be a MambaForCausalLM")
+            raise ValueError(f"Unknown model type: {model.model.__class__.__name__}")
 
         # Aggregation of base model reprs for classification
         self.aggregation_strat = aggregation_strat
@@ -70,21 +70,24 @@ class CookbookModelWithClassificationHead(torch.nn.Module):
         else:
            raise ValueError(f"Aggregation strategy `{self.aggregation_strat}` not supported.") 
 
-    def forward(self, input_ids: Float[torch.Tensor, 'B L'] = None, attention_mask: Float[torch.Tensor, 'B L'] = None, **kwargs) -> Float[torch.Tensor, 'B C']:
+    def forward(self, *args, **kwargs) -> Float[torch.Tensor, 'B C']:
         """Return logits for classification task"""
-        reprs: Float[torch.Tensor, 'B L H'] = self.base_model(input_ids=input_ids, attention_mask=attention_mask, **kwargs).last_hidden_state
+        if self.base_model_name == 'hyena':
+            reprs: Float[torch.Tensor, 'B L H'] = self.base_model(*args, **kwargs, output_hidden_states=True)[1][-1]
+        else:
+            reprs: Float[torch.Tensor, 'B L H'] = self.base_model(*args, **kwargs).last_hidden_state
         agg: Float[torch.Tensor, 'B H'] = self.aggregate(reprs)
         logits: Float[torch.Tensor, 'B C'] = self.classifier(agg)
         return logits
     
-    def predict_proba(self, input_ids: Float[torch.Tensor, 'B L'] = None, attention_mask: Float[torch.Tensor, 'B L'] = None, **kwargs) -> Float[torch.Tensor, 'B C']:
+    def predict_proba(self, *args, **kwargs) -> Float[torch.Tensor, 'B C']:
         """Return a probability distribution over classes."""
-        logits: Float[torch.Tensor, 'B C'] = self.forward(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+        logits: Float[torch.Tensor, 'B C'] = self.forward(*args, **kwargs)
         return torch.softmax(logits, dim=-1)
 
-    def predict(self, input_ids: Float[torch.Tensor, 'B L'] = None, attention_mask: Float[torch.Tensor, 'B L'] = None, **kwargs) -> Float[torch.Tensor, 'B']:
+    def predict(self, *args, **kwargs) -> Float[torch.Tensor, 'B']:
         """Return index of predicted class."""
-        logits: Float[torch.Tensor, 'B C'] = self.forward(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
+        logits: Float[torch.Tensor, 'B C'] = self.forward(*args, **kwargs)
         return torch.argmax(logits, dim=-1)
 
 def parse_args() -> argparse.Namespace:
