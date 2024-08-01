@@ -38,6 +38,11 @@ class GPTLanguageModel(BaseModel):
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
 
+        # TODO - remove
+        import pickle
+        with open(f'/share/pi/nigam/mwornow/test/batch_{batch_idx}.pkl', 'wb') as fd:
+            pickle.dump(batch, fd)
+        
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
         
