@@ -227,6 +227,10 @@ def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
     model.load_state_dict(ckpt['state_dict'])
     return model
 
+def load_ckpt(path_to_ckpt: str) -> Dict[str, Any]:
+    """Given a path to a model checkpoint, load the model."""
+    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    return ckpt
 
 def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     """Given a path to a model checkpoint, load the model."""
@@ -237,7 +241,7 @@ def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     from hf_ehr.models.t5 import T5LanguageModel
 
     # Load checkpoint
-    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    ckpt = load_ckpt(path_to_ckpt)
     config = load_config_from_ckpt(ckpt)
     
     # Load tokenizer
