@@ -100,7 +100,6 @@ def calculate_avg_ppl(model: BaseModel,
     total_token_count = 0
 
     for batch in tqdm(dataloader, total=len(dataloader)):
-        breakpoint()
         batch_log_probs, batch_token_count = calculate_perplexity_batch(model, batch, device)
         total_log_probs += batch_log_probs
         total_token_count += batch_token_count
