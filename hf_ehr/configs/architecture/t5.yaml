@@ -4,6 +4,8 @@ model:
   name: t5
   # Name/path to pass to HF.from_pretrained()
   hf_name: t5-base
+  # If TRUE, then keep pretrained weights
+  is_keep_pretrained_weights: False
 
 # Default trainer
 trainer:

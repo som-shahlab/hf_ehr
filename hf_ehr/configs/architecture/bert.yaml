@@ -4,6 +4,8 @@ model:
   name: bert
   # Name/path to pass to HF.from_pretrained()
   hf_name: bert-base-uncased
+  # If TRUE, then keep pretrained weights
+  is_keep_pretrained_weights: False
 
 # Default trainer
 trainer:

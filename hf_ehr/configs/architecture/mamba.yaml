@@ -4,6 +4,8 @@ model:
   name: mamba
   # Name/path to pass to HF.from_pretrained()
   hf_name: state-spaces/mamba-130m-hf
+  # If TRUE, then keep pretrained weights
+  is_keep_pretrained_weights: False
 
 # Default trainer
 trainer:

@@ -4,6 +4,8 @@ model:
   name: hyena
   # Name/path to pass to HF.from_pretrained()
   hf_name: LongSafari/hyenadna-large-1m-seqlen-hf
+  # If TRUE, then keep pretrained weights
+  is_keep_pretrained_weights: False
 
 # Default trainer
 trainer:

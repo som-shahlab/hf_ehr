@@ -88,6 +88,7 @@ Model architecture definitions
 * `model`
     * `name`: str -- Short, unique identifier for model. Used in code to determine what type of model we're using.
     * `hf_name`: str -- Name/path to pass to `AutoModel.from_pretrained()`
+    * `is_keep_pretrained_weights`: bool *= False* -- If TRUE and not resuming from ckpt, then keep the HF model's pretrained weights when starting training.
 * `trainer`
     * `mlm_mask_pct`: Optional[float] -- For models that use MLM training, this is the percent of tokens to randomly mask
     * `optimizer`
