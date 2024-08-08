@@ -17,6 +17,8 @@ from hf_ehr.config import (
     save_tokenizer_config_to_path
 )
 from hf_ehr.data.tokenization import CookbookTokenizer
+import cProfile
+import pstats
 
 ################################################
 # Get all categorical codes in dataset
@@ -94,7 +96,7 @@ def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: st
     # Step 2: Calculate the range for each code and update the tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     existing_entries: Set[str] = set([
-        (t.code, t.unit) 
+        (t.code, t.tokenization['unit']) 
         for t in tokenizer_config 
         if t.type == 'numerical_range'
     ])
@@ -175,30 +177,50 @@ def merge_code_2_unique_patient_count(results: List[Dict[str, int]]) -> Dict:
 ################################################
 # Code occurrence count
 ################################################
-
+## TODO - add a print function here - "Starting calc_code_2_occurrence_count with {id} and {args}"
 def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
     """Given a list of patient IDs, count the occurrences of each token using CookbookTokenizer."""
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     path_to_tokenizer_config = args[2]
+    # Adding the print statement to indicate the start of the function
+    print(f"Starting calc_code_2_occurrence_count with path_to_femr_db: {path_to_femr_db}, pids: {pids}, and path_to_tokenizer_config: {path_to_tokenizer_config}")
+    
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     tokenizer = CookbookTokenizer(path_to_tokenizer_config, metadata=metadata)
     
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
     results: Dict[str, int] = collections.defaultdict(int)
-    for pid in pids:
-        for event in femr_db[pid].events:
+    # Pre-fetch all events for all pids to minimize repeated data access
+    print("Fetching patient events")
+    start_time = datetime.datetime.now()
+    patient_events = {pid: femr_db[pid].events for pid in pids}
+    print(f"Finished fetching patient events, time taken: {datetime.datetime.now() - start_time}")
+    
+    # Process events
+    print("Processing events")
+    start_time = datetime.datetime.now()
+    for pid, events in patient_events.items():
+        for event in events:
             token = tokenizer.convert_event_to_token(event)
             if token is not None:
                 results[token] += 1
+    print(f"Finished processing events, time taken: {datetime.datetime.now() - start_time}")
+    
+    print("Ending calc_code_2_occurrence_count")
     return dict(results)
 
 def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict[str, int]:
     """Merge results from `calc_code_2_occurrence_count`."""
+    print("Starting merge_code_2_occurrence_count")
     merged: Dict[str, int] = collections.defaultdict(int)
+    start_time = datetime.datetime.now()
     for r in results:
         for token, count in r.items():
             merged[token] += count
+    print(f"Finished merging, time taken: {datetime.datetime.now() - start_time}")
+    
+    print("Ending merge_code_2_occurrence_count")
     return dict(merged)
 
 ################################################
@@ -257,13 +279,20 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     """Add occurrence count to each entry in tokenizer config."""
-    # Run function in parallel    
+    print("Starting add_occurrence_count_to_codes function")
+
+    # Run function in parallel   
+    print("Running run_helper") 
+    start_time = datetime.datetime.now()
     results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_femr_db, pids, additional_args=(path_to_tokenizer_config,), **kwargs)
+    print(f"Finished run_helper, time taken: {datetime.datetime.now() - start_time}")
 
     # Add stats to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     # Map each code => idx in tokenizer_config
     # Update each code's occurrence count in the tokenizer config
+    print("Updating occurrence counts in tokenizer config")
+    start_time = datetime.datetime.now()
     for token in tokenizer_config:
         if token.to_token() in results:
             count = results[token.to_token()]
@@ -277,11 +306,17 @@ def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db
                 token.stats.append(occurrence_stat)
             else:
                 token.stats = [occurrence_stat]
+    print(f"Finished updating occurrence counts, time taken: {datetime.datetime.now() - start_time}")
     
     # Save updated tokenizer config
+    print("Saving updated tokenizer config")
+    start_time = datetime.datetime.now()
     if 'is_already_run' not in metadata: metadata['is_already_run'] = {}
     metadata['is_already_run']['add_occurrence_count_to_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
+    print(f"Finished saving tokenizer config, time taken: {datetime.datetime.now() - start_time}")
+
+    print("Completed add_occurrence_count_to_codes function")
     
 def add_description_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, **kwargs):
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
@@ -322,7 +357,7 @@ def remove_codes_belonging_to_vocabs(path_to_tokenizer_config: str, excluded_voc
 #
 ################################################
 
-def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pids: List[int], n_procs: int = 5, chunk_size: int = 1_000, additional_args: Tuple = ()):
+def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pids: List[int], n_procs: int = 5, chunk_size: int = 10000, additional_args: Tuple = ()):
     # Set up parallel tasks
     tasks = [(path_to_femr_db, pids[start:start+chunk_size]) + additional_args for start in range(0, len(pids), chunk_size)]
 
