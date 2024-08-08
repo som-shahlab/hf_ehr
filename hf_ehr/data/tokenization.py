@@ -507,34 +507,40 @@ class CookbookTokenizer(BaseCodeTokenizer):
         previous_end = None
         
         for e in events:
-            if previous_end is not None:
-                interval = (e.start - previous_end).days
-                if self.is_add_day_att:
-                    if interval <= 1080:
-                        att = self.day_atts_cehr_gpt[interval - 1]
-                    else:
-                        att = self.long_att_cehr_gpt
-                    tokens.append(att)
-                elif self.is_add_day_week_month_att:
-                    if interval < 7:
-                        att = self.day_atts_cehr_bert[interval - 1]
-                    elif 7 <= interval < 30:
-                        att = self.week_atts[(interval // 7) - 1]
-                    elif 30 <= interval < 360:
-                        att = self.month_atts[(interval // 30) - 1]
-                    else:
-                        att = self.long_att_cehr_bert
-                    tokens.append(att)
-        
-            if self.is_add_visit_start:
-                tokens.append(self.visit_start)
-            token = self.convert_event_to_token(e, **kwargs)
-            if token:
-                tokens.append(token)
-            if self.is_add_visit_end:
-                tokens.append(self.visit_end)
-        
-            previous_end = e.end
+            # Check if the event is a visit
+            if "Visit" in e.code:
+                if previous_end is not None:
+                    interval = (e.start - previous_end).days
+                    if self.is_add_day_att:
+                        if interval <= 1080:
+                            att = self.day_atts_cehr_gpt[interval - 1]
+                        else:
+                            att = self.long_att_cehr_gpt
+                        tokens.append(att)
+                    elif self.is_add_day_week_month_att:
+                        if interval < 7:
+                            att = self.day_atts_cehr_bert[interval - 1]
+                        elif 7 <= interval < 30:
+                            att = self.week_atts[(interval // 7) - 1]
+                        elif 30 <= interval < 360:
+                            att = self.month_atts[(interval // 30) - 1]
+                        else:
+                            att = self.long_att_cehr_bert
+                        tokens.append(att)
+
+                if self.is_add_visit_start:
+                    tokens.append(self.visit_start)
+                token = self.convert_event_to_token(e, **kwargs)
+                if token:
+                    tokens.append(token)
+                if self.is_add_visit_end:
+                    tokens.append(self.visit_end)
+                
+                previous_end = e.end
+            else:
+                token = self.convert_event_to_token(e, **kwargs)
+                if token:
+                    tokens.append(token)
         
         return tokens
 
