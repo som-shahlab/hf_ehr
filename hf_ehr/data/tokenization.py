@@ -415,52 +415,54 @@ class CookbookTokenizer(BaseCodeTokenizer):
 
     def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
         """NOTE: This is basically the same as the CLMBR tokenizer's version."""
+        event_code = e.code
         # If code isn't in vocab => ignore
-        if e.code not in self.code_2_token:
+        if event_code not in self.code_2_token:
             return None
         
+        event_value = e.value
         # If numerical code...
         if (
-            'numerical_range' in self.code_2_token[e.code] # `numerical_range` is a valid type for this code
-            and e.value is not None # `value` is not None
+            'numerical_range' in self.code_2_token[event_code] # `numerical_range` is a valid type for this code
+            and event_value is not None # `value` is not None
             and ( # `value` is numeric
-                isinstance(e.value, float)
-                or isinstance(e.value, int)
+                isinstance(event_value, float)
+                or isinstance(event_value, int)
             )
         ):
-            for token_range in self.code_2_token[e.code]['numerical_range']:
+            for token_range in self.code_2_token[event_code]['numerical_range']:
                 assert 'token' in token_range, f"ERROR - Missing 'token' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
                 assert 'tokenization' in token_range, f"ERROR - Missing 'tokenization' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
                 token: str = token_range['token']
                 unit: str = token_range['tokenization']['unit']
                 range_start: float = token_range['tokenization']['range_start']
                 range_end: float = token_range['tokenization']['range_end']
-                if range_start <= e.value <= range_end and e.unit == unit:
+                if range_start <= event_value <= range_end and e.unit == unit:
                     return token
             return None
 
         # If textual code...
         if (
-            'categorical' in self.code_2_token[e.code] # `categorical` is a valid type for this code
-            and e.value is not None # `value` is not None
-            and e.value != '' # `value` is not blank
+            'categorical' in self.code_2_token[event_code] # `categorical` is a valid type for this code
+            and event_value is not None # `value` is not None
+            and event_value != '' # `value` is not blank
             and ( # `value` is textual
-                isinstance(e.value, str)
+                isinstance(event_value, str)
             )
         ):
-            for categorical_value in self.code_2_token[e.code]['categorical']:
-                assert 'token' in categorical_value, f"ERROR - Missing 'token' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
-                assert 'tokenization' in categorical_value, f"ERROR - Missing 'tokenization' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
-                if e.value in categorical_value['tokenization']['categories']:
+            for categorical_value in self.code_2_token[event_code]['categorical']:
+                assert 'token' in categorical_value, f"ERROR - Missing 'token' for code={event_code},type=categorical in self.code_2_token: {self.code_2_token[event_code]['categorical']}"
+                assert 'tokenization' in categorical_value, f"ERROR - Missing 'tokenization' for code={event_code},type=categorical in self.code_2_token: {self.code_2_token[event_code]['categorical']}"
+                if event_value in categorical_value['tokenization']['categories']:
                     token: str = categorical_value['token']
                     return token
             return None
 
         # If just vanilla code...
         if (
-            'code' in self.code_2_token[e.code] # `code` is a valid type for this code
+            'code' in self.code_2_token[event_code] # `code` is a valid type for this code
         ):
-            token: str = self.code_2_token[e.code]['code'][0]['token']
+            token: str = self.code_2_token[event_code]['code'][0]['token']
             return token
 
         return None
