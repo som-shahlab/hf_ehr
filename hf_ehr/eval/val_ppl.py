@@ -66,7 +66,7 @@ def calculate_perplexity_batch(model: BaseModel,
         inputs = batch['tokens']['input_ids'].to(device)
 
         if 'hyena' in config['model']['name']:
-            batch.pop('attention_mask') 
+            batch["tokens"].pop('attention_mask') 
             
         attention_mask = batch['tokens'].get('attention_mask', None)
 
