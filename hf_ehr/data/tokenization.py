@@ -397,6 +397,7 @@ class CookbookTokenizer(BaseCodeTokenizer):
                 self.metadata.pop(key)
         
          # Initialize special tokens
+        # TODO -- prepend all these attributes with 'token_' for readibility
         self.visit_start = "[VISIT START]"
         self.visit_end = "[VISIT END]"
         self.day_atts_cehr_gpt = [f"[DAY {i}]" for i in range(1, 1081)]
@@ -504,13 +505,30 @@ class CookbookTokenizer(BaseCodeTokenizer):
     
     def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
         tokens: List[str] = []
-        previous_end = None
-        
+        current_visit_end: Optional[datetime.datetime] = None # track the end time of the currently active visit
+        previous_visit_end: Optional[datetime.datetime] = None # track the end time of the immediately preceding visit
+
         for e in events:
+
+            # Check if we need to add a visit end token
+            if current_visit_end is not None and (
+                e.start > current_visit_end # If we have [VISIT A = { TOKEN 1, TOKEN 2 }] [TOKEN 3], then add a visit end token before [TOKEN 3]
+                or "Visit" in e.code # If we have [VISIT A = { TOKEN 1, TOKEN 2 }] [VISIT B = { TOKEN 3, TOKEN 4 }], then add a visit end token after [VISIT A]
+            ):
+                # This token occurs after the currently active visit ends, so end it (if exists)
+                if self.is_add_visit_end:
+                    tokens.append(self.visit_end)
+                current_visit_end = None
+
             # Check if the event is a visit
             if "Visit" in e.code:
-                if previous_end is not None:
-                    interval = (e.start - previous_end).days
+                    
+                # Add ATT Tokens, if applicable
+                # This will be inserted between the prior visit and the current visit
+                if previous_visit_end is not None:
+                    interval: float = (e.start - previous_visit_end).days # Time (in days) between this visit's start and the immediately preceding visit's end
+                    assert interval >= 0, f"Interval has value = {interval} but should always be positive, but fails on {e}."
+                    
                     if self.is_add_day_att:
                         if interval <= 1080:
                             att = self.day_atts_cehr_gpt[interval - 1]
@@ -528,15 +546,18 @@ class CookbookTokenizer(BaseCodeTokenizer):
                             att = self.long_att_cehr_bert
                         tokens.append(att)
 
+                # Add visit start token, if applicable
                 if self.is_add_visit_start:
                     tokens.append(self.visit_start)
+            
+                # Add token itself
                 token = self.convert_event_to_token(e, **kwargs)
                 if token:
                     tokens.append(token)
-                if self.is_add_visit_end:
-                    tokens.append(self.visit_end)
-                
-                previous_end = e.end
+
+                # Keep track of this visit's end
+                current_visit_end = e.end
+                previous_visit_end = e.end
             else:
                 token = self.convert_event_to_token(e, **kwargs)
                 if token:
