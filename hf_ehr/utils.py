@@ -171,9 +171,9 @@ def load_tokenizer_from_config(config):
     elif name == 'CookbookTokenizer':
         # CookbookTokenizer
         tokenizer = CookbookTokenizer(path_to_config, 
-                                    excluded_vocabs=tokenizer__excluded_vocabs,
-                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                                    min_code_count=tokenizer__min_code_count)
+                                        excluded_vocabs=tokenizer__excluded_vocabs,
+                                        is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
+                                        min_code_count=tokenizer__min_code_count)
     return tokenizer
 
 def load_tokenizer_old_from_path(path_to_ckpt: str):

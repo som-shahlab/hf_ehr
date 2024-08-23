@@ -4,7 +4,7 @@ import lightning as L
 import torch.distributed as dist
 from tqdm import tqdm
 from omegaconf import DictConfig
-from torchmetrics.aggregation import SumMetric
+from torchmetrics.aggregation import SumMetric, CatMetric
 from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union
 from calflops import calculate_flops
@@ -56,6 +56,10 @@ class BaseModel(L.LightningModule):
             'train_total_tokens_PAD': SumMetric(),
             'train_total_tokens_nonPAD': SumMetric(),
         })
+        self.cat_metrics: Dict[str, CatMetric] = torch.nn.ModuleDict({
+            'val_batch_loss': CatMetric(),
+            'val_batch_tokens_nonPAD': CatMetric(),
+        })
     
     def post_init(self):
         """Post-initialization method to be called by subclass."""
@@ -101,14 +105,21 @@ class BaseModel(L.LightningModule):
         """Save each metric's state in the checkpoint."""
         for key, metric in self.sum_metrics.items():
             checkpoint[key] = metric.compute()
+        for key, metric in self.cat_metrics.items():
+            checkpoint[key] = metric.compute()
         checkpoint['batch_idx'] = self.batch_idx
 
     def on_load_checkpoint(self, checkpoint):
         """Restore each metric's state from the checkpoint."""
         super().on_load_checkpoint(checkpoint)
+        # Sum Metrics
         for key, metric in self.sum_metrics.items():
             self.sum_metrics[key].update(checkpoint[key])
             logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.sum_metrics[key].cuda().compute()}`")
+        # Cat Metrics
+        for key, metric in self.cat_metrics.items():
+            self.cat_metrics[key].update(checkpoint[key])
+            logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.cat_metrics[key].cuda().compute()}`")
         self.batch_idx: int = checkpoint.get('batch_idx', 0)
         logger.info(f"Loaded `batch_idx` from checkpoint with value: `{self.batch_idx}`")
 
@@ -121,7 +132,7 @@ class BaseModel(L.LightningModule):
         # Forward pass
         outputs = self.model(**tokens)
         loss: torch.Tensor = outputs.loss
-        
+                
         if torch.isnan(loss).any():
             nan_detected = torch.tensor([1.0], device=self.device)
         else:
@@ -133,7 +144,7 @@ class BaseModel(L.LightningModule):
             return  # Skip this batch on all processes
 
         # Logging
-        self.log_validation_step(loss)
+        self.log_validation_step(loss, tokens) # ! NOTE: I'm assuming this loss is averaged over all non-PAD tokens for this function call
 
         return loss
 
@@ -185,15 +196,32 @@ class BaseModel(L.LightningModule):
                 logger.success(f"We are resuming from a checkpoint that used `ApproxBatchSampler`, so set: `epoch={self.trainer.current_epoch}` and `start_batch_idx={self.trainer.train_dataloader.batch_sampler.start_batch_idx}`")
         torch.distributed.barrier()
 
-    def log_validation_step(self, loss: torch.Tensor):
+    def on_validation_start(self):
+        # When we restart validation, reset # of tokens that have gone into the val loss calculation to 0
+        self.cat_metrics['val_batch_loss'].reset()
+        self.cat_metrics['val_batch_tokens_nonPAD'].reset()
+
+    def on_validation_end(self):
+        # Calculate per-token val loss/ppl
+        val_batch_loss: torch.Tensor = self.cat_metrics['val_loss'].compute() # Loss/token across all val batches
+        val_batch_tokens_nonPAD: torch.Tensor = self.cat_metrics['val_batch_tokens_nonPAD'].compute() # Tokens/batch across all batches
+        loss = torch.sum(val_batch_loss * val_batch_tokens_nonPAD) # Calculate overall loss/token (with appropriate weighting across batches)
+        # Log val loss/ppl
         ppl: torch.Tensor = torch.exp(loss)
-        self.log('val/loss', loss, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val/loss', loss, on_step=False, on_epoch=True, sync_dist=True)
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
+        # Log training metrics to sync val/loss to training metrics
         self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
         self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
         self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
         if self.flops_per_token is not None:
             self.log('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token, on_step=False, on_epoch=True, sync_dist=True)
+
+    def log_validation_step(self, loss: torch.Tensor, tokens: Dict[str, Any]):
+        # NOTE: Assumes `loss` has been scaled per-token already
+        val_batch_tokens_nonPAD: int = (tokens['input_ids'] != self.pad_token_id).sum().detach().cpu().item()
+        self.sum_metrics['val_batch_loss'].update(loss)
+        self.sum_metrics['val_batch_tokens_nonPAD'].update(val_batch_tokens_nonPAD)
 
     def log_training_step(self, loss: torch.Tensor, B: int, tokens: Dict[str, Any], lr: float):
         """

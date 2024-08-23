@@ -3,10 +3,9 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/create_cookbook_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/create_cookbook_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=normal
-#SBATCH --mem=300G
-#SBATCH --cpus-per-task=20
+#SBATCH --partition=nigam-h100
+#SBATCH --mem=650G
+#SBATCH --cpus-per-task=40
 
-set -e
 source ../carina/base.sh
-python3 ../../tokenizers/create_cookbook.py
+python3 ../../tokenizers/create_cookbook.py --n_procs 40

@@ -7,13 +7,16 @@ We currently support three different tokenizers:
 2. `DescTokenizer` -- tokenizer based on Ed Choi's DescEmb/UniHPF work
 3. `CookbookTokenizer` -- custom tokenizer for this project
 
-**Note:** Files marked `old--` are deprecated and should not be used. They are kept for reference only for future code.
-
 ## Quick Start
 
 ```bash
+# Create CLMBRTokenizer
 python3 tokenizers/create_clmbr.py # Takes ~5 seconds
+
+# Create DescTokenizer
 python3 tokenizers/create_desc.py  # Takes ~30 mins
+
+# Create CookbookTokenizer
 python3 tokenizers/create_cookbook.py # TBD
 ```
 

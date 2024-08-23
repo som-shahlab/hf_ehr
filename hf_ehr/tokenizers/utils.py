@@ -13,19 +13,16 @@ from hf_ehr.config import (
     NumericalRangeTCE,
     TokenizerConfigEntry, 
     load_tokenizer_config_and_metadata_from_path,
-    load_tokenizer_config_from_path, 
     save_tokenizer_config_to_path
 )
 from hf_ehr.data.tokenization import CookbookTokenizer
-import cProfile
-import pstats
+import time
 
 ################################################
 # Get all categorical codes in dataset
 ################################################
 def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, category) in dataset."""
-    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
@@ -43,7 +40,6 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
 
 def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
     """Merge results from `calc_categorical_codes`."""
-    # TODO
     merged: Set[Tuple[str, List[str]]] = set()
     for r in tqdm(results, total=len(results), desc='merge_categorical_codes()'):
         merged = merged.union(r)
@@ -56,7 +52,6 @@ def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tu
 ################################################
 def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, start_range, end_range) in dataset."""
-    # TODO
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
@@ -177,35 +172,40 @@ def merge_code_2_unique_patient_count(results: List[Dict[str, int]]) -> Dict:
 ################################################
 # Code occurrence count
 ################################################
-## TODO - add a print function here - "Starting calc_code_2_occurrence_count with {id} and {args}"
 def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
     """Given a list of patient IDs, count the occurrences of each token using CookbookTokenizer."""
     path_to_femr_db: str = args[0]
     pids: List[int] = args[1]
     path_to_tokenizer_config = args[2]
+    
     # Adding the print statement to indicate the start of the function
-    print(f"Starting calc_code_2_occurrence_count with path_to_femr_db: {path_to_femr_db}, pids: {pids}, and path_to_tokenizer_config: {path_to_tokenizer_config}")
+    print(f"\nStarting calc_code_2_occurrence_count() with path_to_femr_db: {path_to_femr_db}, pids: {len(pids)}, and path_to_tokenizer_config: {path_to_tokenizer_config}")
     
-    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
+    print("Start | Loading tokenizer metadata")
+    start_time = datetime.datetime.now()
+    __, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
+    print(f"Finish | Loading tokenizer metadata | Time= {datetime.datetime.now() - start_time}s")
+
+    print("Loading CookbookTokenizer")
+    start_time = datetime.datetime.now()
     tokenizer = CookbookTokenizer(path_to_tokenizer_config, metadata=metadata)
-    
+    print(f"Finish | CookbookTokenizer | Time= {datetime.datetime.now() - start_time}s")
+
+    print("Loading FEMR PatientDatabase")
+    start_time = datetime.datetime.now()
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
-    results: Dict[str, int] = collections.defaultdict(int)
-    # Pre-fetch all events for all pids to minimize repeated data access
-    print("Fetching patient events")
-    start_time = datetime.datetime.now()
-    patient_events = {pid: femr_db[pid].events for pid in pids}
-    print(f"Finished fetching patient events, time taken: {datetime.datetime.now() - start_time}")
-    
+    print(f"Finish | FEMR PatientDatabase | Time= {datetime.datetime.now() - start_time}s")
+
     # Process events
-    print("Processing events")
+    print("Start | Processing events")
     start_time = datetime.datetime.now()
-    for pid, events in patient_events.items():
-        for event in events:
+    results: Dict[str, int] = collections.defaultdict(int)
+    for pid in tqdm(pids, total=len(pids), desc='pids'):
+        for event in femr_db[pid].events:
             token = tokenizer.convert_event_to_token(event)
             if token is not None:
                 results[token] += 1
-    print(f"Finished processing events, time taken: {datetime.datetime.now() - start_time}")
+    print(f"Finish | Processing events | Time= {datetime.datetime.now() - start_time}s")
     
     print("Ending calc_code_2_occurrence_count")
     return dict(results)
@@ -279,7 +279,7 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     """Add occurrence count to each entry in tokenizer config."""
-    print("Starting add_occurrence_count_to_codes function")
+    print("Starting add_occurrence_count_to_codes function\n")
 
     # Run function in parallel   
     print("Running run_helper") 
@@ -339,14 +339,14 @@ def remove_codes_belonging_to_vocabs(path_to_tokenizer_config: str, excluded_voc
     # Ignore any code that belongs to a vocab in `excluded_vocabs`
     excluded_vocabs = set([ x.lower() for x in excluded_vocabs ])
     valid_entries: List[TokenizerConfigEntry] = []
-    for entry in tqdm(tokenizer_config, total=len(tokenizer_config), desc=f'remove_codes_from_vocabs() | Removing codes from vocabs `{excluded_vocabs}` from tokenizer_config...'):
+    for entry in tqdm(tokenizer_config, total=len(tokenizer_config), desc=f'remove_codes_belonging_to_vocabs() | Removing codes from vocabs `{excluded_vocabs}` from tokenizer_config...'):
         if entry.code.split("/")[0].lower() not in excluded_vocabs:
             valid_entries.append(entry)
     tokenizer_config = valid_entries
     
     # Save updated tokenizer config
     if 'is_already_run' not in metadata: metadata['is_already_run'] = {}
-    metadata['is_already_run']['remove_codes_from_vocabs'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    metadata['is_already_run']['remove_codes_belonging_to_vocabs'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
 
@@ -388,10 +388,10 @@ def run_helper(calc_func: Callable, merge_func: Callable, path_to_femr_db: str, 
 # Called in `create.py`
 #
 ##########################################
-def wrapper_with_logging(func: Callable, func_name: str, path_to_tokenizer_config: str, *args, **kwargs):
+def call_func_with_logging(func: Callable, func_name: str, path_to_tokenizer_config: str, *args, **kwargs):
     __, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    if 'is_already_done' in metadata and metadata['is_already_done'].get(func_name, False):
-        print(f"Skipping {func_name}() b/c metadata['is_already_done'] == True")
+    if 'is_already_run' in metadata and metadata['is_already_run'].get(func_name, False):
+        print(f"Skipping {func_name}() b/c metadata['is_already_run'] == True")
     else:
         start = time.time()
         print(f"\n----\nStart | {func_name}()...")

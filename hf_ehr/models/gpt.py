@@ -27,7 +27,10 @@ class GPTLanguageModel(BaseModel):
         self.hidden_size = model_config.n_embd
 
         # Model
-        self.model = AutoModelForCausalLM.from_config(model_config)
+        if getattr(config.model, 'is_keep_pretrained_weights', False):
+            self.model = AutoModelForCausalLM.from_pretrained(model_config)
+        else:
+            self.model = AutoModelForCausalLM.from_config(model_config)
         
         # Run any post-init handlers from super()
         self.post_init()

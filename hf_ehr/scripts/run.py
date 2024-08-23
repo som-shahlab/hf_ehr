@@ -310,7 +310,6 @@ def main(config: DictConfig) -> None:
         metadata = OmegaConf.to_container(tokenizer_metadata, resolve=True, enum_to_str=True)
         logger.info(f"Loading DescTokenizer: `{PATH_TO_TOKENIZER_DESC_v8_CONFIG}` using base tokenizer `{config.data.tokenizer.metadata.desc_emb_tokenizer}`")
         tokenizer = DescTokenizer( PATH_TO_TOKENIZER_DESC_v8_CONFIG, metadata=metadata)
-        
     elif config.data.tokenizer.name == 'CLMBRTokenizer':
         # CLMBR
         logger.info(f"Loading CLMBRTokenizer: `{PATH_TO_TOKENIZER_CLMBR_v8_CONFIG}`")
@@ -320,6 +319,7 @@ def main(config: DictConfig) -> None:
         raise ValueError("CookbookTokenizer is not supported in this script yet.")
         logger.info(f"Loading CookbookTokenizer: `{path_to_tokenizer_config}`")
         tokenizer = CookbookTokenizer( path_to_tokenizer_config, metadata=tokenizer_metadata, )
+    tokenizer.save() # write to file to save this exact tokenizer for reproducibility
     logger.info(f"Vocab size: all={tokenizer.vocab_size} | non_special_tokens={len(tokenizer.non_special_tokens)} | special_tokens={len(tokenizer.special_tokens)}")
 
     # Model

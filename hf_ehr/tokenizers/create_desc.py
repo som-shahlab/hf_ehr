@@ -4,7 +4,8 @@ import time
 from typing import List
 from hf_ehr.scripts.create_vocab.utils import add_unique_codes, add_description_to_codes
 from hf_ehr.data.datasets import FEMRDataset
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_DESC_v8_CONFIG, wrapper_with_logging
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_TOKENIZER_DESC_v8_CONFIG
+from hf_ehr.tokenizers.utils import call_func_with_logging
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Generate statistics about dataset')
@@ -40,10 +41,10 @@ def main():
     print(f"Running with n_procs={args.n_procs}, chunk_size={chunk_size}")
 
     # With `n_procs=5`, should take ~20 mins
-    wrapper_with_logging(add_unique_codes, 'add_unique_codes', PATH_TO_TOKENIZER_DESC_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
+    call_func_with_logging(add_unique_codes, 'add_unique_codes', PATH_TO_TOKENIZER_DESC_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
 
     # With `n_procs=5`, should take 5 mins
-    wrapper_with_logging(add_description_to_codes, 'add_description_to_codes', PATH_TO_TOKENIZER_DESC_v8_CONFIG, path_to_femr_extract)
+    call_func_with_logging(add_description_to_codes, 'add_description_to_codes', PATH_TO_TOKENIZER_DESC_v8_CONFIG, path_to_femr_extract)
     
     print(f"Total time taken: {round(time.time() - start_total, 2)}s")
     print("Done!")

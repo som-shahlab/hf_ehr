@@ -43,7 +43,7 @@ class FEMRDataset(BaseDataset):
         self.train_pids: np.ndarray = all_pids[np.where(hashed_pids < SPLIT_TRAIN_CUTOFF)[0]]
         self.val_pids: np.ndarray = all_pids[np.where((SPLIT_TRAIN_CUTOFF <= hashed_pids) & (hashed_pids < SPLIT_VAL_CUTOFF))[0]]
         self.test_pids: np.ndarray = all_pids[np.where(hashed_pids >= SPLIT_VAL_CUTOFF)[0]]
-        
+
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
         assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
@@ -176,7 +176,7 @@ class AllTokensFEMRDataset(FEMRDataset):
 
 if __name__ == '__main__':
     from hf_ehr.data.tokenization import CLMBRTokenizer, DescTokenizer
-    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
+    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
     
     # Tokenizer
     tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
@@ -201,17 +201,18 @@ if __name__ == '__main__':
     breakpoint()
 
     # FEMRDataset
-    # train_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='train', is_remap_numerical_codes=False)
-    #val_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='val', is_remap_numerical_codes=True)
-    #test_dataset = FEMRDataset(path_to_femr_extract, path_to_code_2_detail, split='test', is_remap_numerical_codes=True)
-    # t1 = time.time()
-    # event_count = 0
-    # for pid in tqdm(train_dataset.get_pids()[:100000]):
-    #     for e in train_dataset.femr_db[pid].events:
-    #         event_count += 1
-    #         train_dataset.femr_db.get_ontology().get_text_description(e.code)
-    # t2 = time.time()
-    # print("Time to loop through all events in train_dataset: ", t2 - t1)
-    # # Print average time per event
-    # print("Average time per patient: ", (t2 - t1) / 100000)
-    # print("Average time per event: ", (t2 - t1) / event_count)
+    # TODO - sanity check that `PATH_TO_FEMR_EXTRACT_MIMIC4` works >>
+    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
+    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
+    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')
+    t1 = time.time()
+    event_count = 0
+    for pid in tqdm(train_dataset.get_pids()[:100000]):
+        for e in train_dataset.femr_db[pid].events:
+            event_count += 1
+            train_dataset.femr_db.get_ontology().get_text_description(e.code)
+    t2 = time.time()
+    print("Time to loop through all events in train_dataset: ", t2 - t1)
+    # Print average time per event
+    print("Average time per patient: ", (t2 - t1) / 100000)
+    print("Average time per event: ", (t2 - t1) / event_count)

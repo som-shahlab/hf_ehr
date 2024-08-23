@@ -6,6 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 from loguru import logger
 from dataclasses import dataclass, asdict, field
 import logging
+from tqdm import tqdm
 
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
@@ -18,24 +19,23 @@ GPU_BASE_DIR: str = '/home/hf_ehr/'
 
 PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
 PATH_TO_RUNS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'runs/')
+
+# Datasets
 PATH_TO_DATASET_CACHE_DIR = os.path.join(PATH_TO_CACHE_DIR, 'dataset/')
 PATH_TO_FEMR_EXTRACT_v9 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9'
 PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
+PATH_TO_FEMR_EXTRACT_MIMIC4 = '/share/pi/nigam/datasets/femr_mimic_4_extract'
 
+# Tokenizers
 PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/')
 PATH_TO_TOKENIZER_COOKBOOK_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_v8/')
+PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_mimic4/')
 PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/')
 PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/')
 PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_v8_DIR, 'tokenizer_config.json')
+PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
-
-# TODO - OLD - remove start
-PATH_TO_TOKENIZER_v8_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v8/')
-PATH_TO_TOKENIZER_v8_CLMBR_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v8_clmbr/')
-PATH_TO_TOKENIZER_v9_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v9/')
-PATH_TO_TOKENIZER_v9_LITE_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizer_v9_lite/')
-# TODO - OLD - remove end
 
 def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: Any) -> None:
     """
@@ -190,8 +190,8 @@ def save_tokenizer_config_to_path(path_to_tokenizer_config: str, tokenizer_confi
     json.dump({
         'timestamp' : str(datetime.datetime.now().isoformat()),
         'metadata' : metadata if metadata else {},
-        'tokens' : [ x.to_dict() for x in tokenizer_config ],
-    }, open(path_to_tokenizer_config, 'w'), indent=2)
+        'tokens' : [ x.to_dict() for x in tokenizer_config ], # NOTE: Takes ~30 seconds for 1.5M tokens
+    }, open(path_to_tokenizer_config, 'w'), indent=2) # NOTE: Saving takes a few minutes
 
 def load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config: str) -> Tuple[List[TokenizerConfigEntry], Dict[str, Any]]:
     return load_tokenizer_config_from_path(path_to_tokenizer_config, is_return_metadata=True) # type: ignore
