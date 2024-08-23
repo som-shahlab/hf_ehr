@@ -18,8 +18,8 @@
 
 **Evaluations:**
 1. Val/PPL on STARR-OMOP held-out 15% dataset split (canonical FEMR split)
-2. AUROC/AUPRC on EHRSHOT benchmark
-3. **TODO** -- MIMIC?
+2. AUROC/AUPRC on EHRSHOT tasks
+3. AUROC/AUPRC on MIMIC-IV tasks
 3. **TODO** -- EHRSHOT labelers on all of STARR?
 
 ## Installation
