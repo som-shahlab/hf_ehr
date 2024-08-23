@@ -62,7 +62,7 @@ You can either overwrite the config files in `configs/` or pass in CLI arguments
 
 There are 3 ways to launch a training run. 
 
-### Easy
+### Easy Mode
 
 Launch multiple runs in parallel on the same SLURM node  (each job gets 1 GPU) using `hf_ehr/scripts/carina/parallel_{model}.sh`:
 
@@ -82,7 +82,7 @@ sbatch parallel_hyena.sh
 sbatch parallel_mamba.sh
 ```
 
-### Medium
+### Medium Mode
 
 Launch one run on a SLURM node using `hf_ehr/scripts/carina/{model}.sh`:
 
@@ -123,7 +123,7 @@ where...
 - `[--is_skip_base]`: Optional -- An optional flag that skips running `source base.sh`. Useful when running `parallel.sh` and we don't want to reinit the conda environment multiple times
 - `[--is_run_local]`: Optional -- An optional flag that runs the script locally as `python run.py` instead of as a SLURM `sbatch` command
 
-### Advanced
+### Advanced Mode
 
 Directly call `run.py`, which allows maximum flexibility for configs. 
 
@@ -149,6 +149,12 @@ python3 ../run.py \
 ```
 
 ## Evaluation
+
+## MIMIC-IV
+
+TODO
+
+### EHRSHOT
 
 #### 1. Generate Patient Representations
 This all occurs within the `hf_ehr` repo.
