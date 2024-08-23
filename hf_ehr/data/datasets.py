@@ -177,34 +177,34 @@ class AllTokensFEMRDataset(FEMRDataset):
 if __name__ == '__main__':
     from hf_ehr.data.tokenization import CLMBRTokenizer, DescTokenizer
     from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
-    
+    import time
     # Tokenizer
-    tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
+    # tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
 
-    # AllTokensFEMRDataset
-    train_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='train', is_debug=True)
-    val_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='val', is_debug=True)
-    test_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='test', is_debug=True)
-    assert len(train_dataset) == 1081
-    assert len(train_dataset.get_pids()) == 1000
-    assert len(train_dataset[-3][1]) == 2326 # raw FEMR events
-    assert train_dataset[-3][2] == 1024 # start token idx
-    assert train_dataset[-3][3] == 1858 # end token idx
-    assert train_dataset.idx_to_pidx_start_end[-3] == (997, 1024, 1858)
-    assert train_dataset.idx_to_seq_length[-3] == 1858 - 1024
-    assert train_dataset.seq_length_per_patient[997] == 1858
-    print('train', len(train_dataset))
-    print('val', len(val_dataset))
-    print('test', len(test_dataset))
-    print(train_dataset[0])
-    print(train_dataset[-1])
-    breakpoint()
+    # # AllTokensFEMRDataset
+    # train_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='train', is_debug=True)
+    # val_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='val', is_debug=True)
+    # test_dataset = AllTokensFEMRDataset(tokenizer, max_length=1024, path_to_femr_extract=PATH_TO_FEMR_EXTRACT_v8, split='test', is_debug=True)
+    # assert len(train_dataset) == 1081
+    # assert len(train_dataset.get_pids()) == 1000
+    # assert len(train_dataset[-3][1]) == 2326 # raw FEMR events
+    # assert train_dataset[-3][2] == 1024 # start token idx
+    # assert train_dataset[-3][3] == 1858 # end token idx
+    # assert train_dataset.idx_to_pidx_start_end[-3] == (997, 1024, 1858)
+    # assert train_dataset.idx_to_seq_length[-3] == 1858 - 1024
+    # assert train_dataset.seq_length_per_patient[997] == 1858
+    # print('train', len(train_dataset))
+    # print('val', len(val_dataset))
+    # print('test', len(test_dataset))
+    # print(train_dataset[0])
+    # print(train_dataset[-1])
 
     # FEMRDataset
-    # TODO - sanity check that `PATH_TO_FEMR_EXTRACT_MIMIC4` works >>
+    # TODO - sanity check that `PATH_TO_FEMR_EXTRACT_MIMIC4` works
     train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
     val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
     test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')
+    breakpoint()
     t1 = time.time()
     event_count = 0
     for pid in tqdm(train_dataset.get_pids()[:100000]):

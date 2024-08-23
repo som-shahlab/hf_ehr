@@ -40,7 +40,7 @@ def filter_tokenizer_config(tokenizer_config: List[TokenizerConfigEntry],
         # Remove tokens with < `min_code_occurrence_count` occurrences in our dataset
         if (
             min_code_occurrence_count is not None
-            and entry.get_stat('count_occurrences') < min_code_occurrence_count
+            and entry.get_stat('count_occurrences', None) < min_code_occurrence_count
         ):
             invalid_entries.append(entry.to_token())
             continue
@@ -50,7 +50,7 @@ def filter_tokenizer_config(tokenizer_config: List[TokenizerConfigEntry],
     
     # Keep only the top `keep_n_max_occurrence_codes` tokens, sorted by occurrence count (if specified)
     if keep_n_max_occurrence_codes is not None:
-        sorted_entries: List[TokenizerConfigEntry] = sorted(valid_entries, key=lambda x: x.get_stat('count_occurrences'), reverse=True)
+        sorted_entries: List[TokenizerConfigEntry] = sorted(valid_entries, key=lambda x: x.get_stat('count_occurrences', None), reverse=True)
         valid_entries = sorted_entries[:keep_n_max_occurrence_codes]
         invalid_entries = sorted_entries[keep_n_max_occurrence_codes:]
 
@@ -458,6 +458,37 @@ class CookbookTokenizer(BaseCodeTokenizer):
         self.metadata: Dict[str, Any] = {} if metadata is None else dict(metadata)
         self.metadata['cls'] = 'CookbookTokenizer'
 
+        # Fetches ATT metadata - By default, it'll be done in CEHR-GPT style
+        self.is_add_visit_start: bool = metadata.get('is_add_visit_start', True)
+        self.is_add_visit_end: bool = metadata.get('is_add_visit_end', True)
+        self.is_add_day_att: bool = metadata.get('is_add_day_att', True)
+        self.is_add_day_week_month_att: bool = metadata.get('is_add_day_week_month_att', False)
+
+        # Pop the flags from metadata after initializing them to avoid recreating the config
+        for key in ['is_add_visit_start', 'is_add_visit_end', 'is_add_day_att', 'is_add_day_week_month_att']:
+            if key in self.metadata:
+                self.metadata.pop(key)
+        
+         # Initialize special tokens
+        # TODO -- prepend all these attributes with 'token_' for readibility
+        self.visit_start = "[VISIT START]"
+        self.visit_end = "[VISIT END]"
+        self.day_atts_cehr_gpt = [f"[DAY {i}]" for i in range(1, 1081)]
+        self.long_att_cehr_gpt = "[LONG TERM]"
+        self.day_atts_cehr_bert = [f"[DAY {i}]" for i in range(1, 7)]
+        self.week_atts = [f"[WEEK {i}]" for i in range(1, 4)]
+        self.month_atts = [f"[MONTH {i}]" for i in range(1, 12)]
+        self.long_att_cehr_bert = "[LONG TERM]"
+
+        # Add special tokens to the vocabulary
+        self.special_tokens.extend(self.day_atts_cehr_gpt)
+        self.special_tokens.append(self.long_att_cehr_gpt)
+        self.special_tokens.extend(self.day_atts_cehr_bert)
+        self.special_tokens.extend(self.week_atts)
+        self.special_tokens.extend(self.month_atts)
+        self.special_tokens.append(self.long_att_cehr_bert)
+        self.special_tokens.extend([self.visit_start, self.visit_end])
+
         # Metadata
         self.is_remap_numerical_codes_to_quantiles: bool = metadata.get('is_remap_numerical_codes_to_quantiles', False)
         self.excluded_vocabs: Optional[Set[str]] = { x.lower() for x in metadata.get('excluded_vocabs', {}) } if metadata.get('excluded_vocabs', {}) else None # type: ignore
@@ -482,6 +513,11 @@ class CookbookTokenizer(BaseCodeTokenizer):
                 'token' : entry.to_token(),
             })
             self.non_special_tokens.append(entry.to_token())
+        
+        # Update vocab and token mappings after adding all tokens
+        self.vocab = self.special_tokens + self.non_special_tokens
+        self.token_2_idx = {x: idx for idx, x in enumerate(self.vocab)}
+        self.idx_2_token = {idx: x for idx, x in enumerate(self.vocab)}
 
         # Create tokenizer
         super().__init__()
@@ -539,6 +575,68 @@ class CookbookTokenizer(BaseCodeTokenizer):
             return token
 
         return None
+    
+    def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
+        tokens: List[str] = []
+        current_visit_end: Optional[datetime.datetime] = None # track the end time of the currently active visit
+        previous_visit_end: Optional[datetime.datetime] = None # track the end time of the immediately preceding visit
+
+        for e in events:
+
+            # Check if we need to add a visit end token
+            if current_visit_end is not None and (
+                e.start > current_visit_end # If we have [VISIT A = { TOKEN 1, TOKEN 2 }] [TOKEN 3], then add a visit end token before [TOKEN 3]
+                or "Visit" in e.code # If we have [VISIT A = { TOKEN 1, TOKEN 2 }] [VISIT B = { TOKEN 3, TOKEN 4 }], then add a visit end token after [VISIT A]
+            ):
+                # This token occurs after the currently active visit ends, so end it (if exists)
+                if self.is_add_visit_end:
+                    tokens.append(self.visit_end)
+                current_visit_end = None
+
+            # Check if the event is a visit
+            if "Visit" in e.code:
+                    
+                # Add ATT Tokens, if applicable
+                # This will be inserted between the prior visit and the current visit
+                if previous_visit_end is not None:
+                    interval: float = (e.start - previous_visit_end).days # Time (in days) between this visit's start and the immediately preceding visit's end
+                    assert interval >= 0, f"Interval has value = {interval} but should always be positive, but fails on {e}."
+                    
+                    if self.is_add_day_att:
+                        if interval <= 1080:
+                            att = self.day_atts_cehr_gpt[interval - 1]
+                        else:
+                            att = self.long_att_cehr_gpt
+                        tokens.append(att)
+                    elif self.is_add_day_week_month_att:
+                        if interval < 7:
+                            att = self.day_atts_cehr_bert[interval - 1]
+                        elif 7 <= interval < 30:
+                            att = self.week_atts[(interval // 7) - 1]
+                        elif 30 <= interval < 360:
+                            att = self.month_atts[(interval // 30) - 1]
+                        else:
+                            att = self.long_att_cehr_bert
+                        tokens.append(att)
+
+                # Add visit start token, if applicable
+                if self.is_add_visit_start:
+                    tokens.append(self.visit_start)
+            
+                # Add token itself
+                token = self.convert_event_to_token(e, **kwargs)
+                if token:
+                    tokens.append(token)
+
+                # Keep track of this visit's end
+                current_visit_end = e.end
+                previous_visit_end = e.end
+            else:
+                token = self.convert_event_to_token(e, **kwargs)
+                if token:
+                    tokens.append(token)
+        
+        return tokens
 
 class CLMBRTokenizer(BaseCodeTokenizer):
     def __init__(self, path_to_tokenizer_config: str) -> None:

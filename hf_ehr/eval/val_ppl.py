@@ -8,7 +8,7 @@ import torch
 from argparse import ArgumentParser, Namespace
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Tuple
 from typing import Dict
 from tqdm import tqdm
 from jaxtyping import Float
@@ -23,7 +23,7 @@ from hf_ehr.utils import load_config_from_ckpt, load_tokenizer_from_config, load
 def parse_arguments() -> Namespace:
     """"Parse command-line arguments."""
     parser = ArgumentParser(description='Calculate PPL for a model checkpoint.')
-    parser.add_argument('--path_to_ckpt', type=str, required=True, help='Path to model checkpoint')
+    parser.add_argument('--path_to_ckpt_dir', type=str, required=True, help='Path to model checkpoint directory')
     parser.add_argument('--device', type=str, default="cuda", help='Device to run validation on')
     parser.add_argument('--split', type=str, default="val", help='Split on which to calculate PPL')
     return parser.parse_args()
@@ -52,6 +52,7 @@ def load_config(ckpt: Dict[str, Any]) -> Dict[str, Any]:
 
 def calculate_perplexity_batch(model: BaseModel,
                                batch: Dict[str, Any],
+                               config: Dict[str, Any],
                                device: str = "cuda") -> Tuple[float, int]:
     """Calculate perplexity for a single batch."""
 
@@ -61,8 +62,19 @@ def calculate_perplexity_batch(model: BaseModel,
     total_log_probs = 0.0
     total_token_count = 0
     with torch.no_grad():
+<<<<<<< HEAD
         inputs: Float[torch.Tensor, 'B L'] = batch['tokens']['input_ids'].to(device)
         attention_mask: Float[torch.Tensor, 'B L'] = batch['tokens'].get('attention_mask', None)
+=======
+        inputs = batch['tokens']['input_ids'].to(device)
+
+        if 'hyena' in config['model']['name']:
+            batch["tokens"].pop('attention_mask') 
+            
+        attention_mask = batch['tokens'].get('attention_mask', None)
+>>>>>>> f00fbf8ae17df227404df819aa0f5b86fe8f6d8e
+
+
 
         if attention_mask is not None:
             attention_mask = attention_mask.to(device)
@@ -91,6 +103,7 @@ def calculate_perplexity_batch(model: BaseModel,
 
 def calculate_avg_ppl(model: BaseModel,
                       dataloader: DataLoader,
+                      config: Dict[str, Any],
                       device: str = "cuda") -> Dict[str, Any]:
     """Calculate average perplexity for a dataset split."""
 
@@ -98,7 +111,7 @@ def calculate_avg_ppl(model: BaseModel,
     total_token_count = 0
 
     for batch in tqdm(dataloader, total=len(dataloader)):
-        batch_log_probs, batch_token_count = calculate_perplexity_batch(model, batch, device)
+        batch_log_probs, batch_token_count = calculate_perplexity_batch(model, batch, config, device)
         total_log_probs += batch_log_probs
         total_token_count += batch_token_count
 
@@ -119,14 +132,21 @@ def save_results(results: Dict[str, Any],
     with open(path_to_output, 'w') as f:
         json.dump(results, f)
 
-def main() -> None:
-    args: Namespace = parse_arguments()
-    print(f"Loading model configuration from checkpoint: {args.path_to_ckpt}")
-    device: str = args.device
-    ckpt: str = load_ckpt(args.path_to_ckpt)
-    output_json: str = f"{args.path_to_ckpt}.json"
-    model: BaseModel = load_model_from_path(args.path_to_ckpt)
+def get_output_dir(ckpt_path: str, split: str) -> None:
+    """Create output directory if it does not exist."""
+
+    ckpt_dir = os.path.dirname(ckpt_path)
+    output_dir = os.path.join(ckpt_dir, ".." ,"ppl", split)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    return output_dir
+
+def process_ckpt(path_to_ckpt: str, output_path: str, split: str, device: str) -> None:
+    ckpt: str = load_ckpt(path_to_ckpt)
+    model: BaseModel = load_model_from_path(path_to_ckpt)
     config: Dict[str, Any] = load_config(ckpt)
+    print("Model config: ", config)
     tokenizer: CLMBRTokenizer | DescTokenizer | CookbookTokenizer = load_tokenizer_from_config(config)
     
     
@@ -163,26 +183,53 @@ def main() -> None:
     datasets: Dict[str, BaseDataset] = load_datasets(config, tokenizer)
     print("Loading dataloaders...")
     dataloaders: Dict[str, DataLoader] = load_dataloaders(config, datasets, tokenizer)
-    dataloader: DataLoader = dataloaders[args.split]
+    dataloader: DataLoader = dataloaders[split]
     
     print("Calculating average perplexity...")
     start_time = time.time()
-    results = calculate_avg_ppl(model, dataloader, device)
+    results = calculate_avg_ppl(model, dataloader, config, device)
     end_time = time.time()
     elapsed_time = end_time - start_time
 
-    results["split"] = args.split
+    results["split"] = split
     results["stats"] = {
         "time_taken_seconds": elapsed_time,
-        "num_batches": len(dataloader),
+        "num_batches": len(dataloader)
     }
-    results["model_ckpt"] = args.path_to_ckpt
+    results["model_ckpt"] = path_to_ckpt
     results["model_conifg"] = OmegaConf.to_container(config, resolve=True)
 
     save_results(results, args.output_path)
     print("Average perplexity: ", results["avg_ppl"])
     print("Stats: ", results["stats"])
-    print(f"Results for {args.split} saved under {output_json}.")
+    print(f"Results for {split} saved under {output_path}.")
+
+
+def main() -> None:
+    args: Namespace = parse_arguments()
+    
+    path_to_ckpt_dir: str = args.path_to_ckpt_dir
+    device: str = args.device
+    split: str = args.split
+    output_dir: str = get_output_dir(args.path_to_ckpt_dir, split)
+    unevaluated_ckpts: List[str] = []
+    for file in os.listdir(path_to_ckpt_dir):
+        if not file.endswith(".ckpt"):
+            continue
+        path_to_ckpt: str = os.path.join(path_to_ckpt_dir, file)
+        output_path: str = os.path.join(output_dir, f"{file}.json")
+        print("#"* 50)
+        print(f"Processing model checkpoint : {path_to_ckpt}")
+        print("-"* 30)
+        try:
+            process_ckpt(path_to_ckpt, output_path, args.split, device)
+        except Exception as e:
+            print(f"Error processing checkpoint {path_to_ckpt}: {e}")
+            unevaluated_ckpts.append(path_to_ckpt)
+    
+    if len(unevaluated_ckpts) > 0:
+        print("Unevaluated checkpoints: ")
+        print(unevaluated_ckpts)
 
 if __name__ == "__main__":
     main()

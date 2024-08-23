@@ -58,6 +58,8 @@ data:
     max_length: 1024
     # If TRUE, then truncate patient timelines at random locations, rather than always doing right-hand side truncation.
     is_truncation_random: true
+    # Use Rotary Position Embeddings (RoPE) instead of traditional positional embeddings
+    is_use_rope: False
 
 trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.

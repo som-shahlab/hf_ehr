@@ -27,10 +27,10 @@ cd -
 RUN_NAMES=( "gpt-base-1024--clmbr" "bert-base-1024--clmbr" "hyena-large-1024--clmbr" "mamba-tiny-1024--clmbr" )
 
 RUN_ARGS=(
-    "python3 val_ppl.py --path_to_ckpt /share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt-base-1024--clmbr-10-epochs/ckpts/last.ckpt"
-    "python3 val_ppl.py --path_to_ckpt /share/pi/nigam/migufuen/hf_ehr/cache/runs/bert-base-1024--clmbr-10-epochs/ckpts/last.ckpt"
-    "python3 val_ppl.py --path_to_ckpt /share/pi/nigam/migufuen/hf_ehr/cache/runs/hyena-large-1024--clmbr-10-epochs/ckpts/last.ckpt"
-    "python3 val_ppl.py --path_to_ckpt /share/pi/nigam/migufuen/hf_ehr/cache/runs/mamba-tiny-1024--clmbr-10-epochs/ckpts/last.ckpt"
+    "python3 val_ppl.py --path_to_ckpt_dir /share/pi/nigam/migufuen/hf_ehr/cache/runs/gpt-base-1024--clmbr-10-epochs/ckpts" --split val
+    "python3 val_ppl.py --path_to_ckpt_dir /share/pi/nigam/migufuen/hf_ehr/cache/runs/bert-base-1024--clmbr-10-epochs/ckpts" --split val
+    "python3 val_ppl.py --path_to_ckpt_dir /share/pi/nigam/migufuen/hf_ehr/cache/runs/hyena-large-1024--clmbr-10-epochs/ckpts" --split val
+    "python3 val_ppl.py --path_to_ckpt_dir /share/pi/nigam/migufuen/hf_ehr/cache/runs/mamba-tiny-1024--clmbr-10-epochs/ckpts" --split val
 )
 
 # Loop over the RUN_NAMES and args
