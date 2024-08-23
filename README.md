@@ -46,8 +46,10 @@ Launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on anot
 
 ```bash
 cd hf_ehr/scripts/carina
+
 # GPT runs
 sbatch parallel_gpt.sh
+
 # Mamba runs
 sbatch parallel_mamba.sh
 ```
