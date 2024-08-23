@@ -9,11 +9,11 @@
 1. Build infrastructure to train off-the-shelf HuggingFace models on structured EHR data
 2. Measure how each of these modeling choices impacts model performance:
     1. Architecture (bert, gpt, mamba, hyena)
-    2.  Model size (120M, ...)
+    2. Model size (120M, ...)
     3. Context window length (1k, 4k, 8k, 16k)
-    4. Vocab size (...)
+    4. Vocab size (32k, 64, 128k)
     5. Tokenizer choice (DescEmb, CLMBR, Custom)
-    6. Tokens (...)
+    6. Finetuning (frozen, full, 1-layer)
 4. Measure "scaling laws" for Foundation Models for EHRs
 
 **Evaluations:**
