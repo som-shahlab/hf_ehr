@@ -1,0 +1,8 @@
+# @package _global_
+
+# TODO
+
+data:
+  dataset:
+    name: SparkDataset
+    # TODO -- any kwargs used by your SparkDataset go here

@@ -1,0 +1,9 @@
+# @package _global_
+
+# TODO
+
+data:
+  tokenizer:
+    name: SparkTokenizer
+    # TODO -- add anything that the sparktokenizer needs
+    path_to_config: # TODO

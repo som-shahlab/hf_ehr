@@ -103,14 +103,17 @@ class GPTLanguageModel(BaseModel):
             assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"
             setattr(model_config, key, val)
         self.hidden_size = model_config.n_embd
-        self.use_rope = config.data.dataloader.is_use_rope # added to replace default attention layers with custom RoPEGPT2Attention layers
 
         # Model
         if getattr(config.model, 'is_keep_pretrained_weights', False):
             self.model = AutoModelForCausalLM.from_pretrained(model_config)
         else:
             self.model = AutoModelForCausalLM.from_config(model_config)
+        self.is_use_rope = getattr(config.data.dataloader, 'is_use_rope', False) # added to replace default attention layers with custom RoPEGPT2Attention layers
         
+        if self.is_use_rope:
+            self._replace_attention_with_rope()
+
         # Run any post-init handlers from super()
         self.post_init()
     
@@ -134,8 +137,6 @@ class GPTLanguageModel(BaseModel):
             nan_detected = torch.tensor([1.0], device=self.device)
         else:
             nan_detected = torch.tensor([0.0], device=self.device)
-
-        #dist.all_reduce(nan_detected, op=dist.ReduceOp.MAX)
 
         if nan_detected.item() == 1:
             print("NaN detected in loss, skipping this batch across all processes.")

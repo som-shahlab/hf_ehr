@@ -81,12 +81,12 @@ class BERTLanguageModel(BaseModel):
             setattr(model_config, key, val)
         self.model_config = model_config
         self.hidden_size = model_config.n_embd if hasattr(model_config, 'n_embd') else model_config.hidden_size
-        self.use_rope = config.data.dataloader.is_use_rope # added to replace default attention layers with custom RoPEBertSelfAttention layers
 
         # Model
         self.model = AutoModelForMaskedLM.from_config(model_config)
+        self.is_use_rope = getattr(config.data.dataloader, 'is_use_rope', False) # added to replace default attention layers with custom RoPEGPT2Attention layers
         
-        if self.use_rope:
+        if self.is_use_rope:
             self._replace_attention_with_rope()
 
         # Run any post-init handlers from super()
