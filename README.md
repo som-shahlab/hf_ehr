@@ -7,19 +7,19 @@
 
 **Goals:**
 1. Build infrastructure to train off-the-shelf HuggingFace models on structured EHR data
-2. Measure how each of these modeling choices impacts model performance:
-    a. Architecture (bert, gpt, mamba, hyena)
-    b. Model size (120M, ...)
-    c. Context window length (1k, 4k, 8k, 16k)
-    d. Vocab size (...)
-    e. Tokenizer choice (DescEmb, CLMBR, Custom)
-    f. Tokens (...)
-3. Measure "scaling laws" for Foundation Models for EHRs
+2. Measure how each of these modeling choices impacts model performance (in terms of **val ppl**, **EHRSHOT**, **MIMIC-IV**):
+    1. Architecture (bert, gpt, mamba, hyena)
+    2. Model size (120M, ...)
+    3. Context window length (1k, 4k, 8k, 16k)
+    4. Vocab size (32k, 64, 128k)
+    5. Tokenizer choice (DescEmb, CLMBR, Custom)
+    6. Finetuning (frozen, full, 1-layer)
+3. Some sort of generative synthetic patient timeline generations
 
 **Evaluations:**
 1. Val/PPL on STARR-OMOP held-out 15% dataset split (canonical FEMR split)
-2. AUROC/AUPRC on EHRSHOT benchmark
-3. **TODO** -- MIMIC?
+2. AUROC/AUPRC on EHRSHOT tasks
+3. AUROC/AUPRC on MIMIC-IV tasks
 3. **TODO** -- EHRSHOT labelers on all of STARR?
 
 ## Installation
@@ -46,7 +46,11 @@ Launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on anot
 
 ```bash
 cd hf_ehr/scripts/carina
+
+# GPT runs
 sbatch parallel_gpt.sh
+
+# Mamba runs
 sbatch parallel_mamba.sh
 ```
 
@@ -58,7 +62,7 @@ You can either overwrite the config files in `configs/` or pass in CLI arguments
 
 There are 3 ways to launch a training run. 
 
-### Easy
+### Easy Mode
 
 Launch multiple runs in parallel on the same SLURM node  (each job gets 1 GPU) using `hf_ehr/scripts/carina/parallel_{model}.sh`:
 
@@ -78,7 +82,7 @@ sbatch parallel_hyena.sh
 sbatch parallel_mamba.sh
 ```
 
-### Medium
+### Medium Mode
 
 Launch one run on a SLURM node using `hf_ehr/scripts/carina/{model}.sh`:
 
@@ -119,7 +123,7 @@ where...
 - `[--is_skip_base]`: Optional -- An optional flag that skips running `source base.sh`. Useful when running `parallel.sh` and we don't want to reinit the conda environment multiple times
 - `[--is_run_local]`: Optional -- An optional flag that runs the script locally as `python run.py` instead of as a SLURM `sbatch` command
 
-### Advanced
+### Advanced Mode
 
 Directly call `run.py`, which allows maximum flexibility for configs. 
 
@@ -145,6 +149,12 @@ python3 ../run.py \
 ```
 
 ## Evaluation
+
+## MIMIC-IV
+
+TODO
+
+### EHRSHOT
 
 #### 1. Generate Patient Representations
 This all occurs within the `hf_ehr` repo.
