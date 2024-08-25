@@ -202,6 +202,10 @@ This all occurs within the `ehrshot-benchmark` repo.
 ```bash
 # cd to ehrshot-benchmark/ directory
 
+# NOTE: This assumes you've already created your EHRHSOT_ENV conda environment.
+#     If you haven't, then follow the README.md here:
+#     https://github.com/som-shahlab/ehrshot-benchmark
+
 conda activate EHRSHOT_ENV
 cd ehrshot/bash_scripts/
 
