@@ -1,6 +1,14 @@
 # EHR FM Cookbook
 
-**Quick Links:**
+**Table of Contents**
+
+1. [Installation](#installation)
+1. [Quick Start](#quick-start)
+1. [Training](#training)
+1. [Evaluation](#evaluation)
+1. [Other](#how-to)
+
+**External Links:**
 * [Wandb Home](https://wandb.ai/ehr-fm/hf_ehr?nw=nwusermiking98)
 * [Wandb Reports](https://wandb.ai/ehr-fm/hf_ehr/reportlist)
 * [Experiment Tracker](https://docs.google.com/spreadsheets/u/1/d/1YTQaoaAicntzNqe0jeUoU5yiAAh-Q6UeZBT9yBBf7mc/edit#gid=0)
@@ -148,6 +156,11 @@ python3 ../run.py \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-test/
 ```
 
+### How to Configure Runs
+
+See the [Config README](hf_ehr/configs/README.md) for details on all config settings (models, training, dataloaders, tokenizers, etc.).
+
+
 ## Evaluation
 
 ## MIMIC-IV
@@ -182,6 +195,7 @@ This all occurs within the `ehrshot-benchmark` repo.
 
 conda activate EHRSHOT_ENV
 cd ehrshot/bash_scripts/
+
 bash 7_eval.sh --is_use_slurm
 ```
 
@@ -199,11 +213,7 @@ cd ehrshot/bash_scripts/
 bash 8_make_results_plots.sh
 ```
 
-## Configurations
-
-See the [Config README](hf_ehr/configs/README.md) for details on all config settings (models, training, dataloaders, tokenizers, etc.).
-
-## How To...
+## How To
 
 ### Create a Model
 
