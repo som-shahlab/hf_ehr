@@ -1,11 +1,14 @@
 # EHR FM Cookbook
 
-**Quick Links:**
-* [Wandb Home](https://wandb.ai/ehr-fm/hf_ehr?nw=nwusermiking98)
-* [Wandb Reports](https://wandb.ai/ehr-fm/hf_ehr/reportlist)
-* [Experiment Tracker](https://docs.google.com/spreadsheets/u/1/d/1YTQaoaAicntzNqe0jeUoU5yiAAh-Q6UeZBT9yBBf7mc/edit#gid=0)
+**📖 Table of Contents**
 
-**Goals:**
+1. 📀 [Installation](#installation)
+1. 🚀 [Quick Start](#quick_start)
+1. 🏋️‍♀️ [Training](#training)
+1. 📊 [Evaluation](#evaluation)
+1. ℹ️ [Other](#other)
+
+**🎯 Goals:**
 1. Build infrastructure to train off-the-shelf HuggingFace models on structured EHR data
 2. Measure how each of these modeling choices impacts model performance (in terms of **val ppl**, **EHRSHOT**, **MIMIC-IV**):
     1. Architecture (bert, gpt, mamba, hyena)
@@ -16,13 +19,16 @@
     6. Finetuning (frozen, full, 1-layer)
 3. Some sort of generative synthetic patient timeline generations
 
-**Evaluations:**
-1. Val/PPL on STARR-OMOP held-out 15% dataset split (canonical FEMR split)
-2. AUROC/AUPRC on EHRSHOT tasks
-3. AUROC/AUPRC on MIMIC-IV tasks
-3. **TODO** -- EHRSHOT labelers on all of STARR?
+**🔗 External Links:**
+* [Wandb Home](https://wandb.ai/ehr-fm/hf_ehr?nw=nwusermiking98)
+* [Wandb Reports](https://wandb.ai/ehr-fm/hf_ehr/reportlist)
+* [Experiment Tracker](https://docs.google.com/spreadsheets/u/1/d/1YTQaoaAicntzNqe0jeUoU5yiAAh-Q6UeZBT9yBBf7mc/edit#gid=0)
+* [Manuscript Draft](https://docs.google.com/document/d/1E3Ngad7a-JWj74MeVgjnGS1WC1zakfsuN0_wPFyzlw8/edit)
 
-## Installation
+
+<a name="installation" />
+
+## 📀 Installation
 
 1. Install packages
 ```bash
@@ -39,8 +45,9 @@ sbatch clmbr.sh # Takes ~5 seconds
 sbatch desc.sh # Takes ~30 min
 sbatch cookbook.sh # Takes TBD
 ```
+<a name="quick_start"/>
 
-## Quick Start
+## 🚀 Quick Start
 
 Launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):
 
@@ -54,7 +61,9 @@ sbatch parallel_gpt.sh
 sbatch parallel_mamba.sh
 ```
 
-## Training
+<a name="training" />
+
+## 🏋️‍♀️ Training
 
 We use [Hydra](https://github.com/facebookresearch/hydra) to manage our configurations and [PyTorch Lightning](https://github.com/Lightning-AI/pytorch-lightning) for training. 
 
@@ -148,9 +157,22 @@ python3 ../run.py \
     main.path_to_output_dir=/share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-test/
 ```
 
-## Evaluation
+### How to Configure Runs
 
-## MIMIC-IV
+See the [Config README](hf_ehr/configs/README.md) for details on all config settings (models, training, dataloaders, tokenizers, etc.).
+
+
+<a name="evaluation"/>
+    
+## 📊 Evaluation
+
+**Evaluations:**
+1. Val/PPL on STARR-OMOP held-out 15% dataset split (canonical FEMR split)
+2. AUROC/AUPRC on EHRSHOT tasks
+3. AUROC/AUPRC on MIMIC-IV tasks
+3. **TODO** -- EHRSHOT labelers on all of STARR?
+
+### MIMIC-IV
 
 TODO
 
@@ -165,8 +187,6 @@ This all occurs within the `hf_ehr` repo.
 
 
 ```bash
-# cd to hf_ehr/ directory
-
 cd hf_ehr/scripts/eval/
 sbatch ehrshot.sh <path_to_ckpt>
 ```
@@ -182,8 +202,13 @@ This all occurs within the `ehrshot-benchmark` repo.
 ```bash
 # cd to ehrshot-benchmark/ directory
 
+# NOTE: This assumes you've already created your EHRHSOT_ENV conda environment.
+#     If you haven't, then follow the README.md here:
+#     https://github.com/som-shahlab/ehrshot-benchmark
+
 conda activate EHRSHOT_ENV
 cd ehrshot/bash_scripts/
+
 bash 7_eval.sh --is_use_slurm
 ```
 
@@ -198,16 +223,15 @@ This all occurs within the `ehrshot-benchmark` repo.
 
 conda activate EHRSHOT_ENV
 cd ehrshot/bash_scripts/
+
 bash 8_make_results_plots.sh
 ```
 
-## Configurations
+<a name="other" />
 
-See the [Config README](hf_ehr/configs/README.md) for details on all config settings (models, training, dataloaders, tokenizers, etc.).
+## ℹ️ Other
 
-## How To...
-
-### Create a Model
+### Creating a Model
 
 Let's say we want to create a new model called `{model}` of size `{size}`.
 
@@ -219,11 +243,9 @@ Let's say we want to create a new model called `{model}` of size `{size}`.
 
 4. Add your model to `hf_ehr/scripts/run.py` above the line **raise ValueError(f"Model `{config.model.name}` not supported.")**
 
-### Create a Tokenizer
+### Creating a Tokenizer
 
 See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating tokenizers and how they are stored on the file system.
-
-## Miscellaneous
 
 ### Tensorboard:
 
