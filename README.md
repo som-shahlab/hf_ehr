@@ -165,8 +165,6 @@ This all occurs within the `hf_ehr` repo.
 
 
 ```bash
-# cd to hf_ehr/ directory
-
 cd hf_ehr/scripts/eval/
 sbatch ehrshot.sh <path_to_ckpt>
 ```
