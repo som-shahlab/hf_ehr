@@ -3,7 +3,7 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/mamba_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/mamba_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-a100,nigam-a100
+#SBATCH --partition=nigam-a100,nigam-h100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:4

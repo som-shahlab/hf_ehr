@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable, Dict, List
 from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, PATH_TO_SPARK_DATASET, PATH_TO_TOKENIZER_SPARK_CONFIG
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, PATH_TO_SPARK_DATASET, PATH_TO_TOKENIZER_SPARK_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG
 from hf_ehr.tokenizers.utils import call_func_with_logging
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +47,9 @@ def main():
     # Parse command-line arguments
     args = parse_args()
     # TODO -- may need to change path to PATH_TO_TOKENIZER_SPARK_CONFIG
+    PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG = PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG # TODO - remove
+    assert PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG == PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG and 'debug' in PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
+
     os.makedirs(os.path.dirname(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG), exist_ok=True)
     if os.path.exists(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG):
         if args.is_force_refresh:
@@ -57,7 +60,11 @@ def main():
         else:
             # Keep existing tokenizer config, only fill in parts that haven't already been done
             print(f"Tokenizer config already exists at: {PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG}. Only filling in parts that haven't already been done, according to to metadata['is_already_done']")
-
+    else:
+        # Create new config
+        with open(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, 'w') as f:
+            f.write('{"metadata" : {}, "tokens" : []}')
+        
     # Load datasets
     start = time.time()
     if args.dataset == 'v8':

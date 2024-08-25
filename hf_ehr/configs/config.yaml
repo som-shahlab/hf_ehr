@@ -63,7 +63,7 @@ data:
 
 trainer:
   # Accumulated gradients runs K small batches of size `data.dataloader.batch_size` before doing a backwards pass.
-  accumulate_grad_batches: 4
+  accumulate_grad_batches: ${32768//data.dataloader.approx_batch_sampler.max_tokens}
   # Value for gradient clipping
   gradient_clip_value: 1.0
   # Whether to clip the gradients based on their 'norm' or 'value'

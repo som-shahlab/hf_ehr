@@ -23,7 +23,7 @@ trap 'stop_child_processes' SIGTERM SIGINT
 source base.sh
 
 # Experiment names
-RUN_NAMES=( "gpt-base-512--clmbr-newval" "gpt-base-1024--clmbr-newval" "gpt-base-2048--clmbr-newval" "gpt-base-4096--clmbr-newval" )
+RUN_NAMES=( "gpt-base-512--clmbr" "gpt-base-1024--clmbr" "gpt-base-2048--clmbr" "gpt-base-4096--clmbr" )
 RUN_ARGS=(
     "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
     "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"

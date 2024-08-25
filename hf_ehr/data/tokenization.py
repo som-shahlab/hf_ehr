@@ -282,74 +282,9 @@ class BaseCodeTokenizer(BaseTokenizer):
             cls_token='[CLS]',
             mask_token='[MASK]',
         )
-        # breakpoint()
-        # if trie_to_inject is not None:
-        #     # self.add_tokens() can be super slow b/c of HF's slow `Trie` Python implementation
-        #     # so if we know the trie in advance, just directly inject
-        #     self.tokens_trie.data = trie_data
-        #     self.tokens_trie._tokens = trie_tokens
-        # else:
         self.add_tokens(self.non_special_tokens)
 
 
-    # def _add_tokens(self, 
-    #                 new_tokens: Union[List[str], List[AddedToken]], 
-    #                 special_tokens: bool = False,
-    #                 trie_data: Optional[dict],
-    #                 trie_tokens: Optional[set]) -> int
-    #     """Taken from: "/home/hf_ehr/hf_env/lib/python3.10/site-packages/transformers/tokenization_utils.py", line 513"""
-    #     added_tokens = 0
-    #     if new_tokens is None:
-    #         return added_tokens
-    #     current_vocab = self.get_vocab().copy()
-    #     new_idx = len(current_vocab)  # only call this once, len gives the last index + 1
-    #     for token in new_tokens:
-    #         if not isinstance(token, (str, AddedToken)):
-    #             raise TypeError(f"Token {token} is not a string but a {type(token)}.")
-    #         if str(token) == "":
-    #             continue
-    #         if isinstance(token, str):
-    #             if token in self._added_tokens_encoder:
-    #                 continue
-    #             else:
-    #                 # very important for fast and slow equivalence!
-    #                 is_special = token in self.all_special_tokens or special_tokens
-    #                 token = AddedToken(
-    #                     token, rstrip=False, lstrip=False, normalized=not is_special, special=is_special
-    #                 )
-    #         elif special_tokens:
-    #             # doing token.special=True changes the normalization! will fix in rust
-    #             # this is important and the only reason why the AddedTokens in each class are normalized by default
-    #             token.__setstate__({"special": True, "normalized": token.normalized})
-    #         if token in self._added_tokens_decoder:
-    #             continue
-    #         if not token.special and token.normalized and getattr(self, "do_lower_case", False):
-    #             # Normalize if requested
-    #             token.content = token.content.lower()
-    #         if token.content not in current_vocab:
-    #             token_index = new_idx + added_tokens
-    #             current_vocab[token.content] = token_index
-    #             added_tokens += 1
-    #         else:
-    #             token_index = current_vocab[token.content]
-
-    #         if token.special and str(token) not in self.all_special_tokens:
-    #             self._additional_special_tokens.append(token)
-    #         # the setter automatically updates the reverse map
-    #         self._added_tokens_decoder[token_index] = token
-    #         self._added_tokens_encoder[token.content] = token_index
-    #         if self.verbose:
-    #             logger.info(f"Adding {token} to the vocabulary")
-        
-    #     if trie_data is not None:
-    #     for token in self._added_tokens_decoder.values():
-    #         if token not in self.tokens_trie._tokens:
-    #             self.tokens_trie.add(token.content)
-    #     for token in unique_no_split_tokens:
-    #         if token not in self.tokens_trie._tokens:
-    #             self.tokens_trie.add(token)
-
-    #     return added_tokens
     
     def __call__(self, 
                  batch_of_events: Union[List[Event], List[List[Event]]],
@@ -469,25 +404,25 @@ class CookbookTokenizer(BaseCodeTokenizer):
             if key in self.metadata:
                 self.metadata.pop(key)
         
-         # Initialize special tokens
-        # TODO -- prepend all these attributes with 'token_' for readibility
-        self.visit_start = "[VISIT START]"
-        self.visit_end = "[VISIT END]"
-        self.day_atts_cehr_gpt = [f"[DAY {i}]" for i in range(1, 1081)]
-        self.long_att_cehr_gpt = "[LONG TERM]"
-        self.day_atts_cehr_bert = [f"[DAY {i}]" for i in range(1, 7)]
-        self.week_atts = [f"[WEEK {i}]" for i in range(1, 4)]
-        self.month_atts = [f"[MONTH {i}]" for i in range(1, 12)]
-        self.long_att_cehr_bert = "[LONG TERM]"
+        #  # Initialize special tokens
+        # # TODO -- prepend all these attributes with 'token_' for readibility
+        # self.visit_start = "[VISIT START]"
+        # self.visit_end = "[VISIT END]"
+        # self.day_atts_cehr_gpt = [f"[DAY {i}]" for i in range(1, 1081)]
+        # self.long_att_cehr_gpt = "[LONG TERM]"
+        # self.day_atts_cehr_bert = [f"[DAY {i}]" for i in range(1, 7)]
+        # self.week_atts = [f"[WEEK {i}]" for i in range(1, 4)]
+        # self.month_atts = [f"[MONTH {i}]" for i in range(1, 12)]
+        # self.long_att_cehr_bert = "[LONG TERM]"
 
-        # Add special tokens to the vocabulary
-        self.special_tokens.extend(self.day_atts_cehr_gpt)
-        self.special_tokens.append(self.long_att_cehr_gpt)
-        self.special_tokens.extend(self.day_atts_cehr_bert)
-        self.special_tokens.extend(self.week_atts)
-        self.special_tokens.extend(self.month_atts)
-        self.special_tokens.append(self.long_att_cehr_bert)
-        self.special_tokens.extend([self.visit_start, self.visit_end])
+        # # Add special tokens to the vocabulary
+        # self.special_tokens.extend(self.day_atts_cehr_gpt)
+        # self.special_tokens.append(self.long_att_cehr_gpt)
+        # self.special_tokens.extend(self.day_atts_cehr_bert)
+        # self.special_tokens.extend(self.week_atts)
+        # self.special_tokens.extend(self.month_atts)
+        # self.special_tokens.append(self.long_att_cehr_bert)
+        # self.special_tokens.extend([self.visit_start, self.visit_end])
 
         # Metadata
         self.is_remap_numerical_codes_to_quantiles: bool = metadata.get('is_remap_numerical_codes_to_quantiles', False)
@@ -514,11 +449,6 @@ class CookbookTokenizer(BaseCodeTokenizer):
             })
             self.non_special_tokens.append(entry.to_token())
         
-        # Update vocab and token mappings after adding all tokens
-        self.vocab = self.special_tokens + self.non_special_tokens
-        self.token_2_idx = {x: idx for idx, x in enumerate(self.vocab)}
-        self.idx_2_token = {idx: x for idx, x in enumerate(self.vocab)}
-
         # Create tokenizer
         super().__init__()
 

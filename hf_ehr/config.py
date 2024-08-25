@@ -30,12 +30,14 @@ PATH_TO_SPARK_DATASET = '' # TODO -- spark
 # Tokenizers
 PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/')
 PATH_TO_TOKENIZER_COOKBOOK_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_v8/')
+PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_debug/')
 PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_mimic4/')
 PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/')
 PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/')
 PATH_TO_TOKENIZER_SPARK_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'spark/') # TODO -- spark
 
 PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_v8_DIR, 'tokenizer_config.json')
+PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
