@@ -223,6 +223,7 @@ This all occurs within the `ehrshot-benchmark` repo.
 
 conda activate EHRSHOT_ENV
 cd ehrshot/bash_scripts/
+
 bash 8_make_results_plots.sh
 ```
 
