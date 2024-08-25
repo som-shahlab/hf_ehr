@@ -23,6 +23,7 @@
 * [Wandb Home](https://wandb.ai/ehr-fm/hf_ehr?nw=nwusermiking98)
 * [Wandb Reports](https://wandb.ai/ehr-fm/hf_ehr/reportlist)
 * [Experiment Tracker](https://docs.google.com/spreadsheets/u/1/d/1YTQaoaAicntzNqe0jeUoU5yiAAh-Q6UeZBT9yBBf7mc/edit#gid=0)
+* [Manuscript Draft](https://docs.google.com/document/d/1E3Ngad7a-JWj74MeVgjnGS1WC1zakfsuN0_wPFyzlw8/edit)
 
 
 <a name="installation" />
