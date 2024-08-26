@@ -203,25 +203,28 @@ class BaseModel(L.LightningModule):
 
     def on_validation_end(self):
         # Calculate per-token val loss/ppl
-        val_batch_loss: torch.Tensor = self.cat_metrics['val_loss'].compute() # Loss/token across all val batches
-        val_batch_tokens_nonPAD: torch.Tensor = self.cat_metrics['val_batch_tokens_nonPAD'].compute() # Tokens/batch across all batches
-        loss = torch.sum(val_batch_loss * val_batch_tokens_nonPAD) # Calculate overall loss/token (with appropriate weighting across batches)
-        # Log val loss/ppl
+        val_batch_loss: torch.Tensor = self.cat_metrics['val_batch_loss'].compute()  # Loss/token across all val batches
+        val_batch_tokens_nonPAD: torch.Tensor = self.cat_metrics['val_batch_tokens_nonPAD'].compute()  # Tokens/batch across all batches
+        loss = torch.sum(val_batch_loss * val_batch_tokens_nonPAD)  # Calculate overall loss/token (with appropriate weighting across batches)
         ppl: torch.Tensor = torch.exp(loss)
-        self.log('val/loss', loss, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True) # artificially cap to 100 so that charts look prettier
-        # Log training metrics to sync val/loss to training metrics
-        self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
-        self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
-        self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
+
+        # Log val loss/ppl using TensorBoardLogger directly
+        self.logger.experiment.add_scalar('val/loss', loss, self.global_step)
+        self.logger.experiment.add_scalar('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), self.global_step)
+
+        # Log training metrics to sync val/loss to training metrics using TensorBoardLogger directly
+        self.logger.experiment.add_scalar('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32), self.global_step)
+        self.logger.experiment.add_scalar('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), self.global_step)
+        self.logger.experiment.add_scalar('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), self.global_step)
+
         if self.flops_per_token is not None:
-            self.log('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token, on_step=False, on_epoch=True, sync_dist=True)
+            self.logger.experiment.add_scalar('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token, self.global_step)
 
     def log_validation_step(self, loss: torch.Tensor, tokens: Dict[str, Any]):
         # NOTE: Assumes `loss` has been scaled per-token already
         val_batch_tokens_nonPAD: int = (tokens['input_ids'] != self.pad_token_id).sum().detach().cpu().item()
-        self.sum_metrics['val_batch_loss'].update(loss)
-        self.sum_metrics['val_batch_tokens_nonPAD'].update(val_batch_tokens_nonPAD)
+        self.cat_metrics['val_batch_loss'].update(loss)  # Corrected to use cat_metrics
+        self.cat_metrics['val_batch_tokens_nonPAD'].update(val_batch_tokens_nonPAD)
 
     def log_training_step(self, loss: torch.Tensor, B: int, tokens: Dict[str, Any], lr: float):
         """

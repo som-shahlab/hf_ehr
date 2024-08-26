@@ -157,6 +157,16 @@ def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
     config = rewrite_paths_for_carina_from_config(config)
 
+    if 'trainer' in config and 'accumulate_grad_batches' in config.trainer:
+        if config.trainer.accumulate_grad_batches == "__PLACEHOLDER__":
+            try:
+                config.trainer.accumulate_grad_batches = 65536 // config.data.dataloader.approx_batch_sampler.max_tokens
+                logger.info(f"Manually setting accumulate_grad_batches: {config.trainer.accumulate_grad_batches}")
+            except (KeyError, ZeroDivisionError) as e:
+                logger.error(f"Failed to calculate accumulate_grad_batches: {e}")
+                return
+
+
     # Load config
     print(config)
     path_to_output_dir: str = config.main.path_to_output_dir
@@ -429,7 +439,7 @@ def main(config: DictConfig) -> None:
     shutil.copy(path_to_tokenizer_config, path_to_artifacts_dir) # save tokenizer code_2_detail
     with open(os.path.join(path_to_artifacts_dir, 'config.yaml'), 'w') as fd: # save config
         OmegaConf.save(config=config, f=fd)
-
+    
     # Trainer
     trainer = pl.Trainer(
         logger=loggers,
