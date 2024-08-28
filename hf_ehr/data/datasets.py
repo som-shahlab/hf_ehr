@@ -75,10 +75,19 @@ class MEDSDataset(BaseDataset):
         pass
 
 class SparkDataset(BaseDataset):
-    # TODO -- spark
+    """
+    This is an implementation of the FEMRDataset class that reads data from a sql table using a spark context
+    """
 
+    from pyspark.context import SparkContext
+    from pyspark.sql.dataframe import DataFrame
+    from pyspark.sql.functions import col 
+    
     def __init__(self, 
-                 # TODO -- add any relevant kwargs here 
+                 code_df: DataFrame,   # dataframe with columns [pat_id (int), timestamp, code (string)]
+                 train_pids: List[str], # list of patient ids in the training set
+                 test_pids: List[str], # list of patient ids in the test set
+                 val_pids: List[str], # list of patient ids in the val set
                  split: str = 'train',
                  is_debug: bool = False,
                  seed: int = 1):
@@ -96,11 +105,12 @@ class SparkDataset(BaseDataset):
             'seed' : seed,
         }
 
-        # Pre-calculate canonical splits based on patient ids
-        # TODO -- rewrite
-        self.train_pids: np.ndarray = []
-        self.val_pids: np.ndarray = []
-        self.test_pids: np.ndarray = []
+        # create patient id lists for each split
+        self.train_pids: np.ndarray = np.array(train_pids)
+        self.val_pids: np.ndarray = np.array(val_pids)
+        self.test_pids: np.ndarray = np.array(test_pids)
+
+        self.code_df = code_df
 
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
@@ -132,10 +142,23 @@ class SparkDataset(BaseDataset):
         return len(self.get_pids())
     
     def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
-        """Return all event codes for this patient at `idx` in `self.split`.
         """
-        # TODO
-        pass
+        Return all event codes for this patient at `idx` in `self.split`.
+        """
+        # get the patient id
+        pat_id = self.get_pids()[idx]
+        print(f"getting events for patient with id={pat_id}")
+
+        df = (
+            self.code_df
+            .select("code")
+            .filter(col("pat_id") == pat_id)
+            .orderBy(col("timestamp"))
+        )
+
+        code_list = df.toPandas()["code"].to_list()
+
+        return (pat_id, code_list)
 
 class FEMRDataset(BaseDataset):
     """Dataset that returns patients in a FEMR extract.
