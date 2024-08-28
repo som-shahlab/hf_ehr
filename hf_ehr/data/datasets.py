@@ -5,9 +5,74 @@ from typing import Dict, List, Tuple
 from torch.utils.data import Dataset
 from hf_ehr.config import Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
 from hf_ehr.data.tokenization import DescTokenizer
-
+import meds_reader
 class BaseDataset(Dataset):
     pass
+
+class MEDSDataset(BaseDataset):
+    # TODO
+    
+    def __init__(self, 
+                 path_to_meds_extract: str, 
+                 split: str = 'train',
+                 is_debug: bool = False,
+                 seed: int = 1):
+        assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
+        self.path_to_meds_extract: str = path_to_meds_extract
+        self.split: str = split
+        self.is_debug: bool = is_debug
+        self.seed: int = seed
+        
+        # Set metadata -- used for tokenizer versioning later
+        # ! CAUTION: Essential that this contains all args/kwargs; otherwise get_seq_length_per_patient() in tokenizer breaks!
+        self.metadata = {
+            'cls' : 'SparkDataset',
+            'split' : split,
+            'is_debug' : is_debug,
+            'seed' : seed,
+        }
+
+        # Pre-calculate canonical splits based on patient ids
+        # TODO -- rewrite
+        self.train_pids: np.ndarray = []
+        self.val_pids: np.ndarray = []
+        self.test_pids: np.ndarray = []
+
+        # Confirm disjoint train/val/test
+        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
+        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
+        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
+
+        # If debug, then shrink to 1k patients
+        if is_debug:
+            self.train_pids = self.train_pids[:1000]
+            self.val_pids = self.val_pids[:1000]
+            self.test_pids = self.test_pids[:1000]
+
+    def get_n_patients(self) -> int:
+        return len(self.get_pids())
+
+    def get_pids(self) -> np.ndarray:
+        """Return patient ids for this split"""
+        if self.split == 'train':
+            pids = self.train_pids
+        elif self.split == 'val':
+            pids = self.val_pids
+        elif self.split == 'test':
+            pids = self.test_pids
+        else:
+            raise ValueError(f"Invalid split: {self.split}")
+        return pids
+
+    def __len__(self) -> int:
+        return len(self.get_pids())
+    
+    def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
+        """Return all event codes for this patient at `idx` in `self.split`.
+        """
+        # with meds_reader.PatientDatabase(self.path_to_meds_extract, num_threads=32) as database:
+        # TODO
+        pass
 
 class SparkDataset(BaseDataset):
     # TODO -- spark
