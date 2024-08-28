@@ -6,19 +6,24 @@ from torch.utils.data import Dataset
 from hf_ehr.config import Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
 from hf_ehr.data.tokenization import DescTokenizer
 import meds_reader
+import polars as pl
+
 class BaseDataset(Dataset):
     pass
 
 class MEDSDataset(BaseDataset):
-    # TODO
-    
+    """Dataset that returns patients in a MEDS dataset.
+        dataset[idx] = a specific patient, so you can only retrieve ONE sample per patient.
+    """
     def __init__(self, 
-                 path_to_meds_extract: str, 
+                 path_to_meds_reader_extract: str,
                  split: str = 'train',
                  is_debug: bool = False,
                  seed: int = 1):
+        assert os.path.exists(path_to_meds_reader_extract), f"{path_to_meds_reader_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
-        self.path_to_meds_extract: str = path_to_meds_extract
+        self.path_to_meds_reader_extract: str = path_to_meds_reader_extract
+        self.meds_db = meds_reader.SubjectDatabase(path_to_meds_reader_extract, num_threads=1)
         self.split: str = split
         self.is_debug: bool = is_debug
         self.seed: int = seed
@@ -26,17 +31,20 @@ class MEDSDataset(BaseDataset):
         # Set metadata -- used for tokenizer versioning later
         # ! CAUTION: Essential that this contains all args/kwargs; otherwise get_seq_length_per_patient() in tokenizer breaks!
         self.metadata = {
-            'cls' : 'SparkDataset',
+            'cls' : 'MEDSDataset',
+            'path_to_meds_reader_extract': path_to_meds_reader_extract,
             'split' : split,
             'is_debug' : is_debug,
             'seed' : seed,
         }
 
         # Pre-calculate canonical splits based on patient ids
-        # TODO -- rewrite
-        self.train_pids: np.ndarray = []
-        self.val_pids: np.ndarray = []
-        self.test_pids: np.ndarray = []
+
+        splits = pl.read_parquet(os.path.join(path_to_meds_reader_extract, 'metadata', 'subject_splits.parquet'))
+
+        self.train_pids = splits.filter(pl.col('split') == 'train').select('subject_id').to_series().to_numpy()
+        self.val_pids = splits.filter(pl.col('split') == 'tuning').select('subject_id').to_series().to_numpy()
+        self.test_pids = splits.filter(pl.col('split') == 'held_out').select('subject_id').to_series().to_numpy()
 
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
@@ -70,9 +78,26 @@ class MEDSDataset(BaseDataset):
     def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
         """Return all event codes for this patient at `idx` in `self.split`.
         """
-        # with meds_reader.PatientDatabase(self.path_to_meds_extract, num_threads=32) as database:
-        # TODO
-        pass
+        pids: np.ndarray = self.get_pids()
+        pid: int = pids[idx]
+
+        # For negative `idx`, we need to unwrap `pid`
+        if len(pid.shape) > 0:
+            pid = pid[0]
+
+        # Get data for each clinical event in patient timeline
+        events: List[Event] = [
+            Event(code=e.code,
+                  value=getattr(e, "numeric_value", None) or getattr(e, "text_value", None),
+                  unit=e.unit,
+                  start=e.time,
+                  end=getattr(e, 'end', None),
+                  omop_table=getattr(e, 'omop_table', None),
+            )
+            for e in self.meds_db[pid].events
+        ]
+        # print("Time to fetch events: ", time.time() - start)
+        return (pid, events)
 
 class SparkDataset(BaseDataset):
     # TODO -- spark
@@ -327,18 +352,24 @@ if __name__ == '__main__':
 
     # FEMRDataset
     # TODO - sanity check that `PATH_TO_FEMR_EXTRACT_MIMIC4` works
-    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
-    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
-    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')
-    breakpoint()
-    t1 = time.time()
-    event_count = 0
-    for pid in tqdm(train_dataset.get_pids()[:100000]):
-        for e in train_dataset.femr_db[pid].events:
-            event_count += 1
-            train_dataset.femr_db.get_ontology().get_text_description(e.code)
-    t2 = time.time()
-    print("Time to loop through all events in train_dataset: ", t2 - t1)
-    # Print average time per event
-    print("Average time per patient: ", (t2 - t1) / 100000)
-    print("Average time per event: ", (t2 - t1) / event_count)
+    # train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
+    # val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
+    # test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')
+    # breakpoint()
+    # t1 = time.time()
+    # event_count = 0
+    # for pid in tqdm(train_dataset.get_pids()[:100000]):
+    #     for e in train_dataset.femr_db[pid].events:
+    #         event_count += 1
+    #         train_dataset.femr_db.get_ontology().get_text_description(e.code)
+    # t2 = time.time()
+    # print("Time to loop through all events in train_dataset: ", t2 - t1)
+    # # Print average time per event
+    # print("Average time per patient: ", (t2 - t1) / 100000)
+    # print("Average time per event: ", (t2 - t1) / event_count)
+
+    train_dataset = MEDSDataset('../../../meds_transform_test/MEDS_Extract_v0.0.3_fixed_reader', split='train')
+
+    assert len(train_dataset) == 239770
+
+    print(train_dataset[0])
