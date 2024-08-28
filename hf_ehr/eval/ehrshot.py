@@ -56,7 +56,7 @@ class CookbookModelWithClassificationHead(torch.nn.Module):
         self.aggregation_strat = aggregation_strat
 
         # Linear head
-        self.classifier = torch.nn.Linear(self.hidden_dim, n_classes)
+        self.classifier = torch.nn.Linear(self.hidden_dim, n_classes, bias=True)
 
     def aggregate(self, x: Float[torch.Tensor, 'B L H']) -> Float[torch.Tensor, 'B H']:
         if self.aggregation_strat == 'mean':

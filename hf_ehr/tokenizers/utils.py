@@ -1,10 +1,12 @@
+import os
 import collections
 import datetime
 import multiprocessing
+import pickle
 import time
 import numpy as np
 from tqdm import tqdm
-from typing import Callable, List, Dict, Optional, Set, Tuple
+from typing import Callable, List, Dict, Optional, Set, Tuple, Any
 import femr.datasets
 from hf_ehr.config import (
     CodeTCE, 
@@ -18,15 +20,42 @@ from hf_ehr.config import (
 from hf_ehr.data.tokenization import CookbookTokenizer
 import time
 
+PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/create_cookbook/'
+
+def load_results_from_cache(path_to_cache_dir: Optional[str], filename: str) -> Optional[Any]:
+    """Load results from cached .pkl file (if cache dir is provided)."""
+    if path_to_cache_dir is None:
+        return None
+    path_to_cache_file: str = os.path.join(path_to_cache_dir, filename + ".pkl")
+    if os.path.exists(path_to_cache_file):
+        print(f"Loading cached file from: `{path_to_cache_file}`")
+        return pickle.load(open(path_to_cache_file, 'rb'))
+    return None
+
+def save_results_to_cache(results: Any, path_to_cache_dir: Optional[str], filename: str) -> None:
+    """Save results to cache .pkl file (if cache dir is provided)."""
+    if path_to_cache_dir is None:
+        return None
+    path_to_cache_file: str = os.path.join(path_to_cache_dir, filename + ".pkl")
+    print(f"Saving results of length={len(results)} to cached file at: `{path_to_cache_file}`")
+    pickle.dump(results, open(path_to_cache_file, 'wb'))
+
 ################################################
 # Get all categorical codes in dataset
 ################################################
 def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, category) in dataset."""
-    path_to_femr_db: str = args[0]
-    pids: List[int] = args[1]
+    path_to_cache_dir: Optional[str] = args[0]
+    path_to_femr_db: str = args[1]
+    pids: List[int] = args[2]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
 
+    # Load from cached file (if exists)
+    signature: str = f"start={pids[0]}_end={pids[-1]}_len={len(pids)}"
+    if (cache := load_results_from_cache(path_to_cache_dir, signature)) is not None:
+        return cache
+
+    # Run function
     results: Set[Tuple[str, List[str]]] = set()
     for pid in pids:
         for event in femr_db[pid].events:
@@ -36,6 +65,10 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
                 and isinstance(event.value, str) # `value` is textual
             ):
                 results.add((event.code, (event.value,)))
+                
+    # Save to cached file (if applicable)
+    save_results_to_cache(results, path_to_cache_dir, signature)
+
     return results
 
 def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tuple[str, List[str]]]:
@@ -45,17 +78,22 @@ def merge_categorical_codes(results: List[Set[Tuple[str, List[str]]]]) -> Set[Tu
         merged = merged.union(r)
     return merged
 
-
-
 ################################################
 # Get all numerical_range codes in dataset
 ################################################
 def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, start_range, end_range) in dataset."""
-    path_to_femr_db: str = args[0]
-    pids: List[int] = args[1]
+    path_to_cache_dir: Optional[str] = args[0]
+    path_to_femr_db: str = args[1]
+    pids: List[int] = args[2]
     femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
 
+    # Load from cached file (if exists)
+    signature: str = f"start={pids[0]}_end={pids[-1]}_len={len(pids)}"
+    if (cache := load_results_from_cache(path_to_cache_dir, signature)) is not None:
+        return cache
+
+    # Run function
     results: Dict[str, List[float]] = {}
     for pid in pids:
         for event in femr_db[pid].events:
@@ -71,6 +109,10 @@ def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
                 if key not in results:
                     results[key] = []
                 results[key].append(float(event.value))  # Ensure values are stored as float
+                
+    # Save to cached file (if applicable)
+    save_results_to_cache(results, path_to_cache_dir, signature)
+
     return results
 
 def merge_numerical_range_codes(results: List[Dict[Tuple[str, str], List[float]]]) -> Dict[Tuple[str, str], List[float]]:
@@ -83,10 +125,143 @@ def merge_numerical_range_codes(results: List[Dict[Tuple[str, str], List[float]]
             merged[key].extend(values)
     return merged
 
+################################################
+# Get all unique codes in dataset
+################################################
+def calc_unique_codes(args: Tuple) -> Set[str]:
+    """Return all unique codes in dataset."""
+    path_to_cache_dir: Optional[str] = args[0]
+    path_to_femr_db: str = args[1]
+    pids: List[int] = args[2]
+    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
+    
+    # Load from cached file (if exists)
+    signature: str = f"start={pids[0]}_end={pids[-1]}_len={len(pids)}"
+    if (cache := load_results_from_cache(path_to_cache_dir, signature)) is not None:
+        return cache
+
+    # Run function
+    results: Set[str] = set()
+    for pid in pids:
+        for event in femr_db[pid].events:
+            results.add(event.code)
+            
+    # Save to cached file (if applicable)
+    save_results_to_cache(results, path_to_cache_dir, signature)
+
+    return results
+
+def merge_unique_codes(results: List[Set[str]]) -> Set[str]:
+    """Merge results from `calc_unique_codes`."""
+    merged: Set[str] = set()
+    for r in tqdm(results, total=len(results), desc='merge_unique_codes()'):
+        merged = merged.union(r)
+    return merged
+
+
+################################################
+# Code unique patient count
+################################################
+def calc_code_2_unique_patient_count(args: Tuple) -> Dict:
+    # TODO
+    """Given a code, count # of unique patients have it."""
+    path_to_cache_dir: Optional[str] = args[0]
+    path_to_femr_db: str = args[1]
+    pids: List[int] = args[2]
+    path_to_tokenizer_config = args[3] # TODO -- need to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
+    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
+    results: Dict[str, int] = collections.defaultdict(int)
+    for pid in pids:
+        counted = set()
+        for event in femr_db[pid].events:
+            if event.code not in counted:
+                counted.add(event.code)
+                results[event.code] += 1
+    return dict(results)
+
+def merge_code_2_unique_patient_count(results: List[Dict[str, int]]) -> Dict:
+    """Merge results from `calc_code_2_unique_patient_count`."""
+    merged: Dict[str, int] = collections.defaultdict(int)
+    for r in results:
+        for code, count in r.items():
+            merged[code] += count
+    return dict(merged)
+
+################################################
+# Code occurrence count
+################################################
+def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
+    """Given a list of patient IDs, count the occurrences of each token using CookbookTokenizer."""
+    path_to_cache_dir: Optional[str] = args[0]
+    path_to_femr_db: str = args[1]
+    pids: List[int] = args[2]
+    path_to_tokenizer_config = args[3]
+    
+    # Load from cached file (if exists)
+    signature: str = f"start={pids[0]}_end={pids[-1]}_len={len(pids)}"
+    if (cache := load_results_from_cache(path_to_cache_dir, signature)) is not None:
+        return cache
+
+    # Adding the print statement to indicate the start of the function
+    print(f"\nStarting calc_code_2_occurrence_count() with path_to_femr_db: {path_to_femr_db}, pids: {len(pids)}, and path_to_tokenizer_config: {path_to_tokenizer_config}")
+    
+    print("Start | Loading tokenizer metadata")
+    start_time = datetime.datetime.now()
+    __, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
+    print(f"Finish | Loading tokenizer metadata | Time= {datetime.datetime.now() - start_time}s")
+
+    print("Loading CookbookTokenizer")
+    start_time = datetime.datetime.now()
+    tokenizer = CookbookTokenizer(path_to_tokenizer_config, metadata=metadata)
+    print(f"Finish | CookbookTokenizer | Time= {datetime.datetime.now() - start_time}s")
+
+    print("Loading FEMR PatientDatabase")
+    start_time = datetime.datetime.now()
+    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
+    print(f"Finish | FEMR PatientDatabase | Time= {datetime.datetime.now() - start_time}s")
+
+    # Process events
+    print("Start | Processing events")
+    start_time = datetime.datetime.now()
+    results: Dict[str, int] = collections.defaultdict(int)
+    for pid in tqdm(pids, total=len(pids), desc='pids'):
+        for event in femr_db[pid].events:
+            token = tokenizer.convert_event_to_token(event)
+            if token is not None:
+                results[token] += 1
+    print(f"Finish | Processing events | Time= {datetime.datetime.now() - start_time}s")
+    
+    # Save to cached file (if applicable)
+    save_results_to_cache(results, path_to_cache_dir, signature)
+    
+    print("Ending calc_code_2_occurrence_count")
+    return dict(results)
+
+def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict[str, int]:
+    """Merge results from `calc_code_2_occurrence_count`."""
+    print("Starting merge_code_2_occurrence_count")
+    merged: Dict[str, int] = collections.defaultdict(int)
+    start_time = datetime.datetime.now()
+    for r in results:
+        for token, count in r.items():
+            merged[token] += count
+    print(f"Finished merging, time taken: {datetime.datetime.now() - start_time}")
+    
+    print("Ending merge_code_2_occurrence_count")
+    return dict(merged)
+
+################################################
+#
+# Discrete modifiers of tokenizer_config.json
+#
+################################################
 def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], N: int, **kwargs):
     """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
+    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, "add_numerical_range_codes")
+    os.makedirs(path_to_cache_dir, exist_ok=True)
+    
     # Step 1: Collect all numerical values for each code
-    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, **kwargs)
+    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_femr_db, pids, path_to_cache_dir, **kwargs)
 
     # Step 2: Calculate the range for each code and update the tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
@@ -119,119 +294,13 @@ def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_femr_db: st
     metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-
-################################################
-# Get all unique codes in dataset
-################################################
-def calc_unique_codes(args: Tuple) -> Set[str]:
-    """Return all unique codes in dataset."""
-    path_to_femr_db: str = args[0]
-    pids: List[int] = args[1]
-    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
-
-    results: Set[str] = set()
-    for pid in pids:
-        for event in femr_db[pid].events:
-            results.add(event.code)
-    return results
-
-def merge_unique_codes(results: List[Set[str]]) -> Set[str]:
-    """Merge results from `calc_unique_codes`."""
-    merged: Set[str] = set()
-    for r in tqdm(results, total=len(results), desc='merge_unique_codes()'):
-        merged = merged.union(r)
-    return merged
-
-
-################################################
-# Code unique patient count
-################################################
-def calc_code_2_unique_patient_count(args: Tuple) -> Dict:
-    """Given a code, count # of unique patients have it."""
-    path_to_femr_db: str = args[0]
-    pids: List[int] = args[1]
-    path_to_tokenizer_config = args[2] # TODO -- ned to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
-    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
-    results: Dict[str, int] = collections.defaultdict(int)
-    for pid in pids:
-        counted = set()
-        for event in femr_db[pid].events:
-            if event.code not in counted:
-                counted.add(event.code)
-                results[event.code] += 1
-    return dict(results)
-
-def merge_code_2_unique_patient_count(results: List[Dict[str, int]]) -> Dict:
-    """Merge results from `calc_code_2_unique_patient_count`."""
-    merged: Dict[str, int] = collections.defaultdict(int)
-    for r in results:
-        for code, count in r.items():
-            merged[code] += count
-    return dict(merged)
-
-################################################
-# Code occurrence count
-################################################
-def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
-    """Given a list of patient IDs, count the occurrences of each token using CookbookTokenizer."""
-    path_to_femr_db: str = args[0]
-    pids: List[int] = args[1]
-    path_to_tokenizer_config = args[2]
-    
-    # Adding the print statement to indicate the start of the function
-    print(f"\nStarting calc_code_2_occurrence_count() with path_to_femr_db: {path_to_femr_db}, pids: {len(pids)}, and path_to_tokenizer_config: {path_to_tokenizer_config}")
-    
-    print("Start | Loading tokenizer metadata")
-    start_time = datetime.datetime.now()
-    __, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    print(f"Finish | Loading tokenizer metadata | Time= {datetime.datetime.now() - start_time}s")
-
-    print("Loading CookbookTokenizer")
-    start_time = datetime.datetime.now()
-    tokenizer = CookbookTokenizer(path_to_tokenizer_config, metadata=metadata)
-    print(f"Finish | CookbookTokenizer | Time= {datetime.datetime.now() - start_time}s")
-
-    print("Loading FEMR PatientDatabase")
-    start_time = datetime.datetime.now()
-    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
-    print(f"Finish | FEMR PatientDatabase | Time= {datetime.datetime.now() - start_time}s")
-
-    # Process events
-    print("Start | Processing events")
-    start_time = datetime.datetime.now()
-    results: Dict[str, int] = collections.defaultdict(int)
-    for pid in tqdm(pids, total=len(pids), desc='pids'):
-        for event in femr_db[pid].events:
-            token = tokenizer.convert_event_to_token(event)
-            if token is not None:
-                results[token] += 1
-    print(f"Finish | Processing events | Time= {datetime.datetime.now() - start_time}s")
-    
-    print("Ending calc_code_2_occurrence_count")
-    return dict(results)
-
-def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict[str, int]:
-    """Merge results from `calc_code_2_occurrence_count`."""
-    print("Starting merge_code_2_occurrence_count")
-    merged: Dict[str, int] = collections.defaultdict(int)
-    start_time = datetime.datetime.now()
-    for r in results:
-        for token, count in r.items():
-            merged[token] += count
-    print(f"Finished merging, time taken: {datetime.datetime.now() - start_time}")
-    
-    print("Ending merge_code_2_occurrence_count")
-    return dict(merged)
-
-################################################
-#
-# Discrete modifiers of tokenizer_config.json
-#
-################################################
-
 def add_unique_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], **kwargs):
     """For each unique code in dataset, add a CodeTCE to tokenizer config."""
-    results = run_helper(calc_unique_codes, merge_unique_codes, path_to_femr_db, pids, **kwargs)
+    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, "add_unique_codes")
+    os.makedirs(path_to_cache_dir, exist_ok=True)
+    
+    # Run function in parallel    
+    results = run_helper(calc_unique_codes, merge_unique_codes, path_to_femr_db, pids, path_to_cache_dir, **kwargs)
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
@@ -251,8 +320,11 @@ def add_unique_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: 
 
 def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], **kwargs):
     """For each unique (code, categorical value) in dataset, add a CategoricalTCE to tokenizer config."""
+    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, "add_categorical_codes")
+    os.makedirs(path_to_cache_dir, exist_ok=True)
+
     # Run function in parallel    
-    results = run_helper(calc_categorical_codes, merge_categorical_codes, path_to_femr_db, pids, **kwargs)
+    results = run_helper(calc_categorical_codes, merge_categorical_codes, path_to_femr_db, pids, path_to_cache_dir, **kwargs)
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
@@ -280,11 +352,13 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     """Add occurrence count to each entry in tokenizer config."""
     print("Starting add_occurrence_count_to_codes function\n")
+    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, dataset, split, "add_occurrence_count_to_codes")
+    os.makedirs(path_to_cache_dir, exist_ok=True)
 
     # Run function in parallel   
     print("Running run_helper") 
     start_time = datetime.datetime.now()
-    results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_femr_db, pids, additional_args=(path_to_tokenizer_config,), **kwargs)
+    results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_femr_db, pids, path_to_cache_dir, additional_args=(path_to_tokenizer_config,), **kwargs)
     print(f"Finished run_helper, time taken: {datetime.datetime.now() - start_time}")
 
     # Add stats to tokenizer config
@@ -357,9 +431,9 @@ def remove_codes_belonging_to_vocabs(path_to_tokenizer_config: str, excluded_voc
 #
 ################################################
 
-def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pids: List[int], n_procs: int = 5, chunk_size: int = 10000, additional_args: Tuple = ()):
+def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pids: List[int], path_to_cache_dir: Optional[str], n_procs: int = 5, chunk_size: int = 10000, additional_args: Tuple = ()):
     # Set up parallel tasks
-    tasks = [(path_to_femr_db, pids[start:start+chunk_size]) + additional_args for start in range(0, len(pids), chunk_size)]
+    tasks = [(path_to_cache_dir, path_to_femr_db, pids[start:start+chunk_size]) + additional_args for start in range(0, len(pids), chunk_size)]
 
     # Debugging info
     print(f"calc_parallelize: {len(tasks)} tasks created")
@@ -373,12 +447,13 @@ def calc_parallelize(path_to_femr_db: str, func: Callable, merger: Callable, pid
 
     return merger(results)
 
-def run_helper(calc_func: Callable, merge_func: Callable, path_to_femr_db: str, pids: List[int], additional_args: Tuple = (), **kwargs):
+def run_helper(calc_func: Callable, merge_func: Callable, path_to_femr_db: str, pids: List[int], path_to_cache_dir: Optional[str], additional_args: Tuple = (), **kwargs):
     print(f"Running {calc_func.__name__} for {len(pids)} patients")
     results = calc_parallelize(path_to_femr_db, 
                                calc_func, 
                                merge_func, 
                                pids=pids,
+                               path_to_cache_dir=path_to_cache_dir,
                                additional_args=additional_args,
                                **kwargs)
     return results
