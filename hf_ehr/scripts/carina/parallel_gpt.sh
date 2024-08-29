@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=gpt-parallel
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt_parallel_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt_parallel_%A.err
+#SBATCH --output=/share/pi/nigam/suhana/hf_ehr/slurm_logs/gpt_parallel_%A.out
+#SBATCH --error=/share/pi/nigam/suhana/hf_ehr/slurm_logs/gpt_parallel_%A.err
 #SBATCH --time=48:00:00
 #SBATCH --partition=nigam-v100,gpu
 #SBATCH --mem=200G

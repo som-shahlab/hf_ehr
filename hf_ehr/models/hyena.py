@@ -141,6 +141,6 @@ class HyenaLanguageModel(BaseModel):
         loss: torch.Tensor = outputs.loss
 
         # Logging
-        self.log_validation_step(loss.detach())
+        self.log_validation_step(loss.detach(), tokens)  # Pass both loss and tokens
 
         return loss

@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm
 import numpy as np
 import femr.datasets
 from typing import Dict, List, Tuple
@@ -351,24 +352,28 @@ if __name__ == '__main__':
 
     # FEMRDataset
     # TODO - sanity check that `PATH_TO_FEMR_EXTRACT_MIMIC4` works
-    # train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
-    # val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
-    # test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')
-    # breakpoint()
-    # t1 = time.time()
-    # event_count = 0
-    # for pid in tqdm(train_dataset.get_pids()[:100000]):
-    #     for e in train_dataset.femr_db[pid].events:
-    #         event_count += 1
-    #         train_dataset.femr_db.get_ontology().get_text_description(e.code)
-    # t2 = time.time()
-    # print("Time to loop through all events in train_dataset: ", t2 - t1)
-    # # Print average time per event
-    # print("Average time per patient: ", (t2 - t1) / 100000)
-    # print("Average time per event: ", (t2 - t1) / event_count)
+    train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
+    val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
+    test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')
 
-    train_dataset = MEDSDataset('../../../meds_transform_test/MEDS_Extract_v0.0.3_fixed_reader', split='train')
+    # Get the number of patients
+    num_train_patients = len(train_dataset.get_pids())
+    num_val_patients = len(val_dataset.get_pids())
+    num_test_patients = len(test_dataset.get_pids())
 
-    assert len(train_dataset) == 239770
-
-    print(train_dataset[0])
+    print(f"Number of patients in train dataset: {num_train_patients}")
+    print(f"Number of patients in validation dataset: {num_val_patients}")
+    print(f"Number of patients in test dataset: {num_test_patients}")
+    
+    #breakpoint()
+    t1 = time.time()
+    event_count = 0
+    for pid in tqdm(train_dataset.get_pids()[:100000]):
+        for e in train_dataset.femr_db[pid].events:
+            event_count += 1
+            train_dataset.femr_db.get_ontology().get_text_description(e.code)
+    t2 = time.time()
+    print("Time to loop through all events in train_dataset: ", t2 - t1)
+    # Print average time per event
+    print("Average time per patient: ", (t2 - t1) / 100000)
+    print("Average time per event: ", (t2 - t1) / event_count)
