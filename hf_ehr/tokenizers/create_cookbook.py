@@ -13,6 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
     parser.add_argument('--chunk_size', type=int, default=None, help='Number of pids per process')
     parser.add_argument('--is_force_refresh', action='store_true', default=False, help='If specified, will force refresh the tokenizer config')
+    parser.add_argument('--is_debug', action='store_true', default=False, help='If specified, only do 1000 patients')
     return parser.parse_args()
 
 def check_add_unique_codes(tokenizer_config):
@@ -82,6 +83,12 @@ def main():
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
+    
+    # Debug mode
+    if args.is_debug:
+        pids = pids[:10000]
+        args.n_procs = 2
+        print(f"Running in debug mode with only 10000 patients")
 
     # Hparams
     chunk_size: int = args.chunk_size if args.chunk_size else len(pids) // args.n_procs
