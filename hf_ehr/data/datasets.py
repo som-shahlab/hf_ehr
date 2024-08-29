@@ -72,7 +72,26 @@ class MEDSDataset(BaseDataset):
         """
         # with meds_reader.PatientDatabase(self.path_to_meds_extract, num_threads=32) as database:
         # TODO
-        pass
+        pids: np.ndarray = self.get_pids()
+        pid: int = pids[idx]
+
+        # For negative `idx`, we need to unwrap `pid`
+        if len(pid.shape) > 0:
+            pid = pid[0]
+
+        # Get data for each clinical event in patient timeline
+        events: List[Event] = [
+            Event(code=e.code, 
+                  value=e.numeric_value or e.text_value, 
+                  unit=e.unit, 
+                  start=e.time, 
+                  end=e.end, 
+                  omop_table=e.omop_table)
+            for e in self.femr_db[pid].events
+        ]
+        # print("Time to fetch events: ", time.time() - start)
+        return (pid, events)
+
 
 class SparkDataset(BaseDataset):
     # TODO -- spark
