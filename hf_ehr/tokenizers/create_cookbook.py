@@ -3,8 +3,8 @@ import argparse
 import time
 from typing import Any, Callable, Dict, List
 from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
-from hf_ehr.data.datasets import FEMRDataset
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, PATH_TO_SPARK_DATASET, PATH_TO_TOKENIZER_SPARK_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG
+from hf_ehr.data.datasets import FEMRDataset, SparkDataset
+from hf_ehr.config import SPARK_SPLIT_TABLE, PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, SPARK_DATA_TABLE, PATH_TO_TOKENIZER_SPARK_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG
 from hf_ehr.tokenizers.utils import call_func_with_logging
 
 def parse_args() -> argparse.Namespace:
@@ -78,7 +78,18 @@ def main():
         pass
     else:
         raise ValueError(f'Invalid FEMR dataset: {args.dataset}')
-    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False) # TODO -- update for spark
+    
+    if args.dataset == 'spark':
+
+        from pyspark.context import SparkContext
+
+        dataset = SparkDataset(
+            spark=SparkContext.getOrCreate(),
+            data_table_name=SPARK_DATA_TABLE,
+            split_table_name=SPARK_SPLIT_TABLE,
+        )
+    else:
+        dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False) # TODO -- update for spark
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")

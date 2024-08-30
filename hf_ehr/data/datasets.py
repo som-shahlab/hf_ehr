@@ -88,15 +88,12 @@ class SparkDataset(BaseDataset):
     """
 
     from pyspark.context import SparkContext
-    from pyspark.sql.dataframe import DataFrame
-    from pyspark.sql.functions import col
 
     def __init__(
         self,
-        code_df: DataFrame,  # dataframe with columns [pat_id (int), timestamp, code (string)]
-        train_pids: List[str],  # list of patient ids in the training set
-        test_pids: List[str],  # list of patient ids in the test set
-        val_pids: List[str],  # list of patient ids in the val set
+        spark: SparkContext,
+        data_table_name: str,  # table in current spark context with columns [pat_id (int), timestamp, code (string)]
+        split_table_name: str,  # table in current spark context with columns [pat_id (int), split (string in {train, test, val})]
         split: str = "train",
         is_debug: bool = False,
         seed: int = 1,
@@ -119,12 +116,19 @@ class SparkDataset(BaseDataset):
             "seed": seed,
         }
 
+        self.code_df = spark.sql(f"SELECT * FROM {data_table_name}")
+
+        split_df = spark.sql(f"SELECT * FROM {split_table_name}").toPandas()
+
+        train_pids = split_df.loc[split_df['split'] == 'train', 'pat_id'].values
+        test_pids = split_df.loc[split_df['split'] == 'test', 'pat_id'].values
+        val_pids = split_df.loc[split_df['split'] == 'val', 'pat_id'].values
+
         # create patient id lists for each split
         self.train_pids: np.ndarray = np.array(train_pids)
         self.val_pids: np.ndarray = np.array(val_pids)
         self.test_pids: np.ndarray = np.array(test_pids)
 
-        self.code_df = code_df
 
         # Confirm disjoint train/val/test
         assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
@@ -159,6 +163,9 @@ class SparkDataset(BaseDataset):
         """
         Return all event codes for this patient at `idx` in `self.split`.
         """
+
+        from pyspark.sql.functions import col
+
         # get the patient id
         pat_id = self.get_pids()[idx]
         print(f"getting events for patient with id={pat_id}")
