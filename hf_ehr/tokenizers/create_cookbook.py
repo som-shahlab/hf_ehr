@@ -41,11 +41,9 @@ def check_add_occurrence_count_to_codes(tokenizer_config):
     assert len(codes_with_counts) > 0, "No occurrence counts were added."
     print(f"Check passed: Occurrence counts added to {len(codes_with_counts)} codes.")
     
-def main():
+def main(args):
     start_total = time.time()
     
-    # Parse command-line arguments
-    args = parse_args()
     # TODO -- may need to change path to PATH_TO_TOKENIZER_SPARK_CONFIG
     PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG = PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG # TODO - remove
     assert PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG == PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG and 'debug' in PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
@@ -128,4 +126,5 @@ def main():
     print("Done!")
 
 if __name__ == '__main__':
-    main()
+    
+    main(parse_args())
