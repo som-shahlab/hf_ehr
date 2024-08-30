@@ -81,10 +81,10 @@ def main():
     
     if args.dataset == 'spark':
 
-        from pyspark.context import SparkContext
+        from pyspark.sql import SparkSession
 
         dataset = SparkDataset(
-            spark=SparkContext.getOrCreate(),
+            spark=SparkSession.builder.getOrCreate(),
             data_table_name=SPARK_DATA_TABLE,
             split_table_name=SPARK_SPLIT_TABLE,
         )
