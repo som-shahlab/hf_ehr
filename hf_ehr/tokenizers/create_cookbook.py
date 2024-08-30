@@ -2,7 +2,7 @@ import os
 import argparse
 import time
 from typing import Any, Callable, Dict, List
-from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
+from hf_ehr.tokenizers.utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset, SparkDataset
 from hf_ehr.config import SPARK_SPLIT_TABLE, PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, SPARK_DATA_TABLE, PATH_TO_TOKENIZER_SPARK_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG
 from hf_ehr.tokenizers.utils import call_func_with_logging
@@ -87,16 +87,20 @@ def main(args):
             split_table_name=SPARK_SPLIT_TABLE,
         )
     else:
-        dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False) # TODO -- update for spark
+        dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
+        print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
+
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()
-    print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
 
     # Hparams
     chunk_size: int = args.chunk_size if args.chunk_size else len(pids) // args.n_procs
     excluded_vocabs = ['STANFORD_OBS']
     print(f"Running with n_procs={args.n_procs}, chunk_size={chunk_size}")
 
+    # TODO - remove all refs to path_to_femr_extract and ... replace with something else?
+    # TOOD - what is PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG and why do we need this?
+    
     # With `n_procs=5`, should take ~25 mins
     call_func_with_logging(add_unique_codes, 'add_unique_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size)
     tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
