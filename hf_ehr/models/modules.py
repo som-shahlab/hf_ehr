@@ -7,7 +7,6 @@ from omegaconf import DictConfig
 from torchmetrics.aggregation import SumMetric, CatMetric
 from jaxtyping import Float
 from typing import Dict, List, Any, Optional, Union
-from calflops import calculate_flops
 import wandb
 from lightning.pytorch.utilities import rank_zero_only
 from hf_ehr.utils import lr_warmup_with_constant_plateau
@@ -15,18 +14,8 @@ from loguru import logger
 
 def calculate_flops_per_token(model, vocab_size: int) -> int:
     """Returns FLOPs per token for model."""
-    was_training: bool = model.training
-    model.eval()  # Ensure model is in evaluation mode
-    # inputs that match the shape and type of expected inputs
-    dummy_inputs = {
-        "input_ids": torch.randint(0, vocab_size, (1,1)).to(model.device),
-        "labels": torch.randint(0, vocab_size, (1,1)).to(model.device)
-    }
-    flops, macs, params = calculate_flops(model=model, kwargs=dummy_inputs, output_as_string=False, print_results=False, output_precision=4)
-
-    if was_training:
-        model.train()
-    return flops
+    # TODO - remove; needs to be done on input size level
+    return 0
 
 class BaseModel(L.LightningModule):
     """
@@ -64,9 +53,7 @@ class BaseModel(L.LightningModule):
     def post_init(self):
         """Post-initialization method to be called by subclass."""
         # Calculate FLOPs per token
-        logger.info("Start | Calculating FLOPs per token...")
-        self.flops_per_token = calculate_flops_per_token(self.model, self.vocab_size)
-        logger.info("End | Calculating FLOPs per token...")
+        self.flops_per_token = 0
         # Track batch_idx
         self.batch_idx: int = 0
 
@@ -154,7 +141,6 @@ class BaseModel(L.LightningModule):
 
     def on_train_start(self):
         if rank_zero_only.rank == 0 and wandb and wandb.run:
-            wandb.run.summary["flops_per_token"] = self.flops_per_token
             wandb.run.summary["tokenizer_vocab_size"] = self.vocab_size
             wandb.run.summary["tokenizer_pad_token_id"] = self.pad_token_id
             wandb.run.summary["model_parameter_count"] = self.get_param_count()
@@ -223,9 +209,6 @@ class BaseModel(L.LightningModule):
         self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
         self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
 
-        if self.flops_per_token is not None:
-            self.log('val/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute() * self.flops_per_token, on_step=False, on_epoch=True, sync_dist=True)
-
     def log_validation_step(self, loss: torch.Tensor, tokens: Dict[str, Any]):
         # NOTE: Assumes `loss` has been scaled per-token already
         val_batch_tokens_nonPAD: int = (tokens['input_ids'] != self.pad_token_id).sum().detach().cpu().item()
@@ -267,6 +250,3 @@ class BaseModel(L.LightningModule):
         self.log('train/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32))
         self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
         self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
-        
-        if self.flops_per_token is not None:
-            self.log('train/total_flops', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32) * self.flops_per_token)

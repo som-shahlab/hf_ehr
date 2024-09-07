@@ -48,3 +48,6 @@ for i in "${!RUN_NAMES[@]}"; do
 done
 
 wait
+
+# For debugging
+# python3 val_ppl.py --path_to_ckpt_dir /share/pi/nigam/mwornow/hf_ehr/cache/runs/archive/gpt-base-1024--clmbr --n_patients 10

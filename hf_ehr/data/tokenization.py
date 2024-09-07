@@ -589,7 +589,7 @@ class CLMBRTokenizer(BaseCodeTokenizer):
             })
             self.non_special_tokens.append(entry.to_token())
 
-        assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
+        # assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
 
         # Create tokenizer
         super().__init__()

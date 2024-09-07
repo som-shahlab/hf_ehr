@@ -8,4 +8,4 @@
 #SBATCH --cpus-per-task=20
 
 source ../carina/base.sh
-python3 ../../tokenizers/create_cookbook.py --n_procs 20
+python3 ../../tokenizers/create_cookbook.py --n_procs 4 --chunk_size 10000
