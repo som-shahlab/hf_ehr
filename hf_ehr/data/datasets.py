@@ -6,8 +6,8 @@ from typing import Dict, List, Tuple
 from torch.utils.data import Dataset
 from hf_ehr.config import Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
 from hf_ehr.data.tokenization import DescTokenizer
-import meds_reader
 import polars as pl
+# import meds_reader
 
 class BaseDataset(Dataset):
     pass

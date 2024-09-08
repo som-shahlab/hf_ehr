@@ -8,7 +8,7 @@ from typing import List, Dict, Tuple
 
 MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'hyena', 'mamba', 't5' ]
 SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large',]
-TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
+TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_8k', 'clmbr_16k', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
 DATALOADER_CHOICES: List[str] = [ 'approx', 'batch']
 DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', ]
 DEFAULT_PARTITIONS: Dict[str, str] = {

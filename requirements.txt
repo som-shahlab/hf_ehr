@@ -17,4 +17,4 @@ calflops==0.3.2
 hydra-core==1.3.2
 mamba-ssm==2.2.2
 causal-conv1d==1.4.0
-meds_reader==0.1.7
+meds_reader

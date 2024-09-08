@@ -19,7 +19,6 @@ import pandas as pd
 from hf_ehr.config import H100_BASE_DIR, A100_BASE_DIR, V100_BASE_DIR, GPU_BASE_DIR, PATH_TO_FEMR_EXTRACT_v8
 from hf_ehr.data.datasets import AllTokensFEMRDataset, FEMRDataset
 from hf_ehr.data.tokenization import BaseTokenizer, collate_femr_timelines
-from hf_ehr.trainer.samplers import SortishSampler, ApproxBatchSampler
 from hf_ehr.utils import load_config_from_ckpt, load_tokenizer_from_config, load_model_from_path, load_ckpt
 from loguru import logger
 
@@ -107,11 +106,12 @@ def eval(model: BaseModel,
                 # Attention mask
                 if 'hyena' in config['model']['name']:
                     attention_mask = None
+                    outputs = model.model(input_ids=input_ids)
                 else:
                     attention_mask: Float[torch.Tensor, 'B L'] = tokens['attention_mask'][:,start_idx:start_idx + max_length].to(device)
+                    outputs = model.model(input_ids=input_ids, attention_mask=attention_mask)
 
                 # Run model
-                outputs = model.model(input_ids=input_ids, attention_mask=attention_mask)
                 logits: Float[torch.Tensor, 'B L V'] = outputs.logits
 
                 # Calculate log probs
@@ -157,17 +157,23 @@ def eval(model: BaseModel,
             if is_debug and p_idx > 10:
                 break
 
-    loss_per_token: float = np.mean([ x['label_log_prob'] for x in results ])
+    mean_loss_per_token: float = np.mean([ x['label_log_prob'] for x in results ])
+    median_loss_per_token: float = np.median([ x['label_log_prob'] for x in results ])
     std_loss_per_token: float = np.std([ x['label_log_prob'] for x in results ])
+    mean_ppl_per_token: float = np.mean([ np.exp(x['label_log_prob']) for x in results ])
+    median_ppl_per_token: float = np.median([ np.exp(x['label_log_prob']) for x in results ])
+    std_ppl_per_token: float = np.std([ np.exp(x['label_log_prob']) for x in results ])
     n_tokens: int = len(results)
-    ppl_per_token: float = float(np.exp(-loss_per_token))
-    std_ppl_per_token: float = float(np.exp(-std_loss_per_token))
+    ppl: float = float(np.exp(-mean_loss_per_token))
 
     return {
-        "loss_per_token" : loss_per_token,
+        "mean_loss_per_token" : mean_loss_per_token,
+        "median_loss_per_token" : median_loss_per_token,
         "std_loss_per_token" : std_loss_per_token,
-        "ppl_per_token": ppl_per_token,
-        "std_ppl_per_token": std_ppl_per_token,
+        "mean_ppl_per_token" : mean_ppl_per_token,
+        "median_ppl_per_token" : median_ppl_per_token,
+        "std_ppl_per_token" : std_ppl_per_token,
+        "ppl": ppl,
         "n_tokens": n_tokens,
         "n_batches" : len(p_idxs),
         "results" : results,
@@ -232,7 +238,7 @@ def run_ckpt(path_to_ckpt: str,
         # Load dataset/dataloader using fixed settings
         logger.info("Start | Loading dataset")
         start = time.time()
-        path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
+        path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8 # TODO -- add ability to swap in MIMIC / EHRSHOT
         max_length: int = config.data.dataloader.max_length
         is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
         seed: int = config.main.seed
@@ -252,7 +258,7 @@ def run_ckpt(path_to_ckpt: str,
     p_idxs: List[int] = random.sample(range(len(dataset)), n_patients)
     assert len(p_idxs) == n_patients, f"Error -- len(p_idxs)={len(p_idxs)} must equal n_patients={n_patients}"
     raw_results = eval(model, dataset, tokenizer, max_length, p_idxs, stride, config, device, is_debug=is_eval_debug)
-    logger.info(f"Mean ppl per token: {raw_results['ppl_per_token']}")
+    logger.info(f"PPL: {raw_results['ppl']}")
     logger.info(f"Total tokens: {raw_results['n_tokens']}")
     logger.info(f"Finish | Calculating average perplexity | t={time.time() - start}")
 
@@ -267,10 +273,13 @@ def run_ckpt(path_to_ckpt: str,
         'config' : OmegaConf.to_container(config, resolve=True),
         'is_debug' : is_eval_debug,
         'results' : {
-            'loss_per_token' : raw_results['loss_per_token'],
+            'mean_loss_per_token' : raw_results['mean_loss_per_token'],
+            'median_loss_per_token' : raw_results['median_loss_per_token'],
             'std_loss_per_token' : raw_results['std_loss_per_token'],
-            'ppl_per_token' : raw_results['ppl_per_token'],
+            'mean_ppl_per_token' : raw_results['mean_ppl_per_token'],
+            'median_ppl_per_token' : raw_results['median_ppl_per_token'],
             'std_ppl_per_token' : raw_results['std_ppl_per_token'],
+            'ppl' : raw_results['ppl'],
             'n_tokens' : raw_results['n_tokens'],
         }
     }
