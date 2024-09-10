@@ -101,7 +101,7 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                 elif context_length == 2048:
                     max_tokens = 2048
                 elif context_length == 4096:
-                    max_tokens = 4096 # ! OOM
+                    max_tokens = 2048
         else:
             raise ValueError(f"Unknown SLURM partition: {partitions}")
     # HYENA
@@ -153,6 +153,8 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                 max_tokens = 16384
             elif size == "medium":
                 max_tokens = 16384
+            elif size == "large":
+                max_tokens = 16384
         elif "nigam-v100" in partitions or "gpu" in partitions:
             # ! Context length > 2048 will OOM
             # ! Not worth running here b/c super slow without conv-1d packages
@@ -161,6 +163,8 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
             elif size == "small":
                 max_tokens = 2048
             elif size == "medium":
+                max_tokens = 2048
+            elif size == "large":
                 max_tokens = 2048
         else:
             raise ValueError(f"Unknown SLURM partition: {partitions}")
