@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=k-gpt-parallel
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/k_gpt_parallel_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/k_gpt_parallel_%A.err
+#SBATCH --job-name=llama-parallel
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/llama_parallel_%A.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/llama_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-v100,gpu
+#SBATCH --partition=nigam-a100,nigam-h100,nigam-v100,gpu
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=12
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:4
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2,secure-gpu-3,secure-gpu-4,secure-gpu-5,secure-gpu-6,secure-gpu-7
 
@@ -24,12 +24,12 @@ trap 'stop_child_processes' SIGTERM SIGINT
 source base.sh
 
 # Experiment names
-RUN_NAMES=( "gpt-base-1024--clmbr_8k" "gpt-base-1024--clmbr_16k" "gpt-base-1024--clmbr_64k" "gpt-base-1024--clmbr_96k" )
+RUN_NAMES=( "llama-base-512--clmbr" "llama-base-1024--clmbr" "llama-base-2048--clmbr" "llama-base-4096--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model gpt2 --size base --tokenizer clmbr_8k --context_length 1024 --dataloader approx --dataset v8"
-    "python3 main.py --model gpt2 --size base --tokenizer clmbr_16k --context_length 1024 --dataloader approx --dataset v8"
-    "python3 main.py --model gpt2 --size base --tokenizer clmbr_64k --context_length 1024 --dataloader approx --dataset v8"
-    "python3 main.py --model gpt2 --size base --tokenizer clmbr_96k --context_length 1024 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
 )
 
 # Loop over the RUN_NAMES and args

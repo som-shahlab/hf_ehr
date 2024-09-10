@@ -11,9 +11,7 @@ python3 ehrshot.py \
 
 import argparse
 import collections
-import datetime
 import os
-import json
 import pickle
 import numpy as np
 import torch
@@ -25,7 +23,7 @@ from tqdm import tqdm
 from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
 from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path, load_tokenizer_from_config
-from hf_ehr.config import Event
+from hf_ehr.config import Event, PATH_TO_EHRSHOT_CACHE_DIR
 
 class CookbookModelWithClassificationHead(torch.nn.Module):
     def __init__(self, model: torch.nn.Module, aggregation_strat: str, n_classes: int):
@@ -41,6 +39,10 @@ class CookbookModelWithClassificationHead(torch.nn.Module):
             self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.transformer
             self.base_model_name = 'gpt2'
+        elif model.model.__class__.__name__ == 'LlamaForCausalLM':
+            self.hidden_dim: int = model.model.lm_head.in_features
+            self.base_model = model.model.model
+            self.base_model_name = 'llama'
         elif model.model.__class__.__name__ in ['HyenaForCausalLM', 'HyenaDNAForCausalLM']:
             self.hidden_dim: int = model.model.lm_head.in_features
             self.base_model = model.model.hyena.backbone
@@ -128,7 +130,6 @@ def main():
     patient_idx_end: Optional[int] = args.patient_idx_end
     PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}')
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
-
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
     
     logger.critical(f"Saving results to `{PATH_TO_OUTPUT_FILE}`")
@@ -174,7 +175,7 @@ def main():
             label_times.append(label.time)
 
     # Generate patient representations
-    feature_matrix, tokenized_timelines = [], []
+    feature_matrix = []
     max_length: int = model.config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
     
@@ -186,41 +187,52 @@ def main():
         for e in database[pid].events:
             patient_id_2_events[pid].append(Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table))
 
-    with torch.no_grad():
-        for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
-            pids = patient_ids[batch_start:batch_start + batch_size]
-            times = label_times[batch_start:batch_start + batch_size]
-
-            ########################
-            # Tokenize patient timeline
-            ########################
-            batch_tokenized_timelines: List[List[int]] = []
-            for pid, l_time in zip(pids, times):
-                # Create patient timeline
-                valid_events: List[Event] = []
-                for e in patient_id_2_events[pid]:
-                    # Ignore events that occur after the label's time
-                    if e.start > l_time:
-                        break
-                    valid_events.append(e)
-                # Tokenize timeline
-                batch_tokenized_timelines.append(tokenizer(valid_events, add_special_tokens=True)['input_ids'][0][:-1]) # [-1] drops final [EOS] token
+    # Cache tokenized timelines for this sequence length
+    path_to_tokenized_timelines_cache_dir: str = os.path.join(PATH_TO_EHRSHOT_CACHE_DIR, 'tokenized_timelines', f"patient_idx_start={patient_idx_start},patient_idx_end={patient_idx_end}", f"chunk_strat={CHUNK_STRAT}", f"max_length={max_length}")
+    path_to_tokenized_timelines_cache_file: str = os.path.join(path_to_tokenized_timelines_cache_dir, 'tokenized_timelines.npz')
+    os.makedirs(path_to_tokenized_timelines_cache_dir, exist_ok=True)
+    if os.path.exists(path_to_tokenized_timelines_cache_file):
+        # Cache hit
+        logger.success(f"Loading tokenized timelines from cache dir @ `{path_to_tokenized_timelines_cache_dir}`")
+        tokenized_timelines: List[List[int]] = np.load(path_to_tokenized_timelines_cache_file)['tokenized_timelines'].tolist()
+    else:
+        # Cache miss
+        logger.critical(f"Creating tokenized timelines from scratch b/c none found at @ `{path_to_tokenized_timelines_cache_dir}`")
+        tokenized_timelines: List[List[int]] = []
+        for pid, l_time in tqdm(zip(patient_ids, label_times), total=len(patient_ids), desc='Caching tokenized timelines'):
+            # Create patient timeline
+            valid_events: List[Event] = []
+            for e in patient_id_2_events[pid]:
+                # Ignore events that occur after the label's time
+                if e.start > l_time:
+                    break
+                valid_events.append(e)
+            # Tokenize timeline
+            timeline: List[int] = tokenizer(valid_events, add_special_tokens=False)['input_ids'][0]
             
             # Determine how timelines longer than max-length will be chunked
             if CHUNK_STRAT == 'last':
-                batch_tokenized_timelines = [x[-max_length:] for x in batch_tokenized_timelines]
+                timeline = timeline[-max_length:]
             else:
                 raise ValueError(f"Chunk strategy `{CHUNK_STRAT}` not supported.")
+            
+            # PAD timelines to max_length
+            tokenized_timelines.append([pad_token_id] * (max_length - len(timeline)) + timeline) # left padding
+        # Save tokenized version of all timelines
+        assert len(tokenized_timelines) == len(patient_ids), f"Error - tokenized_timelines and patient_ids have different lengths: {len(tokenized_timelines)} vs {len(patient_ids)}"
+        assert all([ len(x) == max_length for x in tokenized_timelines ]), f"Error - some tokenized timelines are not of length max_length={max_length}"
+        np.savez_compressed(path_to_tokenized_timelines_cache_file, tokenized_timelines=np.array(tokenized_timelines))
+        logger.critical(f"Saved tokenized timelines to cache dir @ `{path_to_tokenized_timelines_cache_dir}` | shape={np.array(tokenized_timelines).shape}")
 
-            # Save tokenized version of timelines
-            tokenized_timelines.extend([[pad_token_id] * (max_length - len(x)) + x for x in batch_tokenized_timelines]) # left padding
+    with torch.no_grad():
+        for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
+            pids = patient_ids[batch_start:batch_start + batch_size]
+            batch_tokenized_timelines: List[List[int]] = tokenized_timelines[batch_start:batch_start + batch_size]
 
             ########################
             # Create batch
             ########################
-            max_timeline_length: int = max(len(x) for x in batch_tokenized_timelines)
-            batch_tokenized_timelines_w_pad: List[List[int]] = [[pad_token_id] * (max_timeline_length - len(x)) + x for x in batch_tokenized_timelines] # left padding
-            input_ids: Float[torch.Tensor, 'B max_timeline_length'] = torch.stack([torch.tensor(x, device=device) for x in batch_tokenized_timelines_w_pad])
+            input_ids: Float[torch.Tensor, 'B max_timeline_length'] = torch.stack([torch.tensor(x, device=device) for x in batch_tokenized_timelines])
             attention_mask: Float[torch.Tensor, 'B max_timeline_length'] = (input_ids != pad_token_id).int()
             batch = {
                 'input_ids': input_ids,
@@ -235,6 +247,7 @@ def main():
             ########################
             results = model.model(**batch, output_hidden_states=True)
             hidden_states = results.hidden_states[-1]
+            assert torch.isnan(hidden_states).sum() == 0, f"Error - hidden_states contains NaNs for batch_start={batch_start} | batch_end={batch_start + batch_size}"
 
             ########################
             # Save generated reprs
@@ -260,13 +273,13 @@ def main():
         logger.warning(f"No wandb run id found @ `{path_to_wandb_txt}`")
     ## Copy model ckpt .pt file over
     path_to_model_ehrshot_dir = os.path.abspath(os.path.join(PATH_TO_FEATURES_DIR, "../models/", os.path.basename(PATH_TO_OUTPUT_FILE)))
-    logger.info(f"Copying model ckpt from `{PATH_TO_MODEL}` to `{path_to_model_ehrshot_dir}`")
+    logger.critical(f"Copying model ckpt from `{PATH_TO_MODEL}` to `{path_to_model_ehrshot_dir}`")
     if os.path.exists(path_to_model_ehrshot_dir):
         shutil.rmtree(path_to_model_ehrshot_dir)
     os.makedirs(path_to_model_ehrshot_dir, exist_ok=True)
     shutil.copy(PATH_TO_MODEL, path_to_model_ehrshot_dir)
     ## Copy logging files over
-    logger.info(f"Copying logs from `{os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/')}` to `{path_to_model_ehrshot_dir}/logs`")
+    logger.critical(f"Copying logs from `{os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/')}` to `{path_to_model_ehrshot_dir}/logs`")
     shutil.copytree(os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/'), os.path.join(path_to_model_ehrshot_dir, 'logs/'))
 
     # Save EHRSHOT featurization results
@@ -284,14 +297,13 @@ def main():
         'patient_ids' : patient_ids,
         'labeling_time' : label_times,
         'label_values' : label_values,
-        'tokenized_timelines' : tokenized_timelines, # tokenized timeline for each patient in EHRSHOT
         'wandb_run_id' : wandb_run_id,
         'path_to_ckpt_ehrshot' : path_to_model_ehrshot_dir,
         'path_to_ckpt_orig' : PATH_TO_MODEL,
     }
 
     path_to_features_pkl: str = PATH_TO_OUTPUT_FILE + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + '_features.pkl'
-    logger.info(f"Saving results to `{path_to_features_pkl}`")
+    logger.critical(f"Saving results to `{path_to_features_pkl}`")
     with open(path_to_features_pkl, 'wb') as f:
         pickle.dump(results, f)
 

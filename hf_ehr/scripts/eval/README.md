@@ -1,9 +1,11 @@
 # How to Run
 
-Usage: `sbatch ehrshot.sh <path_to_ckpt>`
+Usage: `sbatch ehrshot.sh <path_to_ckpt> <model_name> <batch_size>`
 
 where...
 - `<path_to_ckpt>` is the path to the checkpoint to load
+- `<model_name>` is the name of the model
+- `<batch_size>` is the batch size to use
 
 ### V100/GPU
 
@@ -32,7 +34,7 @@ sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-1024--clm
 sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600007104-ckpt_val=600000000-persist.ckpt mamba-tiny-4096--clmbr 16
 sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-8192--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist.ckpt mamba-tiny-8192--clmbr 8
 sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist.ckpt mamba-tiny-16k--clmbr 1
-"```
+```
 
 ### A100/H100
 

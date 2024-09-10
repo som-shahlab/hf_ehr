@@ -20,9 +20,10 @@ from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
+from hf_ehr.models.llama import LlamaLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
-from hf_ehr.config import rewrite_paths_for_carina_from_config, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG
+from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
 
 class GradNormCallback(Callback):
@@ -160,6 +161,8 @@ def main(config: DictConfig) -> None:
     if 'trainer' in config and 'accumulate_grad_batches' in config.trainer:
         if config.trainer.accumulate_grad_batches == "__PLACEHOLDER__":
             try:
+                assert config.data.dataloader.approx_batch_sampler.max_tokens <= 65536, "config.data.dataloader.approx_batch_sampler.max_tokens must be <= 65536"
+                assert 65536 % config.data.dataloader.approx_batch_sampler.max_tokens == 0, "config.data.dataloader.approx_batch_sampler.max_tokens must be a factor of 65536"
                 config.trainer.accumulate_grad_batches = 65536 // config.data.dataloader.approx_batch_sampler.max_tokens
                 logger.info(f"Manually setting accumulate_grad_batches: {config.trainer.accumulate_grad_batches}")
             except (KeyError, ZeroDivisionError) as e:
@@ -342,12 +345,12 @@ def main(config: DictConfig) -> None:
         model = HyenaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'mamba' in model_name:
         model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+    elif 'llama' in model_name:
+        model = LlamaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
         model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
         raise ValueError(f"Model `{config.model.name}` not supported.")
-
-    logger.info(f"FLOPs per token of model = {model.flops_per_token}")
     logger.info(f"Parameter count of model = {model.get_param_count()}")
     
     # Datasets

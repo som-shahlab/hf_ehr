@@ -106,6 +106,8 @@ class GPTLanguageModel(BaseModel):
 
         # Model
         if getattr(config.model, 'is_keep_pretrained_weights', False):
+            # TODO: Implement loading of pretrained weights
+            raise NotImplementedError("Loading of pretrained weights is not yet implemented.")
             self.model = AutoModelForCausalLM.from_pretrained(model_config)
         else:
             self.model = AutoModelForCausalLM.from_config(model_config)

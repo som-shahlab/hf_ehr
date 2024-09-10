@@ -52,7 +52,6 @@ class BaseModel(L.LightningModule):
     
     def post_init(self):
         """Post-initialization method to be called by subclass."""
-        # Calculate FLOPs per token
         self.flops_per_token = 0
         # Track batch_idx
         self.batch_idx: int = 0
@@ -115,6 +114,9 @@ class BaseModel(L.LightningModule):
                         batch_idx: int) -> Optional[torch.Tensor]:
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens']
         B: int = tokens['input_ids'].shape[0]
+        
+        if 'llama' in self.model_name:
+            tokens.pop("token_type_ids", None)
         
         # Forward pass
         outputs = self.model(**tokens)

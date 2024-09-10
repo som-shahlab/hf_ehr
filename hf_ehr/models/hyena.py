@@ -47,16 +47,6 @@ def hyena_forward(
         # Enable model parallelism
         shift_labels = shift_labels.to(shift_logits.device)
         loss = loss_fct(shift_logits, shift_labels)
-        """
-        # mask to retrieve non-pad tokens
-        pad_mask = shift_labels != self.pad_token_id
-        #filtered labels and logits
-        shift_logits_filtered = shift_logits[pad_mask].view(-1, self.vocab_size)
-        shift_labels_filtered = shift_labels[pad_mask]
-        # Enable model parallelism
-        loss_fct = nn.CrossEntropyLoss()
-        loss = loss_fct(shift_logits_filtered, shift_labels_filtered)
-        """
 
     if not return_dict:
         output = (logits,) + outputs[1:]
@@ -124,7 +114,6 @@ class HyenaLanguageModel(BaseModel):
         sch.step()
         
         # Logging + Metrics
-        # TODO -- need to fix attention first
         self.log_training_step(loss.detach(), B, tokens, lr)
 
         return loss
