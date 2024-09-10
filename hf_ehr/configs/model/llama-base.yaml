@@ -1,0 +1,19 @@
+# @package _global_
+
+defaults:
+  - ../architecture/llama
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    bos_token_id: 0
+    eos_token_id: 1
+    hidden_size: 768
+    intermediate_size: 2688 # Llama 3.1 technical report uses `3.5 * hidden_size`
+    max_position_embeddings: ${data.dataloader.max_length}
+    num_attention_heads: 12
+    num_hidden_layers: 8 # to keep model size similar to other 'base' models @ ~115M params
+    num_key_value_heads: 4 # must be a factor of num_attention_heads

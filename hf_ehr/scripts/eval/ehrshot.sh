@@ -14,15 +14,16 @@ source ../carina/base.sh
 # CLI arguments
 PATH_TO_CKPT=$1
 MODEL_NAME=$2
-BATCH_SIZE=$3
-# PATIENT_IDX_START=$4
-# PATIENT_IDX_END=$5
+MAX_LENGTH=$3
+BATCH_SIZE=$4
 
+# 1. Generate patient representations
 echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../../eval/ehrshot.py \
     --path_to_database /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
-    --path_to_labels_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_labels_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot \
+    --path_to_features_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/features_ehrshot \
+    --path_to_tokenized_timelines_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/tokenized_timelines_ehrshot \
     --path_to_model $PATH_TO_CKPT \
     --model_name $MODEL_NAME \
     --batch_size $BATCH_SIZE \
@@ -30,3 +31,21 @@ python3 ../../eval/ehrshot.py \
     --chunk_strat last 
     # --patient_idx_start $PATIENT_IDX_START \
     # --patient_idx_end $PATIENT_IDX_END
+
+# 2. Evaluate patient representations
+cd /share/pi/nigam/$USER/ehrshot-benchmark/ehrshot/bash_scripts/
+bash 7_eval.sh $MODEL_NAME --ehrshot --is_use_slurm
+
+
+# For debugging
+# python3 ../../eval/ehrshot.py \
+#     --path_to_database /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+#     --path_to_labels_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot \
+#     --path_to_features_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/features_ehrshot \
+#     --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/archive/gpt-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=2400000000-ckpt_val=2400000000-persist.ckpt \
+#     --model_name test \
+#     --batch_size 4 \
+#     --embed_strat last \
+#     --chunk_strat last \
+#     --patient_idx_start 0 \
+#     --patient_idx_end 500

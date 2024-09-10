@@ -33,31 +33,31 @@ if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     if [[ ! -e "/local-scratch/nigam/users/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/local-scratch/nigam/users/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/hf_ehr/${ENV_NAME}
+    conda activate /home/mwornow/${ENV_NAME}
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     echo "Detected A100 Partition"
     if [[ ! -e "/local-scratch/nigam/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/local-scratch/nigam/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/hf_ehr/${ENV_NAME}
+    conda activate /home/mwornow/${ENV_NAME}
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
     echo "Detected V100 Partition"
     if [[ ! -e "/local-scratch/nigam/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/local-scratch/nigam/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/hf_ehr/${ENV_NAME}
+    conda activate /home/mwornow/${ENV_NAME}
 elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     echo "Detected GPU Partition"
-    if [[ ! -e "/home/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
-        conda create --prefix=/home/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
+    if [[ ! -e "/home/mwornow/$ENV_NAME" && "$USER" != "suhana" ]]; then
+        conda create --prefix=/home/mwornow/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/hf_ehr/${ENV_NAME}
+    conda activate /home/mwornow/${ENV_NAME}
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     echo "Detected Normal Partition"
-    if [[ ! -e "/home/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
-        conda create --prefix=/home/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
+    if [[ ! -e "/home/mwornow/$ENV_NAME" && "$USER" != "suhana" ]]; then
+        conda create --prefix=/home/mwornow/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/hf_ehr/${ENV_NAME}
+    conda activate /home/mwornow/${ENV_NAME}
 else
     echo "Unknown SLURM partition: $SLURM_JOB_PARTITION"
     exit 1

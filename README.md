@@ -34,7 +34,7 @@
 ```bash
 conda create -n hf_env python=3.10 -y
 conda activate hf_env
-pip install -r requirements.txt
+pip install -r requirements.txt --no-cache-dir
 pip install -e .
 ```
 
@@ -49,7 +49,14 @@ sbatch cookbook.sh # Takes TBD
 
 ## 🚀 Quick Start
 
-Launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):
+Launch a GPT training run with the ability to configure common hyperparameters:
+
+```bash
+cd hf_ehr/scripts/carina
+python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8 --is_run_local
+```
+
+To launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):
 
 ```bash
 cd hf_ehr/scripts/carina

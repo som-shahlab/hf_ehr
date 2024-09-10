@@ -178,19 +178,19 @@ def load_tokenizer_from_config(config):
 
 def load_tokenizer_old_from_path(path_to_ckpt: str):
     """Given a path to a model checkpoint, load the tokenizer."""
-    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu')
+    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
     config: Dict[str, Any] = load_config_from_ckpt(ckpt)
     return load_tokenizer_old_from_config(config)
 
 def load_tokenizer_from_path(path_to_ckpt: str):
     """Given a path to a model checkpoint, load the tokenizer."""
-    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu')
+    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
     config: Dict[str, Any] = load_config_from_ckpt(ckpt)
     return load_tokenizer_from_config(config)
 
 def load_config_from_path(path_to_ckpt: str) -> Dict[str, Any]:
-    """Given a path to a model checkpoint, load the model."""
-    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu')
+    """Given a path to a model checkpoint, load the config."""
+    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
     config: Dict[str, Any] = load_config_from_ckpt(ckpt)
     return config
 
@@ -204,7 +204,7 @@ def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
     from hf_ehr.models.t5 import T5LanguageModel
 
     # Load checkpoint
-    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu')
+    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
     config: Dict[str, Any] = load_config_from_ckpt(ckpt)
     
     # Load tokenizer
@@ -229,7 +229,7 @@ def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
 
 def load_ckpt(path_to_ckpt: str) -> Dict[str, Any]:
     """Given a path to a model checkpoint, load the checkpoint."""
-    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    ckpt = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
     return ckpt
 
 def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
@@ -274,7 +274,7 @@ def get_most_recent_ckpt_from_output_dir(path_to_output_dir: str) -> Optional[st
             max_ckpt, max_tokens = None, None
             for ckpt_file in ckpt_files:
                 path_to_ckpt = os.path.join(path_to_ckpts, ckpt_file)
-                ckpt = torch.load(path_to_ckpt, map_location='cpu')
+                ckpt = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
                 if max_tokens is None or ckpt['train_total_tokens_nonPAD'] > max_tokens:
                     max_ckpt = path_to_ckpt
                     max_tokens = ckpt['train_total_tokens_nonPAD']

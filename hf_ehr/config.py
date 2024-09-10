@@ -15,7 +15,7 @@ SPLIT_VAL_CUTOFF: float = 85
 H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
 V100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
-GPU_BASE_DIR: str = '/home/hf_ehr/'
+GPU_BASE_DIR: str = '/share/pi/nigam/hf_ehr/'
 
 PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
 PATH_TO_RUNS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'runs/')
@@ -35,13 +35,15 @@ PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR
 PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/')
 PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/')
 PATH_TO_TOKENIZER_SPARK_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'spark/') # TODO -- spark
-
 PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_SPARK_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_SPARK_DIR, 'tokenizer_config.json') # TODO -- spark
+
+# Evals
+PATH_TO_EHRSHOT_CACHE_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'ehrshot/')
 
 def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: Any) -> None:
     """
@@ -254,6 +256,9 @@ def copy_file(src: str, dest: str, is_overwrite_if_exists: bool = False) -> None
 def copy_resources_to_local(base_dir: str, is_overwrite_if_exists: bool = False) -> None:
     """Copy resources to local-scratch directories."""
     os.makedirs(base_dir, exist_ok=True)
+    if base_dir == GPU_BASE_DIR:
+        # Don't do any copying if GPU partiton b/c just using the shared drive for now
+        return
     copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9', base_dir, is_overwrite_if_exists=False)
     copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir, is_overwrite_if_exists=False)
     

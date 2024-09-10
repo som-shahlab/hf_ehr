@@ -6,7 +6,7 @@ import os
 import subprocess
 from typing import List, Dict, Tuple
 
-MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'hyena', 'mamba', 't5' ]
+MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'hyena', 'mamba', 'llama', 't5' ]
 SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large',]
 TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_8k', 'clmbr_16k', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
 DATALOADER_CHOICES: List[str] = [ 'approx', 'batch']
@@ -14,6 +14,7 @@ DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', ]
 DEFAULT_PARTITIONS: Dict[str, str] = {
     'gpt2': "nigam-v100,gpu",
     'bert': "nigam-v100,gpu",
+    'llama': "nigam-v100,gpu", # TODO
     'hyena': "nigam-h100,nigam-a100",
     'mamba': "nigam-h100,nigam-a100",
 }
@@ -168,6 +169,41 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                 max_tokens = 2048
         else:
             raise ValueError(f"Unknown SLURM partition: {partitions}")
+    # LLAMA
+    elif model == 'llama':
+        # TODO
+        if "nigam-h100" in partitions or "nigam-a100" in partitions:
+            if size == "base":
+                if context_length == 1024:
+                    max_tokens = 32768
+                elif context_length == 2048:
+                    max_tokens = 32768
+                elif context_length == 4096:
+                    max_tokens = 32768
+                elif context_length == 8192:
+                    max_tokens = 32768
+            elif size == "large":
+                if context_length == 1024:
+                    max_tokens = 4096
+                elif context_length == 2048:
+                    max_tokens = 2048
+        elif "nigam-v100" in partitions or "gpu" in partitions:
+            if size == "base":
+                if context_length == 1024:
+                    max_tokens = 8192
+                elif context_length == 2048:
+                    max_tokens = 8192
+                elif context_length == 4096:
+                    max_tokens = 8192
+                elif context_length == 8192:
+                    max_tokens = 8192
+            elif size == "large":
+                if context_length == 1024:
+                    max_tokens = 1024
+                elif context_length == 2048:
+                    max_tokens = 2048
+        else:
+            raise ValueError(f"Unknown SLURM partition: {partitions}")
     # T5
     elif model == 't5':
         raise NotImplementedError("T5 not yet implemented")
@@ -191,7 +227,7 @@ def main():
     max_tokens = max(args.context_length, max_tokens)
     print(f"Stats: Adjusted max_tokens={max_tokens}")
 
-    # Construct pytonPython command
+    # Construct Python command
     command = [
         "python3", os.path.abspath(os.path.join(__file__, "../../run.py")),
         "+trainer=single_gpu",
@@ -217,6 +253,10 @@ def main():
             f"model.config_kwargs.n_positions={args.context_length}",
         ]
     elif args.model == 'bert':
+        command += [
+            f"model.config_kwargs.max_position_embeddings={args.context_length}",
+        ]
+    elif args.model == 'llama':
         command += [
             f"model.config_kwargs.max_position_embeddings={args.context_length}",
         ]

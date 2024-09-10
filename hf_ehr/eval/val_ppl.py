@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 import datetime
 import traceback
 import pandas as pd
-from hf_ehr.config import H100_BASE_DIR, A100_BASE_DIR, V100_BASE_DIR, GPU_BASE_DIR, PATH_TO_FEMR_EXTRACT_v8
+from hf_ehr.config import H100_BASE_DIR, A100_BASE_DIR, V100_BASE_DIR, GPU_BASE_DIR, PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_MIMIC4
 from hf_ehr.data.datasets import AllTokensFEMRDataset, FEMRDataset
 from hf_ehr.data.tokenization import BaseTokenizer, collate_femr_timelines
 from hf_ehr.utils import load_config_from_ckpt, load_tokenizer_from_config, load_model_from_path, load_ckpt
@@ -29,6 +29,7 @@ def parse_args() -> Namespace:
     parser.add_argument('--device', type=str, default="cuda", help='Device to run validation on')
     parser.add_argument('--split', type=str, default="val", help='Split on which to calculate PPL')
     parser.add_argument('--dataset', type=str, default="FEMRDataset", help='Type of dataset -- AllTokensFEMRDataset or AllTokensDataset')
+    parser.add_argument('--datasource', type=str, default="starr", help='Source of data')
     parser.add_argument('--stride', type=int, default=32, help='Stride')
     parser.add_argument('--n_patients', type=int, default=20_000, help='# of val patients')
     parser.add_argument('--is_debug', action='store_true', default=False, help='Debug setting')
@@ -89,6 +90,7 @@ def eval(model: BaseModel,
     model.to(device)
     with torch.no_grad():
         for p_idx in tqdm(p_idxs, total=len(p_idxs), desc='eval() | Iterating over patients...'):
+            results_for_pid = []
             # Tokenize this patients timeline
             pid, events = dataset[p_idx]
             tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer([ events ], 
@@ -98,17 +100,35 @@ def eval(model: BaseModel,
                                                                                 is_truncation_random=False,
                                                                                 add_special_tokens=False,
                                                                                 return_tensors='pt')
+            seq_len: int = tokens['input_ids'].shape[1]
             
+            if seq_len < 2:
+                # Need at least 2 tokens to calculate PPL
+                continue
+
             # Split timeline into batches of length `max_length` for model to ingest
-            for start_idx in range(0, max(1, tokens['input_ids'].shape[1] - max_length), stride):
-                input_ids: Float[torch.Tensor, 'B L'] = tokens['input_ids'][:,start_idx:start_idx + max_length].to(device)
+            prev_end_idx: int = 0
+            for start_idx in range(0, seq_len, stride):
+                if start_idx + max_length > seq_len and seq_len > max_length:
+                    # Shift start_idx to the left to ensure that the last batch is of length `max_length`
+                    start_idx = seq_len - max_length
+                end_idx: int = min(start_idx + max_length, seq_len)
+                trg_len: int = end_idx - prev_end_idx # may be different from stride on last loop
+                assert start_idx >= 0, f"Error -- start_idx={start_idx} must be >= 0"
+                assert start_idx <= end_idx, f"Error -- start_idx={start_idx} must be <= end_idx={end_idx}"
+                assert end_idx <= seq_len, f"Error -- end_idx={end_idx} must be <= seq_len={seq_len}"
+                assert trg_len <= max_length, f"Error -- trg_len={trg_len} must be <= max_length={max_length}"
+
+                # Tokens
+                input_ids: Float[torch.Tensor, 'B L'] = tokens['input_ids'][:,start_idx:end_idx].to(device)
 
                 # Attention mask
                 if 'hyena' in config['model']['name']:
                     attention_mask = None
                     outputs = model.model(input_ids=input_ids)
                 else:
-                    attention_mask: Float[torch.Tensor, 'B L'] = tokens['attention_mask'][:,start_idx:start_idx + max_length].to(device)
+                    attention_mask: Float[torch.Tensor, 'B L'] = tokens['attention_mask'][:,start_idx:end_idx].to(device)
+                    assert attention_mask.sum() == attention_mask.numel(), "Error -- attention_mask must be all 1's"
                     outputs = model.model(input_ids=input_ids, attention_mask=attention_mask)
 
                 # Run model
@@ -123,28 +143,20 @@ def eval(model: BaseModel,
                     attention_mask: Float[torch.Tensor, 'B L-1'] = attention_mask[:, :-1].contiguous()
                     log_probs_for_labels *= attention_mask
                 
-                # Save results depending on stride
-                first_token_offset: int = 0
+                # Save results depending on trg_len
+                log_probs_for_labels = log_probs_for_labels[:,-trg_len:][0]
+                shift_labels = shift_labels[:,-trg_len:][0]
+                shift_logits = shift_logits[:,-trg_len:][0]
+                log_probs = log_probs[:,-trg_len:][0]
                 if start_idx == 0:
-                    # Keep all tokens
-                    log_probs_for_labels = log_probs_for_labels[0]
-                    shift_labels = shift_labels[0]
-                    shift_logits = shift_logits[0]
-                    log_probs = log_probs[0]
-                    first_token_offset = 0
-                else:
-                    # Keep only last `stride` tokens
-                    first_token_offset = start_idx + log_probs_for_labels.shape[1] - stride
-                    log_probs_for_labels = log_probs_for_labels[:,-stride:][0]
-                    shift_labels = shift_labels[:,-stride:][0]
-                    shift_logits = shift_logits[:,-stride:][0]
-                    log_probs = log_probs[:,-stride:][0]
-
-                results += [ {
+                    assert log_probs_for_labels.shape[0] == min(seq_len, max_length) - 1, f"Error -- log_probs_for_labels.shape[0]={log_probs_for_labels.shape[0]} must equal min(seq_len, max_length) - 1={min(seq_len, max_length) - 1}"
+                    assert trg_len-1 == log_probs_for_labels.shape[0], f"Error -- trg_len-1={trg_len-1} must equal log_probs_for_labels.shape[0]={log_probs_for_labels.shape[0]}"
+                        
+                results_for_pid += [ {
                     'pid' : pid,
                     'n_events' : len(events),
-                    'n_tokens' : tokens['input_ids'].shape[1],
-                    'token_idx' : first_token_offset + token_idx,
+                    'n_tokens' : seq_len,
+                    'token_idx' : prev_end_idx + token_idx + (-1 if start_idx > 0 else 0), # account for shift by 1
                     # what the model is supposed to predict....
                     'label' : shift_labels[token_idx].item(),
                     'label_log_prob' : log_prob,
@@ -152,8 +164,21 @@ def eval(model: BaseModel,
                     'argmax_label' : shift_logits[token_idx].argmax().item(),
                     'argmax_log_prob' : log_probs[token_idx].max().item(),
                 } for token_idx, log_prob in enumerate(log_probs_for_labels.detach().cpu().numpy().tolist()) ]
-                print(f"pid={pid} | n_events={len(events)} | n_tokens={tokens['input_ids'].shape[1]} | start={start_idx} | end={min(tokens['input_ids'].shape[1], start_idx + max_length)} | n_tokens_for_ppl_calc={log_probs_for_labels.shape[0]} | ppl={np.exp(-log_probs_for_labels.detach().cpu().numpy().mean())}")
+                print(f"pid={pid} | n_events={len(events)} | n_tokens={seq_len} | start={start_idx} | end={end_idx} | n_tokens_for_ppl_calc={log_probs_for_labels.shape[0]} | ppl={np.exp(-log_probs_for_labels.detach().cpu().numpy().mean())}")
 
+                prev_end_idx = end_idx
+                if end_idx >= seq_len:
+                    break
+
+            # Sanity checks
+            assert len(results_for_pid) == seq_len - 1, f"Error -- len(results_for_pid)={len(results_for_pid)} must equal seq_len-1={seq_len - 1}"
+            assert results_for_pid[0]['token_idx'] == 0, f"Error -- first token_idx={results_for_pid[0]['token_idx']} must equal 0"
+            assert results_for_pid[-1]['token_idx'] == seq_len - 2, f"Error -- last token_idx{results_for_pid[-1]['token_idx']} must equal seq_len-2={seq_len - 2}"
+            assert len(set([ x['token_idx'] for x in results_for_pid ])) == len(results_for_pid), f"Error -- duplicate token_idx's found in results_for_pid"
+            assert [ int(x['token_idx']) for x in results_for_pid ] == list(range(seq_len - 1)), f"Error -- token_idx's not contiguous in results_for_pid"
+
+            # Save results
+            results += results_for_pid
             if is_debug and p_idx > 10:
                 break
 
@@ -179,9 +204,20 @@ def eval(model: BaseModel,
         "results" : results,
     }
 
-def add_calcs_to_df(df: pd.DataFrame, tokenizer) -> pd.DataFrame:
+def map_datasource_to_femr_extract(datasource: str) -> str:
+    """Maps data source name (e.g. 'mimic4') to the proper path to FEMR extract"""
+    if datasource == 'starr':
+        return PATH_TO_FEMR_EXTRACT_v8
+    elif datasource == 'ehrshot':
+        return '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract'
+    elif datasource == 'mimic4':
+        return PATH_TO_FEMR_EXTRACT_MIMIC4
+    else:
+        raise ValueError(f"Unknown datasource: {datasource}")
+
+def add_calcs_to_df(df: pd.DataFrame, datasource: str, tokenizer) -> pd.DataFrame:
     import femr.datasets
-    femr_db = femr.datasets.PatientDatabase(PATH_TO_FEMR_EXTRACT_v8)
+    femr_db = femr.datasets.PatientDatabase(map_datasource_to_femr_extract(datasource))
     def safe_get_description(x):
         try:
             return femr_db.get_ontology().get_text_description(x.split(" || ")[0])
@@ -209,6 +245,7 @@ def get_path_to_output_dir(path_to_ckpt_dir: str, split: str, dataset: str) -> s
 
 def run_ckpt(path_to_ckpt: str, 
              path_to_output: str, 
+             datasource: str,
              dataset_name: str,
              split: str, 
              n_patients: int,
@@ -238,7 +275,7 @@ def run_ckpt(path_to_ckpt: str,
         # Load dataset/dataloader using fixed settings
         logger.info("Start | Loading dataset")
         start = time.time()
-        path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8 # TODO -- add ability to swap in MIMIC / EHRSHOT
+        path_to_femr_extract: str = map_datasource_to_femr_extract(datasource)
         max_length: int = config.data.dataloader.max_length
         is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
         seed: int = config.main.seed
@@ -289,7 +326,7 @@ def run_ckpt(path_to_ckpt: str,
     logger.warning(f"Saved results to `{path_to_output}.json`")
     # Save .parquet with token-level ppl's
     df = pd.DataFrame(raw_results['results'])
-    df = add_calcs_to_df(df, tokenizer)
+    df = add_calcs_to_df(df, datasource, tokenizer)
     df.to_parquet(path_to_output + '.parquet', index=False)
     logger.warning(f"Saved results to `{path_to_output}.parquet`")
 
@@ -302,11 +339,12 @@ def main() -> None:
     device: str = args.device
     split: str = args.split
     dataset: str = args.dataset
+    datasource: str = args.datasource
     stride: int = args.stride
     n_patients: int = args.n_patients
     is_load_from_config: bool = args.is_load_from_config
     is_debug: bool = args.is_debug
-    path_to_output_dir: str = get_path_to_output_dir(path_to_ckpt_dir, split, f"dataset={dataset}-stride={stride}-n_patients={n_patients}-is_config={is_load_from_config}")
+    path_to_output_dir: str = get_path_to_output_dir(path_to_ckpt_dir, f"{datasource}/{split}", f"dataset={dataset}-stride={stride}-n_patients={n_patients}-is_config={is_load_from_config}")
     logger.critical(f"Output directory: {path_to_output_dir}")
 
     # Find all .ckpt files in `path_to_ckpt_dir`
@@ -330,7 +368,7 @@ def main() -> None:
         logger.info("#"* 50)
         logger.info(f"Start | Processing model ckpt @ `{path_to_ckpt}`")
         try:
-            run_ckpt(path_to_ckpt, path_to_output, dataset, split, n_patients, stride, device, is_load_from_config, is_debug)
+            run_ckpt(path_to_ckpt, path_to_output, datasource, dataset, split, n_patients, stride, device, is_load_from_config, is_debug)
         except Exception as e:
             logger.critical(f"Error processing checkpoint @ `{path_to_ckpt}`: {e}")
             traceback.print_exc()
