@@ -7,7 +7,7 @@ import subprocess
 from typing import List, Dict, Tuple
 
 MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'hyena', 'mamba', 'llama', 't5' ]
-SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large', 'xlarge']
+SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large', 'xlarge', 'xxlarge']
 TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_8k', 'clmbr_16k', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
 DATALOADER_CHOICES: List[str] = [ 'approx', 'batch']
 DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', ]
@@ -57,6 +57,11 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                     max_tokens = 4096
                 elif context_length == 2048:
                     max_tokens = 2048
+            elif size == "xlarge":
+                if context_length == 1024:
+                    max_tokens = 1024
+                elif context_length == 2048:
+                    max_tokens = 512
         elif "nigam-v100" in partitions or "gpu" in partitions:
             if size == "base":
                 if context_length == 1024:
@@ -91,6 +96,15 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                     max_tokens = 2048
                 elif context_length == 4096:
                     max_tokens = 2048
+            elif size == "xlarge":
+                if context_length == 512:
+                    max_tokens = 1024
+                elif context_length == 1024:
+                    max_tokens = 1024
+                elif context_length == 2048:
+                    max_tokens = 1024
+                elif context_length == 4096:
+                    max_tokens = 1024
         elif "nigam-v100" in partitions or "gpu" in partitions:
             if size == "base":
                 if context_length == 512:
@@ -127,6 +141,8 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                 max_tokens = 8192
             elif size == "xlarge":
                 max_tokens = 4096
+            elif size == "xxlarge":
+                max_tokens = 2048
         elif "nigam-v100" in partitions or "gpu" in partitions:
             if size == "tiny":
                 pass
@@ -166,7 +182,9 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
             elif size == "medium":
                 max_tokens = 16384
             elif size == "large":
-                max_tokens = 16384
+                max_tokens = 8192
+            elif size == "xlarge":
+                max_tokens = 4096
         elif "nigam-v100" in partitions or "gpu" in partitions:
             # ! Context length > 2048 will OOM
             # ! Not worth running here b/c super slow without conv-1d packages
@@ -178,6 +196,8 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                 max_tokens = 2048
             elif size == "large":
                 max_tokens = 2048
+            elif size == "xlarge":
+                max_tokens = 1024
         else:
             raise ValueError(f"Unknown SLURM partition: {partitions}")
     # LLAMA

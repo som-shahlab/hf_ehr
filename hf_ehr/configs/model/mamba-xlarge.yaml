@@ -1,0 +1,15 @@
+# @package _global_
+
+defaults:
+  - ../architecture/mamba
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    d_model: 8192
+    n_layer: 340
+    num_hidden_layers: 340
+    state_size: 128

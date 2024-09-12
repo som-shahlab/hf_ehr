@@ -1,0 +1,15 @@
+# @package _global_
+
+defaults:
+  - ../architecture/bert
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    max_position_embeddings: ${data.dataloader.max_length}
+    num_hidden_layers: 96
+    num_attention_heads: 64
+    hidden_size: 1280
