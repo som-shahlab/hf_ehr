@@ -1,5 +1,5 @@
 polars==0.19.5
-transformers==4.44.2
+transformers==4.39.3
 trl==0.10.1
 femr==0.1.16
 datasets==2.14.5
