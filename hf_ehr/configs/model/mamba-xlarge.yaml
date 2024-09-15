@@ -9,7 +9,7 @@ data:
 
 model:
   config_kwargs:
-    d_model: 4096
-    n_layer: 184
-    num_hidden_layers: 184
-    state_size: 64
+    d_model: 8192
+    n_layer: 340
+    num_hidden_layers: 340
+    state_size: 128
