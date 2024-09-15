@@ -27,8 +27,3 @@ torch
 mamba-ssm==2.2.2
 causal-conv1d==1.4.0
 meds_reader
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 474f38d4b31f27b92070dcdb289820abf3357e33
