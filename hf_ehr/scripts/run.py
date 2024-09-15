@@ -99,7 +99,7 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
             self.last_ckpt_metric_value = metric_value
             if is_ckpt:
-                filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-true_val={true_val}-ckpt_val={ckpt_val}-persist.ckpt")
+                filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-ckpt_val={ckpt_val}-persist.ckpt")
                 logger.info(f"Checkpoint starting to save at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
                 trainer.save_checkpoint(filepath)
                 logger.info(f"Checkpoint saved at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
@@ -425,15 +425,16 @@ def main(config: DictConfig) -> None:
             ),
         ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
+        logger.error(f"Skipping FLOPs checkpoint b/c incorrectly calculated")
         # Save checkpoint every `every_n_flops` FLOPs; persists all models
-        callbacks += [ 
-            MetricBasedCheckpoint(
-                dirpath=path_to_ckpt_dir,
-                metric_name="train/total_flops",
-                is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
-                is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
-            ),
-        ]
+        # callbacks += [ 
+        #     MetricBasedCheckpoint(
+        #         dirpath=path_to_ckpt_dir,
+        #         metric_name="train/total_flops",
+        #         is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
+        #         is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
+        #     ),
+        # ]
         
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]

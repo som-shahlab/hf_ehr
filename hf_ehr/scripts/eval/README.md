@@ -7,59 +7,40 @@ where...
 - `<model_name>` is the name of the model
 - `<batch_size>` is the batch size to use
 
-### V100/GPU
-
 ```sh
-# bert-base - V100/GPU
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-512--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600002304-ckpt_val=600000000-persist.ckpt bert-base-512--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600004480-ckpt_val=600000000-persist.ckpt bert-base-1024--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600003136-ckpt_val=600000000-persist.ckpt bert-base-2048--clmbr 16
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist.ckpt bert-base-4096--clmbr 4
+# bert-base
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/bert-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt bert-base-512--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/bert-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt bert-base-1024--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/bert-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt bert-base-2048--clmbr 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/bert-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt bert-base-4096--clmbr 4
 
-# gpt2-base - V100/GPU
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-512--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000896-ckpt_val=600000000-persist.ckpt gpt2-base-512--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist.ckpt gpt2-base-1024--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist.ckpt gpt2-base-2048--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist.ckpt gpt2-base-4096--clmbr 4
+# gpt2-base
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt gpt2-base-512--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt gpt2-base-1024--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt gpt2-base-2048--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt gpt2-base-4096--clmbr 4
 
+# hyena-medium
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-medium-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt hyena-medium-1024--clmbr 32
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-medium-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt hyena-medium-4096--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-medium-8192--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt hyena-medium-8192--clmbr 4
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-medium-16384--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt hyena-medium-16384--clmbr 1
 
-# hyena-medium - V100/GPU
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600012096-ckpt_val=600000000-persist.ckpt hyena-medium-1024--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600007104-ckpt_val=600000000-persist.ckpt hyena-medium-4096--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-8192--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist.ckpt hyena-medium-8192--clmbr 4
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-16384--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist.ckpt hyena-medium-16384--clmbr 1
+# mamba-tiny
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt mamba-tiny-1024--clmbr 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt mamba-tiny-4096--clmbr 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-8192--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt mamba-tiny-8192--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=200000000-persist.ckpt mamba-tiny-16k--clmbr 1
 
-# mamba-tiny - V100/GPU
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600012096-ckpt_val=600000000-persist.ckpt mamba-tiny-1024--clmbr 16
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600007104-ckpt_val=600000000-persist.ckpt mamba-tiny-4096--clmbr 16
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-8192--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist.ckpt mamba-tiny-8192--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist.ckpt mamba-tiny-16k--clmbr 1
-```
+# gpt-base-clmbr_k
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_8k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_8k 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_16k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_16k 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_64k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_64k 8
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_96k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_96k 1
 
-### A100/H100
-
-```sh
-# bert-base - A100/H100
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-512--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600002304-ckpt_val=600000000-persist.ckpt bert-base-512--clmbr 64
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600004480-ckpt_val=600000000-persist.ckpt bert-base-1024--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600003136-ckpt_val=600000000-persist.ckpt bert-base-2048--clmbr 16
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/bert-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist.ckpt bert-base-4096--clmbr 8
-
-# gpt2-base - A100/H100
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-512--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000896-ckpt_val=600000000-persist.ckpt gpt2-base-512--clmbr 64
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist.ckpt gpt2-base-1024--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000064-ckpt_val=600000000-persist.ckpt gpt2-base-2048--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600000704-ckpt_val=600000000-persist.ckpt gpt2-base-4096--clmbr 4
-
-# hyena-medium - A100/H100
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600012096-ckpt_val=600000000-persist.ckpt hyena-medium-1024--clmbr 64
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600007104-ckpt_val=600000000-persist.ckpt hyena-medium-4096--clmbr 16
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-8192--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist.ckpt hyena-medium-8192--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/hyena-medium-16384--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist.ckpt hyena-medium-16384--clmbr 2
-
-# mamba-tiny - A100/H100
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-1024--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600012096-ckpt_val=600000000-persist.ckpt mamba-tiny-1024--clmbr 32
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-4096--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600007104-ckpt_val=600000000-persist.ckpt mamba-tiny-4096--clmbr 16
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-8192--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600001472-ckpt_val=600000000-persist.ckpt mamba-tiny-8192--clmbr 8
-sbatch ehrshot.sh /share/pi/nigam/mwornow/hf_ehr/cache/runs/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-true_val=600008768-ckpt_val=600000000-persist.ckpt mamba-tiny-16k--clmbr 4
+# llama-base
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt llama-base-512--clmbr 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt llama-base-1024--clmbr 16
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-2048--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt llama-base-2048--clmbr 8
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt llama-base-4096--clmbr 1
 ```

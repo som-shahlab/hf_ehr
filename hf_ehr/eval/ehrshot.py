@@ -22,8 +22,8 @@ from typing import List, Dict, Tuple, Optional, Any, Set, Union
 from tqdm import tqdm
 from loguru import logger
 from femr.labelers import LabeledPatients, load_labeled_patients
-from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path, load_tokenizer_from_config
-from hf_ehr.config import Event, PATH_TO_EHRSHOT_CACHE_DIR
+from hf_ehr.utils import load_config_from_path, load_tokenizer_from_path, load_model_from_path
+from hf_ehr.config import Event
 
 class CookbookModelWithClassificationHead(torch.nn.Module):
     def __init__(self, model: torch.nn.Module, aggregation_strat: str, n_classes: int):
@@ -97,6 +97,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path_to_database", required=True, type=str, help="Path to FEMR patient database")
     parser.add_argument("--path_to_labels_dir", required=True, type=str, help="Path to directory containing saved labels")
     parser.add_argument("--path_to_features_dir", required=True, type=str, help="Path to directory where features will be saved")
+    parser.add_argument("--path_to_tokenized_timelines_dir", required=True, type=str, help="Path to directory where tokenized timelines will be saved")
     parser.add_argument("--path_to_model", type=str, help="Path to model .ckpt")
     parser.add_argument("--model_name", type=str, default=None, help="If specified, replace folder name with this as the model's name")
     parser.add_argument("--embed_strat", type=str, help="Strategy used for condensing a chunk of a timeline into a single embedding. Options: 'last' (only take last token), 'mean' (avg all tokens).")
@@ -120,6 +121,7 @@ def main():
     PATH_TO_PATIENT_DATABASE = args.path_to_database
     PATH_TO_LABELS_DIR: str = args.path_to_labels_dir
     PATH_TO_FEATURES_DIR: str = args.path_to_features_dir
+    PATH_TO_TOKENIZED_TIMELINES_DIR: str = args.path_to_tokenized_timelines_dir
     PATH_TO_LABELED_PATIENTS: str = os.path.join(PATH_TO_LABELS_DIR, 'all_labels.csv')
     PATH_TO_MODEL = args.path_to_model
     MODEL: str = args.path_to_model.split("/")[-3] if args.model_name in [ None, '' ] else args.model_name
@@ -128,7 +130,8 @@ def main():
     device: str = args.device
     patient_idx_start: Optional[int] = args.patient_idx_start
     patient_idx_end: Optional[int] = args.patient_idx_end
-    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}')
+    model_signature: str = f'{MODEL}_{CKPT}_chunk:{CHUNK_STRAT}_embed:{EMBED_STRAT}'
+    PATH_TO_OUTPUT_FILE: str = os.path.join(PATH_TO_FEATURES_DIR, model_signature)
     os.makedirs(os.path.dirname(PATH_TO_OUTPUT_FILE), exist_ok=True)
     assert os.path.exists(PATH_TO_MODEL), f"No model exists @ `{PATH_TO_MODEL}`"
     
@@ -188,16 +191,14 @@ def main():
             patient_id_2_events[pid].append(Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table))
 
     # Cache tokenized timelines for this sequence length
-    path_to_tokenized_timelines_cache_dir: str = os.path.join(PATH_TO_EHRSHOT_CACHE_DIR, 'tokenized_timelines', f"patient_idx_start={patient_idx_start},patient_idx_end={patient_idx_end}", f"chunk_strat={CHUNK_STRAT}", f"max_length={max_length}")
-    path_to_tokenized_timelines_cache_file: str = os.path.join(path_to_tokenized_timelines_cache_dir, 'tokenized_timelines.npz')
-    os.makedirs(path_to_tokenized_timelines_cache_dir, exist_ok=True)
+    path_to_tokenized_timelines_cache_file: str = os.path.join(PATH_TO_TOKENIZED_TIMELINES_DIR, f"chunk_strat={CHUNK_STRAT},max_length={max_length}" + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + "_tokenized_timelines.npz")
     if os.path.exists(path_to_tokenized_timelines_cache_file):
         # Cache hit
-        logger.success(f"Loading tokenized timelines from cache dir @ `{path_to_tokenized_timelines_cache_dir}`")
+        logger.success(f"Loading tokenized timelines from cache dir @ `{path_to_tokenized_timelines_cache_file}`")
         tokenized_timelines: List[List[int]] = np.load(path_to_tokenized_timelines_cache_file)['tokenized_timelines'].tolist()
     else:
         # Cache miss
-        logger.critical(f"Creating tokenized timelines from scratch b/c none found at @ `{path_to_tokenized_timelines_cache_dir}`")
+        logger.critical(f"Creating tokenized timelines from scratch b/c none found at @ `{path_to_tokenized_timelines_cache_file}`")
         tokenized_timelines: List[List[int]] = []
         for pid, l_time in tqdm(zip(patient_ids, label_times), total=len(patient_ids), desc='Caching tokenized timelines'):
             # Create patient timeline
@@ -222,7 +223,7 @@ def main():
         assert len(tokenized_timelines) == len(patient_ids), f"Error - tokenized_timelines and patient_ids have different lengths: {len(tokenized_timelines)} vs {len(patient_ids)}"
         assert all([ len(x) == max_length for x in tokenized_timelines ]), f"Error - some tokenized timelines are not of length max_length={max_length}"
         np.savez_compressed(path_to_tokenized_timelines_cache_file, tokenized_timelines=np.array(tokenized_timelines))
-        logger.critical(f"Saved tokenized timelines to cache dir @ `{path_to_tokenized_timelines_cache_dir}` | shape={np.array(tokenized_timelines).shape}")
+        logger.critical(f"Saved tokenized timelines to cache dir @ `{path_to_tokenized_timelines_cache_file}` | shape={np.array(tokenized_timelines).shape}")
 
     with torch.no_grad():
         for batch_start in tqdm(range(0, len(patient_ids), batch_size), desc='Generating patient representations', total=len(patient_ids) // batch_size):
@@ -281,7 +282,11 @@ def main():
     ## Copy logging files over
     logger.critical(f"Copying logs from `{os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/')}` to `{path_to_model_ehrshot_dir}/logs`")
     shutil.copytree(os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/'), os.path.join(path_to_model_ehrshot_dir, 'logs/'))
-
+    ## Copy tokenized timelines over into EHRSHOT cache dir and associate with this model
+    path_to_tokenized_timelines_ehrshot_file: str = os.path.join(PATH_TO_TOKENIZED_TIMELINES_DIR, model_signature + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + "_tokenized_timelines.npz")
+    logger.critical(f"Copying tokenized timelines from `{path_to_tokenized_timelines_cache_file}` to `{path_to_tokenized_timelines_ehrshot_file}`")
+    shutil.copy(path_to_tokenized_timelines_cache_file, path_to_tokenized_timelines_ehrshot_file)
+    
     # Save EHRSHOT featurization results
     logger.info(f"Stacking featurization results...")
     feature_matrix = np.stack(feature_matrix)

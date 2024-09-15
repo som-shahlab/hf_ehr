@@ -42,9 +42,6 @@ PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8
 PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
 PATH_TO_TOKENIZER_SPARK_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_SPARK_DIR, 'tokenizer_config.json') # TODO -- spark
 
-# Evals
-PATH_TO_EHRSHOT_CACHE_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'ehrshot/')
-
 def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: Any) -> None:
     """
     Wrapper function to log the execution of another function and optionally handle multiprocessing.

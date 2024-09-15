@@ -550,8 +550,8 @@ class CookbookTokenizer(BaseCodeTokenizer):
                         tokens.append(att)
 
                 # Add visit start token, if applicable
-                if self.is_add_visit_start:
-                    tokens.append(self.visit_start)
+                # if self.is_add_visit_start:
+                #     tokens.append(self.visit_start)
             
                 # Add token itself
                 token = self.convert_event_to_token(e, **kwargs)
@@ -859,7 +859,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
                                                                             padding=True,
                                                                             max_length=max_length,
                                                                             is_truncation_random=False,
-                                                                            add_special_tokens=False,
+                                                                            add_special_tokens=True,
                                                                             seed=seed, 
                                                                             return_tensors='pt')
     elif dataset_name == 'FEMRDataset':
@@ -869,7 +869,7 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
                                                                             padding=True, 
                                                                             max_length=max_length,
                                                                             is_truncation_random=is_truncation_random,
-                                                                            add_special_tokens=False,
+                                                                            add_special_tokens=True,
                                                                             seed=seed, 
                                                                             return_tensors='pt')
     else:

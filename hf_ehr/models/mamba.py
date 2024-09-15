@@ -26,7 +26,7 @@ class MambaLanguageModel(BaseModel):
 
         # Model
         self.model = AutoModelForCausalLM.from_config(model_config)
-        
+
         # Run any post-init handlers from super()
         self.post_init()
 
