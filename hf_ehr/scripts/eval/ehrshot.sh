@@ -9,17 +9,20 @@
 #SBATCH --gres=gpu:1
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2,secure-gpu-3,secure-gpu-4,secure-gpu-5,secure-gpu-6,secure-gpu-7
 
-source ../carina/base.sh
+cd ../carina
+source base.sh
+cd -
 
 # CLI arguments
 PATH_TO_CKPT=$1
 MODEL_NAME=$2
 BATCH_SIZE=$3
+DEVICE=$4
 
 # 1. Generate patient representations
 echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../../eval/ehrshot.py \
-    --path_to_database /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
+    --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
     --path_to_labels_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot \
     --path_to_features_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/features_ehrshot \
     --path_to_tokenized_timelines_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/tokenized_timelines_ehrshot \
@@ -27,7 +30,8 @@ python3 ../../eval/ehrshot.py \
     --model_name $MODEL_NAME \
     --batch_size $BATCH_SIZE \
     --embed_strat last \
-    --chunk_strat last 
+    --chunk_strat last \
+    --device $DEVICE
     # --patient_idx_start $PATIENT_IDX_START \
     # --patient_idx_end $PATIENT_IDX_END
 

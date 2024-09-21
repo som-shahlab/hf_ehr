@@ -164,7 +164,7 @@ def load_tokenizer_from_config(config):
 
     if name == 'CLMBRTokenizer':
         # CLMBR
-        tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
+        tokenizer = CLMBRTokenizer(path_to_config)
     elif name == 'DescTokenizer':
         # DescTokenizer
         tokenizer = DescTokenizer(path_to_config, AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))

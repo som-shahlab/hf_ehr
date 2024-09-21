@@ -39,19 +39,19 @@ elif [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]]; then
     if [[ ! -e "/local-scratch/nigam/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/local-scratch/nigam/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/mwornow/${ENV_NAME}
+    conda activate /local-scratch/nigam/hf_ehr/$ENV_NAME
 elif [[ "$SLURM_JOB_PARTITION" == "nigam-v100" ]]; then
     echo "Detected V100 Partition"
     if [[ ! -e "/local-scratch/nigam/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/local-scratch/nigam/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/mwornow/${ENV_NAME}
+    conda activate /local-scratch/nigam/hf_ehr/$ENV_NAME
 elif [[ "$SLURM_JOB_PARTITION" == "gpu" ]]; then
     echo "Detected GPU Partition"
-    if [[ ! -e "/home/mwornow/$ENV_NAME" && "$USER" != "suhana" ]]; then
+    if [[ ! -e "/home/$USER/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/home/mwornow/$ENV_NAME python=3.10 -y # one-time setup
     fi
-    conda activate /home/mwornow/${ENV_NAME}
+    conda activate /home/$USER/${ENV_NAME}
 elif [[ "$SLURM_JOB_PARTITION" == "normal" ]]; then
     echo "Detected Normal Partition"
     if [[ ! -e "/home/mwornow/$ENV_NAME" && "$USER" != "suhana" ]]; then
