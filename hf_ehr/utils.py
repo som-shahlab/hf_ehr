@@ -201,6 +201,7 @@ def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
     from hf_ehr.models.bert import BERTLanguageModel
     from hf_ehr.models.hyena import HyenaLanguageModel
     from hf_ehr.models.mamba import MambaLanguageModel
+    from hf_ehr.models.llama import LlamaLanguageModel
     from hf_ehr.models.t5 import T5LanguageModel
 
     # Load checkpoint
@@ -216,6 +217,7 @@ def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
         'gpt': GPTLanguageModel,
         'hyena': HyenaLanguageModel,
         'mamba': MambaLanguageModel,
+        'llama': LlamaLanguageModel,
         't5': T5LanguageModel
     }
     model_name: str = config['model']['name']
@@ -238,6 +240,7 @@ def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
     from hf_ehr.models.bert import BERTLanguageModel
     from hf_ehr.models.hyena import HyenaLanguageModel
     from hf_ehr.models.mamba import MambaLanguageModel
+    from hf_ehr.models.llama import LlamaLanguageModel
     from hf_ehr.models.t5 import T5LanguageModel
 
     # Load checkpoint
@@ -253,6 +256,7 @@ def load_model_from_path(path_to_ckpt: str) -> torch.nn.Module:
         'gpt': GPTLanguageModel,
         'hyena': HyenaLanguageModel,
         'mamba': MambaLanguageModel,
+        'llama': LlamaLanguageModel,
         't5': T5LanguageModel
     }
     model_name: str = config['model']['name']
