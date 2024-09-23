@@ -151,7 +151,7 @@ def load_tokenizer_old_from_config(config):
 
 def load_tokenizer_from_config(config):
     """Load tokenizer from config."""
-    from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer
+    from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer, CEHRTokenizer
     from transformers import AutoTokenizer
     
     # Load config
@@ -174,6 +174,9 @@ def load_tokenizer_from_config(config):
                                         excluded_vocabs=tokenizer__excluded_vocabs,
                                         is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
                                         min_code_count=tokenizer__min_code_count)
+    elif name == 'CEHRTokenizer':
+        # CEHRTokenizer
+        tokenizer = CEHRTokenizer(path_to_config, config.get('data', {}).get('tokenizer', {}).get('metadata', {}))
     return tokenizer
 
 def load_tokenizer_old_from_path(path_to_ckpt: str):
