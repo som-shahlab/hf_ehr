@@ -1,0 +1,6 @@
+# @package _global_
+
+data:
+  tokenizer:
+    name: CLMBRTokenizer
+    path_to_config: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/clmbr_v8_nbin_0/tokenizer_config.json
