@@ -28,8 +28,6 @@ python3 ../../eval/ehrshot.py \
     --batch_size $BATCH_SIZE \
     --embed_strat last \
     --chunk_strat last 
-    # --patient_idx_start $PATIENT_IDX_START \
-    # --patient_idx_end $PATIENT_IDX_END
 
 if [ $? -ne 0 ]; then
     echo "Error: Failed to generate patient representations"
@@ -51,6 +49,4 @@ bash 7_eval.sh "${MODEL_NAME}_${CKPT}_chunk:last_embed:last" --ehrshot --is_use_
 #     --model_name test \
 #     --batch_size 4 \
 #     --embed_strat last \
-#     --chunk_strat last \
-#     --patient_idx_start 0 \
-#     --patient_idx_end 500
+#     --chunk_strat last 

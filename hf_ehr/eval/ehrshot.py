@@ -222,6 +222,7 @@ def main():
         # Save tokenized version of all timelines
         assert len(tokenized_timelines) == len(patient_ids), f"Error - tokenized_timelines and patient_ids have different lengths: {len(tokenized_timelines)} vs {len(patient_ids)}"
         assert all([ len(x) == max_length for x in tokenized_timelines ]), f"Error - some tokenized timelines are not of length max_length={max_length}"
+        os.makedirs(os.path.dirname(path_to_tokenized_timelines_cache_file), exist_ok=True)
         np.savez_compressed(path_to_tokenized_timelines_cache_file, tokenized_timelines=np.array(tokenized_timelines))
         logger.critical(f"Saved tokenized timelines to cache dir @ `{path_to_tokenized_timelines_cache_file}` | shape={np.array(tokenized_timelines).shape}")
 
