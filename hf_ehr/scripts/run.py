@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
 
 from hf_ehr.data.datasets import BaseDataset
-from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer
+from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer, CEHRTokenizer
 from hf_ehr.models.bert import BERTLanguageModel
 from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
@@ -332,6 +332,11 @@ def main(config: DictConfig) -> None:
         raise ValueError("CookbookTokenizer is not supported in this script yet.")
         logger.info(f"Loading CookbookTokenizer: `{config.data.tokenizer.path_to_config}`")
         tokenizer = CookbookTokenizer( config.data.tokenizer.path_to_config, metadata=tokenizer_metadata, )
+    elif config.data.tokenizer.name == 'CEHRTokenizer':
+        # CLMBR
+        logger.info(f"Loading CEHRTokenizer: `{config.data.tokenizer.path_to_config}`")
+        tokenizer = CEHRTokenizer( config.data.tokenizer.path_to_config )
+        tokenizer = CEHRTokenizer( config.data.tokenizer.path_to_config, metadata=tokenizer_metadata, )
     tokenizer.save() # write to file to save this exact tokenizer for reproducibility
     logger.info(f"Vocab size: all={tokenizer.vocab_size} | non_special_tokens={len(tokenizer.non_special_tokens)} | special_tokens={len(tokenizer.special_tokens)}")
 

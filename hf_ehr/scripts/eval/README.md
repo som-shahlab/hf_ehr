@@ -1,11 +1,12 @@
 # How to Run
 
-Usage: `sbatch ehrshot.sh <path_to_ckpt> <model_name> <batch_size>`
+Usage: `sbatch ehrshot.sh <path_to_ckpt> <model_name> <batch_size> <device>`
 
 where...
 - `<path_to_ckpt>` is the path to the checkpoint to load
 - `<model_name>` is the name of the model
 - `<batch_size>` is the batch size to use
+- `<device>` is the device (cpu/gpu) where to run the program
 
 ```sh
 # gpt2-base
@@ -27,10 +28,10 @@ sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-819
 sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt mamba-tiny-16k--clmbr 1
 
 # gpt-base-clmbr_k
-sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_8k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_8k 16
-sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_16k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_16k 16
-sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_64k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_64k 8
-sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_96k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_96k 1
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_8k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_8k 16 cuda:0
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_16k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_16k 16 cuda:0
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_64k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_64k 8 cuda:0
+sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-base-1024--clmbr_96k/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt gpt-base-1024--clmbr_96k 1 cuda:0
 
 # llama-base
 sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt llama-base-512--clmbr 16

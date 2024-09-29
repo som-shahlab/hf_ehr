@@ -1,0 +1,14 @@
+# @package _global_
+
+data:
+  tokenizer:
+    name: CEHRTokenizer
+    path_to_config: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/cehr_v8/tokenizer_config.json
+    metadata:
+      is_add_visit_start: True # If True, add "VISIT START" token before the start of every visit
+      is_add_visit_end: True # If True, add "VISIT END" token after every visit
+      is_add_day_att: True # If True, add "DAY __" token for T <= 1080, "LONG TERM" token for T > 1080 (CEHR-GPT style)
+      is_add_day_week_month_att: False # If True, add "DAY __" token for T < 7, "WEEK __" token for 7 <= T < 30, "MONTH __" for 30 <= T < 360, "LONG TERM" token for T > 360 (CEHR-BERT style)
+
+
+

@@ -645,6 +645,160 @@ class CLMBRTokenizer(BaseCodeTokenizer):
 
         return None
 
+
+class CEHRTokenizer(BaseCodeTokenizer):
+    def __init__(self, path_to_tokenizer_config: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        self.path_to_tokenizer_config: str = path_to_tokenizer_config
+        self.tokenizer_config: List[TokenizerConfigEntry] = load_tokenizer_config_from_path(path_to_tokenizer_config)
+        
+        # Set metadata        
+        self.metadata: Dict[str, Any] = {} if metadata is None else dict(metadata)
+        self.metadata['cls'] = 'CEHRTokenizer'
+
+        # Fetches ATT metadata - By default, it'll be done in CEHR-GPT style
+        self.is_add_visit_start: bool = self.metadata.get('is_add_visit_start', True)
+        self.is_add_visit_end: bool = self.metadata.get('is_add_visit_end', True)
+        self.is_add_day_att: bool = self.metadata.get('is_add_day_att', True)
+        self.is_add_day_week_month_att: bool = self.metadata.get('is_add_day_week_month_att', False)
+
+        # Initialize special tokens for visits and time intervals (ATT tokens)
+        self.visit_start = "[VISIT START]"
+        self.visit_end = "[VISIT END]"
+        self.day_atts_cehr_gpt = [f"[DAY {i}]" for i in range(1, 1081)]  # Days 1 to 1080
+        self.long_att_cehr_gpt = "[LONG TERM]"
+        self.day_atts_cehr_bert = [f"[DAY {i}]" for i in range(1, 7)]  # Days 1 to 6
+        self.week_atts = [f"[WEEK {i}]" for i in range(1, 5)]  # Weeks 1 to 4
+        self.month_atts = [f"[MONTH {i}]" for i in range(1, 13)]  # Months 1 to 12
+        self.long_att_cehr_bert = "[LONG TERM]"
+
+        # Add special tokens to the tokenizer
+        self.special_tokens = [
+            self.visit_start, self.visit_end, self.long_att_cehr_gpt, self.long_att_cehr_bert
+        ] + self.day_atts_cehr_gpt + self.day_atts_cehr_bert + self.week_atts + self.month_atts
+
+        # Preprocess tokenizer config for quick access
+        self.code_2_token = {} # [key] = token; [val] = { 'type' : str, 'tokenization' : dict, 'token' : str }
+        self.non_special_tokens: List[str] = []
+        for entry in self.tokenizer_config:
+            if entry.code not in self.code_2_token: self.code_2_token[entry.code] = {}
+            if entry.type not in self.code_2_token[entry.code]: self.code_2_token[entry.code][entry.type] = []
+            self.code_2_token[entry.code][entry.type].append({
+                'tokenization': entry.tokenization,
+                'token' : entry.to_token(),
+            })
+            self.non_special_tokens.append(entry.to_token())
+
+        # assert len(self.non_special_tokens) == 39811, f"ERROR - Expected 39811 self.non_special_tokens, but got {len(self.non_special_tokens)}"
+
+        # Create tokenizer
+        super().__init__()
+
+    def convert_event_to_token(self, e: Event, **kwargs) -> Optional[str]:
+        # If code isn't in CLMBR vocab => ignore
+        if e.code not in self.code_2_token:
+            return None
+        
+        # If numerical code...
+        if (
+            'numerical_range' in self.code_2_token[e.code] # `numerical_range` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and ( # `value` is numeric
+                isinstance(e.value, float)
+                or isinstance(e.value, int)
+            )
+        ):
+            # NOTE: CLMBR ignores units
+            for token_range in self.code_2_token[e.code]['numerical_range']:
+                assert 'token' in token_range, f"ERROR - Missing 'token' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                assert 'tokenization' in token_range, f"ERROR - Missing 'tokenization' for code={e.code},type=numerical_range in self.code_2_token: {self.code_2_token[e.code]['numerical_range']}"
+                token: str = token_range['token']
+                range_start: float = token_range['tokenization']['range_start']
+                range_end: float = token_range['tokenization']['range_end']
+                if range_start <= e.value <= range_end:
+                    return token
+            return None
+
+        # If textual code...
+        if (
+            'categorical' in self.code_2_token[e.code] # `categorical` is a valid type for this code
+            and e.value is not None # `value` is not None
+            and e.value != '' # `value` is not blank
+            and ( # `value` is textual
+                isinstance(e.value, str)
+            )
+        ):
+            for categorical_value in self.code_2_token[e.code]['categorical']:
+                assert 'token' in categorical_value, f"ERROR - Missing 'token' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                assert 'tokenization' in categorical_value, f"ERROR - Missing 'tokenization' for code={e.code},type=categorical in self.code_2_token: {self.code_2_token[e.code]['categorical']}"
+                if e.value in categorical_value['tokenization']['categories']:
+                    token: str = categorical_value['token']
+                    return token
+            return None
+
+        # If just vanilla code...
+        if (
+            'code' in self.code_2_token[e.code] # `code` is a valid type for this code
+        ):
+            token: str = self.code_2_token[e.code]['code'][0]['token']
+            return token
+
+        return None
+    
+    def convert_events_to_tokens(self, events: List[Event]) -> List[str]:
+        """
+        Convert a list of events into a list of tokens, inserting ATT tokens based on time intervals between visits.
+        """
+        tokens = []
+        current_visit_end = None
+        previous_visit_end = None
+
+        for e in events:
+            # Add visit end token if the event is after the previous visit's end
+            if current_visit_end is not None and e.start > current_visit_end:
+                if self.is_add_visit_end:
+                    tokens.append(self.visit_end)
+                current_visit_end = None
+
+            # Handling visits and adding ATT tokens
+            if "Visit" in e.code:
+                # Add ATT tokens between visits based on time intervals
+                if previous_visit_end is not None:
+                    interval = (e.start - previous_visit_end).days
+                    if interval >= 0:
+                        if self.is_add_day_att:
+                            if interval <= 1080:
+                                tokens.append(self.day_atts_cehr_gpt[interval - 1])
+                            else:
+                                tokens.append(self.long_att_cehr_gpt)
+                        elif self.is_add_day_week_month_att:
+                            if interval < 7:
+                                tokens.append(self.day_atts_cehr_bert[interval - 1])
+                            elif 7 <= interval < 30:
+                                tokens.append(self.week_atts[(interval // 7) - 1])
+                            elif 30 <= interval < 360:
+                                tokens.append(self.month_atts[(interval // 30) - 1])
+                            else:
+                                tokens.append(self.long_att_cehr_bert)
+
+                # Add visit start token
+                if self.is_add_visit_start:
+                    tokens.append(self.visit_start)
+
+                # Convert visit event to token and add it
+                token = self.convert_event_to_token(e)
+                if token:
+                    tokens.append(token)
+
+                current_visit_end = e.end
+                previous_visit_end = e.end
+            else:
+                # Convert non-visit events to tokens
+                token = self.convert_event_to_token(e)
+                if token:
+                    tokens.append(token)
+
+        return tokens
+
 class DescTokenizer(BaseTokenizer):
     """Converts codes => textual descriptions, then tokenizes using a normal text tokenizer (e.g. BERT)
     """
@@ -890,13 +1044,14 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
 
 if __name__ == '__main__':
     from hf_ehr.data.datasets import FEMRDataset
-    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
+    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, PATH_TO_TOKENIZER_CEHR_v8_CONFIG
     
     # Load v8 dataset
     print("Loading v8 dataset...")
     path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8
     dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     
+  
     # Cookbook Tokenizer
     if False:
         print("Loading tokenizer...")
@@ -966,3 +1121,4 @@ if __name__ == '__main__':
         print(tokens)
 
         exit()
+

@@ -3,7 +3,7 @@
 python3 ehrshot.py \
     --path_to_database /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract \
     --path_to_labels_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark \
-    --path_to_features_dir /share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
+    --path_to_features_dir / share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features \
     --path_to_model /share/pi/nigam/mwornow/hf_ehr/cache/runs/gpt2-base-clmbr/ckpts/epoch=1-step=150000-recent.ckpt \
     --embed_strat last \
     --chunk_strat last
