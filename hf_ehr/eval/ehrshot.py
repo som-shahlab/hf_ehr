@@ -141,8 +141,7 @@ def main():
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
     
     logger.info(f"Loading PatientDatabase from `{PATH_TO_PATIENT_DATABASE}`")
-    database = femr.datasets.PatientDatabase(PATH_TO_PATIENT_DATABASE, read_all=True)
- 
+    database = femr.datasets.PatientDatabase(PATH_TO_PATIENT_DATABASE, read_all=False)
     logger.info(f"Loading Config from `{PATH_TO_MODEL}`")
     config = load_config_from_path(PATH_TO_MODEL)
 
@@ -185,7 +184,7 @@ def main():
     # Cache events for patient
     patient_id_2_events: Dict[str, List[Event]] = collections.defaultdict(list)
     for pid in tqdm(list(set(patient_ids)), desc='Caching patient events', total=len(set(patient_ids))):
-        if pid in patient_id_2_events: 
+        if pid in patient_id_2_events:
             continue
         for e in database[pid].events:
             patient_id_2_events[pid].append(Event(code=e.code, value=e.value, unit=e.unit, start=e.start, end=e.end, omop_table=e.omop_table))

@@ -9,9 +9,9 @@
 #SBATCH --gres=gpu:1
 #SBATCH --exclude=secure-gpu-1,secure-gpu-2,secure-gpu-3,secure-gpu-4,secure-gpu-5,secure-gpu-6,secure-gpu-7
 
-cd ../carina
-source base.sh
-cd -
+# cd ../carina
+# source base.sh
+# cd -
 
 # CLI arguments
 PATH_TO_CKPT=$1
