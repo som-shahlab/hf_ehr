@@ -9,7 +9,7 @@ from hf_ehr.models.modules import BaseModel
 
 class LlamaLanguageModel(BaseModel):
     """
-   Llama with a Language Model head.
+    Llama with a Language Model head.
     """
 
     def __init__(self, config: DictConfig, vocab_size, pad_token_id) -> None:

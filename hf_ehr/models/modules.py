@@ -94,6 +94,7 @@ class BaseModel(L.LightningModule):
         for key, metric in self.cat_metrics.items():
             checkpoint[key] = metric.compute()
         checkpoint['batch_idx'] = self.batch_idx
+        checkpoint['wandb_run_id'] = wandb.run.id if wandb and wandb.run else None
 
     def on_load_checkpoint(self, checkpoint):
         """Restore each metric's state from the checkpoint."""

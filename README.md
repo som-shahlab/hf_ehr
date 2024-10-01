@@ -53,7 +53,7 @@ Launch a GPT training run with the ability to configure common hyperparameters:
 
 ```bash
 cd hf_ehr/scripts/carina
-python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8 --is_run_local
+python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8 --is_run_local --is_force_refresh
 ```
 
 To launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):

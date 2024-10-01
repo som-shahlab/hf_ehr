@@ -116,7 +116,7 @@ def main():
     check_remove_codes_belonging_to_vocabs(tokenizer_config, excluded_vocabs)
     
     # With `n_procs=5`, should take ~XXXX mins
-    call_func_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, dataset=dataset, split='train', n_procs=args.n_procs, chunk_size=chunk_size)
+    call_func_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, path_to_femr_extract, pids=pids, dataset=args.dataset, split='train', n_procs=args.n_procs, chunk_size=chunk_size)
     tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG)
     check_add_occurrence_count_to_codes(tokenizer_config)
     

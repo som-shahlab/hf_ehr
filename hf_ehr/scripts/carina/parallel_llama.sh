@@ -3,10 +3,11 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/llama_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/llama_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=gpu,nigam-v100,nigam-a100
+#SBATCH --partition=nigam-v100,gpu,nigam-h100,nigam-a100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:4
+#SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 IS_FORCE_REFRESH=false
 
@@ -20,18 +21,10 @@ stop_child_processes() {
 
 trap 'stop_child_processes' SIGTERM SIGINT
 
-source base.sh
+source config.sh
 
 # Overwrite transformers version
-conda deactivate
-conda create --prefix=/home/mwornow/llama_hf_env python=3.10 -y
 conda activate /home/mwornow/llama_hf_env
-python -m pip install -r ../../../requirements.txt
-python -m pip install -e ../../../
-python -m pip uninstall transformers -y
-python -m pip install tranformers==4.44.2
-
-pip show hydra
 
 # Experiment names
 RUN_NAMES=( "llama-base-512--clmbr" "llama-base-1024--clmbr" "llama-base-2048--clmbr" "llama-base-4096--clmbr" )

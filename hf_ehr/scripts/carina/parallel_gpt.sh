@@ -7,6 +7,7 @@
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:4
+#SBATCH --exclude=secure-gpu-1,secure-gpu-2
 
 IS_FORCE_REFRESH=false
 

@@ -220,14 +220,16 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
                     max_tokens = 2048
         elif "nigam-v100" in partitions or "gpu" in partitions:
             if size == "base":
+                if context_length == 512:
+                    max_tokens = 16384
                 if context_length == 1024:
-                    max_tokens = 8192
+                    max_tokens = 16384
                 elif context_length == 2048:
-                    max_tokens = 8192
+                    max_tokens = 16384
                 elif context_length == 4096:
-                    max_tokens = 8192
+                    max_tokens = 16384
                 elif context_length == 8192:
-                    max_tokens = 8192
+                    max_tokens = 16384
             elif size == "large":
                 if context_length == 1024:
                     max_tokens = 1024
@@ -308,6 +310,8 @@ def main():
     
     # If run local, then immediately execute `command` for run.py
     if args.is_run_local:
+        # Set up paths
+        subprocess.run(["source", "config.sh"], shell=True)
         # Load environment (if not skipping)
         if args.is_skip_base:
             print("Skipping `source base.sh`")
