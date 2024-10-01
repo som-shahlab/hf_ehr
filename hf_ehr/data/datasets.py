@@ -6,8 +6,6 @@ from typing import Dict, List, Tuple
 from torch.utils.data import Dataset
 from hf_ehr.config import Event, SPLIT_TRAIN_CUTOFF, SPLIT_VAL_CUTOFF, SPLIT_SEED
 from hf_ehr.data.tokenization import DescTokenizer
-import polars as pl
-# import meds_reader
 
 class BaseDataset(Dataset):
     pass
@@ -21,6 +19,8 @@ class MEDSDataset(BaseDataset):
                  split: str = 'train',
                  is_debug: bool = False,
                  seed: int = 1):
+        import polars as pl
+        import meds_reader
         assert os.path.exists(path_to_meds_reader_extract), f"{path_to_meds_reader_extract} is not a valid path"
         assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
         self.path_to_meds_reader_extract: str = path_to_meds_reader_extract
@@ -40,9 +40,7 @@ class MEDSDataset(BaseDataset):
         }
 
         # Pre-calculate canonical splits based on patient ids
-
         splits = pl.read_parquet(os.path.join(path_to_meds_reader_extract, 'metadata', 'subject_splits.parquet'))
-
         self.train_pids = splits.filter(pl.col('split') == 'train').select('subject_id').to_series().to_numpy()
         self.val_pids = splits.filter(pl.col('split') == 'tuning').select('subject_id').to_series().to_numpy()
         self.test_pids = splits.filter(pl.col('split') == 'held_out').select('subject_id').to_series().to_numpy()

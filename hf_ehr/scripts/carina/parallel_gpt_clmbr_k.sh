@@ -3,7 +3,7 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/k_gpt_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/k_gpt_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-v100,gpu
+#SBATCH --partition=nigam-h100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:4

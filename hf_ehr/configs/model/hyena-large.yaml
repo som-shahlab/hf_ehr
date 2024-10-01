@@ -1,4 +1,4 @@
-1920*2.5# @package _global_
+# @package _global_
 
 defaults:
   - ../architecture/hyena

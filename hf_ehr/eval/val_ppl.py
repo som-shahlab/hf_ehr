@@ -333,6 +333,11 @@ def run_ckpt(path_to_ckpt: str,
 def main() -> None:
     args = parse_args()
     path_to_ckpt_dir: str = args.path_to_ckpt_dir
+    path_to_ckpt: str = None
+    if not os.path.isdir(path_to_ckpt_dir):
+        logger.info(f"Assuming path_to_ckpt_dir is a file: {path_to_ckpt_dir}")
+        path_to_ckpt = path_to_ckpt_dir
+        path_to_ckpt_dir = os.path.dirname(path_to_ckpt)
     if not 'ckpts' in path_to_ckpt_dir:
         # Go to `ckpts/` subfolder if not directly specified
         path_to_ckpt_dir = os.path.join(path_to_ckpt_dir, 'ckpts/')
@@ -352,11 +357,15 @@ def main() -> None:
     for file in os.listdir(path_to_ckpt_dir):
         if not file.endswith(".ckpt"):
             continue
+        
+        if path_to_ckpt is not None and file != os.path.basename(path_to_ckpt):
+            # User requested a specific ckpt
+            continue
 
         # TODO - remove
-        if not (
+        if path_to_ckpt is None and not (
             file.startswith('train-tokens-total_nonPAD')
-            and 'ckpt_val=2400000000-persist' in file
+            and 'ckpt_val=2000000000-persist' in file
         ):
             continue
 

@@ -349,48 +349,6 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_femr_db: str, p
     metadata['is_already_run']['add_categorical_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-"""
-def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
-    print("Starting add_occurrence_count_to_codes function\n")
-    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, split, "add_occurrence_count_to_codes")
-    os.makedirs(path_to_cache_dir, exist_ok=True)
-
-    # Load the FEMR database locally within this function
-    print("Loading FEMR PatientDatabase")
-    femr_db = femr.datasets.PatientDatabase(path_to_femr_db)
-
-    # Run the core logic using local femr_db without storing it in any global structure
-    print("Running run_helper")
-    start_time = datetime.datetime.now()
-    results = run_helper(
-        calc_code_2_occurrence_count,
-        merge_code_2_occurrence_count,
-        path_to_femr_db,  # Ensure only the path is passed
-        pids,
-        path_to_cache_dir,
-        additional_args=(path_to_tokenizer_config,),
-        **kwargs
-    )
-    print(f"Finished run_helper, time taken: {datetime.datetime.now() - start_time}")
-
-    # Now update the tokenizer config, ensuring femr_db is not part of the config
-    tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
-    print("Updating occurrence counts in tokenizer config")
-    start_time = datetime.datetime.now()
-    
-    for idx, x in enumerate(tokenizer_config):
-        try:
-            __ = x.to_dict()
-        except Exception as e:
-            print(f"Exception at token idx: {idx}")
-            print(f"Token: {x}")
-            print(f"Exception: {e}")
-            exit()
-
-    print(f"Finished saving tokenizer config, time taken: {datetime.datetime.now() - start_time}")
-    print("Completed add_occurrence_count_to_codes function")
-
-"""
 def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_femr_db: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
     #Add occurrence count to each entry in tokenizer config.
     print("Starting add_occurrence_count_to_codes function\n")
