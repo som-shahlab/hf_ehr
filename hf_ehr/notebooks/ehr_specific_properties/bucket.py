@@ -12,7 +12,7 @@ import numpy as np
 import collections
 import pandas as pd
 from tqdm import tqdm
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import brier_score_loss, roc_auc_score
 from utils import (
     LABELING_FUNCTION_2_PAPER_NAME,
     MODEL_2_INFO,
@@ -29,22 +29,77 @@ from hf_ehr.utils import load_tokenizer_from_path, load_model_from_path
 from starr_eda import calc_n_gram_count, calc_inter_event_times
 
 
-def calculate_auroc_per_quartile(df, strat_column, strat_method, model, task, part=None):
+def calculate_brier_score_per_tercile(df, strat_column, strat_method, model, task, part=None):
     results = []
-    # df['quartile'] = pd.qcut(df[strat_column], 4, labels=False)
+    if df.shape[0] != df.drop_duplicates().shape[0]:
+        print('Dropping duplicates...')
+        df.drop_duplicates(inplace=True)
+
+    # Rank the strat_column and divide into terciles
+    df['tercile'] = pd.qcut(df[strat_column].rank(method='first'), 3, labels=False)
+
+    for tercile in df['tercile'].unique():
+        tercile_df = df[df['tercile'] == tercile]
+
+        # Calculate Brier score for each tercile, even if there's only one label
+        try:
+            brier_score = brier_score_loss(tercile_df['y'], tercile_df['pred_proba'])
+        except ValueError as e:
+            print(f"Error calculating Brier score for tercile {tercile + 1}: {e}")
+            continue
+
+        try:
+            auc_score = roc_auc_score(quartile_df['y'], quartile_df['pred_proba'])
+        except ValueError as e:
+            print(f"Error calculating AUC score for quartile {quartile + 1}: {e}")
+            auc_score = None
+        
+        results.append({
+            'model': model,
+            'task': task,
+            'strat_method': strat_method,
+            'strat_metric': strat_column if not part else f'{strat_column}_{part}',
+            'tercile': f'{tercile + 1}',
+            'brier_score': brier_score,
+            'auc_score': auc_score,
+        })
+    
+    return results
+
+
+def calculate_brier_score_per_quartile(df, strat_column, strat_method, model, task, part=None):
+    results = []
+    if df.shape[0] != df.drop_duplicates().shape[0]:
+        print('Dropping duplicates...')
+        df.drop_duplicates(inplace=True)
+
+    # Rank the strat_column and divide into quartiles
     df['quartile'] = pd.qcut(df[strat_column].rank(method='first'), 4, labels=False)
 
-    # Calculate AUROC for each quartile
     for quartile in df['quartile'].unique():
         quartile_df = df[df['quartile'] == quartile]
-        auroc = roc_auc_score(quartile_df['y'], quartile_df['pred_proba'])
+
+        # Calculate Brier score for each quartile, even if there's only one label
+        try:
+            brier_score = brier_score_loss(quartile_df['y'], quartile_df['pred_proba'])
+        except ValueError as e:
+            print(f"Error calculating Brier score for quartile {quartile + 1}: {e}")
+            continue
+
+        try:
+            auc_score = roc_auc_score(quartile_df['y'], quartile_df['pred_proba'])
+        except ValueError as e:
+            print(f"Error calculating AUC score for quartile {quartile + 1}: {e}")
+            auc_score = None
+        
         results.append({
             'model': model,
             'task': task,
             'strat_method': strat_method,
             'strat_metric': strat_column if not part else f'{strat_column}_{part}',
             'quartile': f'{quartile + 1}',
-            'auroc': auroc
+            'brier_score': brier_score,
+            'auc_score': auc_score,
         })
     
     return results
@@ -58,30 +113,22 @@ def parse_args():
 
 
 if __name__ == '__main__':
-    
-    # 1. You need to load the stratify.py outputs for this TASK
-    # 2. You need to load the EHRSHOT results for this TASK
-    # 3. You need to load the labeled patients for this TASK
-    # 4. You need to split the patients into 4 buckets based on their df_stratify metrics
-        # i.e. 0-25, 25-50, 50-75, 75-100th percentiles
-    # 5. Recalculate AUROC within each bucket
-    
     args = parse_args()
     print("-" * 50)
-    print(f"Computing stratified AUROC for model: {args.model}, task: {args.task}.")
+    print(f"Computing stratified brier score for task: {args.task}, model: {args.model}.")
     print()
     
     # Constants
     PATH_TO_DATABASE: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract'
     PATH_TO_FEATURES_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features_ehrshot'
-    PATH_TO_RESULTS_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/results_ehrshot'
+    PATH_TO_RESULTS_DIR: str = '/share/pi/nigam/migufuen/ehrshot-benchmark/EHRSHOT_ASSETS/results_ehrshot'
     PATH_TO_TOKENIZED_TIMELINES_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/tokenized_timelines_ehrshot'
     PATH_TO_LABELS_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot'
     PATH_TO_SPLIT_CSV: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/splits_ehrshot/person_id_map.csv'
     
     # Output directory
     path_to_output_dir: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/ehrshot/stratify/'
-    path_to_output_file: str = os.path.join(path_to_output_dir, f'auroc__{args.model}__{args.task}.csv')
+    path_to_output_file: str = os.path.join(path_to_output_dir, f'metrics__{args.model}__{args.task}.csv')
     os.makedirs(path_to_output_dir, exist_ok=True)
     
     # Load labeled patients for this task
@@ -92,12 +139,14 @@ if __name__ == '__main__':
 
     # Get features for patients
     model: str = 'gpt2-base-512--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last'
-    # model: str = 'mamba-tiny-16384--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last'
     patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, 
                                                                                         PATH_TO_FEATURES_DIR, 
                                                                                         PATH_TO_TOKENIZED_TIMELINES_DIR,
                                                                                         models_to_keep=[model,])
     train_pids_idx, val_pids_idx, test_pids_idx = get_patient_splits_by_idx(PATH_TO_SPLIT_CSV, patient_ids)
+    label_times = label_times[train_pids_idx + val_pids_idx + test_pids_idx]
+    label_values = label_values[train_pids_idx + val_pids_idx + test_pids_idx]
+    patient_ids = patient_ids[train_pids_idx + val_pids_idx + test_pids_idx]
     label_times = [ x.astype(datetime.datetime) for x in label_times ] # cast to Python datetime
     assert len(train_pids_idx) + len(val_pids_idx) + len(test_pids_idx) == len(patient_ids)
     assert len(np.intersect1d(train_pids_idx, val_pids_idx)) == 0
@@ -116,10 +165,11 @@ if __name__ == '__main__':
                                                  'preds.csv')
     assert os.path.exists(path_to_results_file), f'Path to results file does not exist: {path_to_results_file}'
     df_preds = pd.read_csv(path_to_results_file)
-    df_preds['pid'] = patient_ids[train_pids_idx + val_pids_idx + test_pids_idx]
+    df_preds['pid'] = patient_ids
     df_preds['pid_idx'] = train_pids_idx + val_pids_idx + test_pids_idx
     df_preds['label_time'] = label_times
-    
+    df_preds = df_preds[df_preds['pid_idx'].isin(test_pids_idx)]
+    assert df_preds.shape[0] == len(test_pids_idx)
     strats = {
         'inter_event_times': {
             'strat_cols': ['time'],
@@ -129,26 +179,31 @@ if __name__ == '__main__':
             'strat_cols': ['rr_1', 'rr_2', 'rr_3', 'rr_4', 'rr_10', 'rr', 'ttr']
         }, 
         'timeline_lengths': {
-            'strat_cols': ['n_events']
+            'strat_cols': ['n_events', 'n_unique_events', 'n_tokens', 'n_unique_tokens']
         }
     }
     results_df = pd.DataFrame()
-    for strat, metrics in tqdm(strats.items(), desc='Computing stratified AUROC'):
+    for strat, metrics in tqdm(strats.items(), desc='Computing stratified brier score'):
         strat_cols = metrics['strat_cols']
         sep = metrics.get('sep', None)
         df = pd.read_parquet(os.path.join(path_to_output_dir, f'df__{args.task}__{strat}__metrics.parquet'))
-        
+        assert df['pid_idx'].nunique() == len(test_pids_idx)
         for strat_col in strat_cols:
             # Merge df_preds with df based on pid
+            if strat_col not in df.columns:
+                print(f'{strat_col} not in df columns. Skipping...')
+                continue
             if sep:
                 for part in df['metric'].unique().tolist():
                     df2 = df[df['metric'] == part]
-                    merged_df = pd.merge(df_preds, df2[['pid', strat_col]], on=['pid'])
-                    strat_results = calculate_auroc_per_quartile(merged_df, strat_col, strat, args.model, args.task, part)
+                    assert df2.shape[0] == len(test_pids_idx)
+                    merged_df = pd.merge(df_preds, df2[['pid', 'label_time', strat_col]], how='left', on=['pid', 'label_time'])
+                    assert merged_df[strat_col].notnull().all()
+                    strat_results = calculate_brier_score_per_quartile(merged_df, strat_col, strat, args.model, args.task, part)
                     results_df = pd.concat([results_df, pd.DataFrame(strat_results)], ignore_index=True)
             else:        
-                merged_df = pd.merge(df_preds, df[['pid', strat_col]], on=['pid'])
-                strat_results = calculate_auroc_per_quartile(merged_df, strat_col, strat, args.model, args.task)
+                merged_df = pd.merge(df_preds, df[['pid', 'label_time', strat_col]], how='left', on=['pid', 'label_time'])
+                strat_results = calculate_brier_score_per_quartile(merged_df, strat_col, strat, args.model, args.task)
                 results_df = pd.concat([results_df, pd.DataFrame(strat_results)], ignore_index=True)
 
     results_df.to_csv(path_to_output_file, index=False)
