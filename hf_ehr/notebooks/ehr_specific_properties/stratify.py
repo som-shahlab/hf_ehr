@@ -157,11 +157,11 @@ if __name__ == '__main__':
         # Metric 2: number of raw clinical events
         n_unique_events = []
         n_events = []
-        for pid_idx, pid in enumerate(pids):
+        for idx, pid in enumerate(pids):
             n_event: int = 0
             unique_events = set()
             for e in femr_db[pid].events:
-                if label_times is not None and e.start > label_times[pid_idx]:
+                if label_times is not None and e.start > label_times[idx]:
                     # If label_times is provided, then calculate inter-event times only for events that occur before the label_times
                     break
                 n_event += 1

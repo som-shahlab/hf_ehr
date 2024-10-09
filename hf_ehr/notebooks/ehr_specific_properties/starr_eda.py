@@ -43,18 +43,18 @@ def calc_longest_repeated_substring(femr_db, pids: List[int], label_times: Optio
         return max(repeated_subsequences, key=len)
 
     results = []
-    for pid_idx, pid in enumerate(tqdm(pids, total=len(pids), desc=f'Calculating longest repeated substring')):
+    for idx, pid in enumerate(tqdm(pids, total=len(pids), desc=f'Calculating longest repeated substring')):
         sequence: List[str] = []
         for e in femr_db[pid].events:
-            if label_times is not None and e.start > label_times[pid_idx]:
+            if label_times is not None and e.start > label_times[idx]:
                 # If label_times is provided, then calculate inter-event times only for events that occur before the label_times
                 break
             sequence.append(e.code)
         subsequence: List[str] = get_longest_repeated_substring(sequence)
         results.append({
             'pid' : pid,
-            'pid_idx' : pid_idx if pids_idx is None else pids_idx[pid_idx],
-            'label_time' : label_times[pid_idx] if label_times is not None else None,
+            'pid_idx' : pid_idx if pids_idx is None else pids_idx[idx],
+            'label_time' : label_times[idx] if label_times is not None else None,
             'length' : len(subsequence),
             'subsequence' : subsequence,
         })
@@ -76,10 +76,10 @@ def calc_n_gram_count(femr_db, pids, label_times: Optional[List[datetime.datetim
     for n in ns:
         if label_times is None and os.path.exists(f'df_n_gram_counts_{n}.parquet'):
             continue
-        for pid_idx, pid in enumerate(tqdm(pids, total=len(pids), desc=f'Calculating n-gram repetitions for n={n}')):
+        for idx, pid in enumerate(tqdm(pids, total=len(pids), desc=f'Calculating n-gram repetitions for n={n}')):
             sequence: List[str] = []
             for e in femr_db[pid].events:
-                if label_times is not None and e.start > label_times[pid_idx]:
+                if label_times is not None and e.start > label_times[idx]:
                     # If label_times is provided, then calculate inter-event times only for events that occur before the label_times
                     break
                 sequence.append(e.code)
@@ -89,8 +89,8 @@ def calc_n_gram_count(femr_db, pids, label_times: Optional[List[datetime.datetim
             for ngram, count in counter.items():
                 results.append({
                     'pid' : pid,
-                    'pid_idx' : pid_idx if pids_idx is None else pids_idx[pid_idx],
-                    'label_time' : label_times[pid_idx] if label_times is not None else None,
+                    'pid_idx' : pid_idx if pids_idx is None else pids_idx[idx],
+                    'label_time' : label_times[idx] if label_times is not None else None,
                     # 'ngram' : ngram,
                     'count' : count,
                     'n' : n,
@@ -115,19 +115,19 @@ def calc_inter_event_times(femr_db, pids: List[int], label_times: Optional[List[
     If label_times is provided, then calculate inter-event times only for events that occur before the label_times.
     """
     results: List[Dict] = []
-    for pid_idx, pid in enumerate(tqdm(pids, total=len(pids))):
-        if label_times is None and os.path.exists(f'df_inter_event_times_{pid_idx // 100_000}.parquet'):
+    for idx, pid in enumerate(tqdm(pids, total=len(pids))):
+        if label_times is None and os.path.exists(f'df_inter_event_times_{idx // 100_000}.parquet'):
             continue
         prev_event = None
         for e_idx, e in enumerate(femr_db[pid].events):
-            if label_times is not None and e.start > label_times[pid_idx]:
+            if label_times is not None and e.start > label_times[idx]:
                 # If label_times is provided, then calculate inter-event times only for events that occur before the label_times
                 break
             if prev_event is not None:
                 results.append({
                     'pid' : pid,
-                    'pid_idx' : pid_idx if pids_idx is None else pids_idx[pid_idx],
-                    'label_time' : label_times[pid_idx] if label_times is not None else None,
+                    'pid_idx' : pid_idx if pids_idx is None else pids_idx[idx],
+                    'label_time' : label_times[idx] if label_times is not None else None,
                     'event_code' : e.code,
                     'time' : (e.start - prev_event.start).total_seconds(), # time in secs
                     'event_idx' : e_idx,
@@ -135,9 +135,9 @@ def calc_inter_event_times(femr_db, pids: List[int], label_times: Optional[List[
             prev_event = e
             
         # Checkpointing
-        if label_times is None and (pid_idx + 1) % 100_000 == 0:
+        if label_times is None and (idx + 1) % 100_000 == 0:
             df = pd.DataFrame(results)
-            df.to_parquet(f'df_inter_event_times_{pid_idx // 100_000}.parquet')
+            df.to_parquet(f'df_inter_event_times_{idx // 100_000}.parquet')
             print(f'Saved {df.shape[0]} rows')
 
     df = pd.DataFrame(results)
