@@ -1,8 +1,8 @@
-# Context Clues
+# Training Long Context Models on EHR Data
 
 Code for [Context Clues](TODO). 
 
-This repo allows you to take any model on HuggingFace and train it on structured EHR data. This enables fast iteration with the latest and greatest architectural developments. This repo comes with nice Hydra configs + Wandb logging + PyTorch Lightning distributed training support built-in.
+This repo allows you to take any model on HuggingFace and train it on structured EHR data. This enables fast iteration with the latest and greatest architectural advancements. This repo comes with nice Hydra configs + Wandb logging + PyTorch Lightning distributed training support built-in.
 
 **📖 Table of Contents**
 
