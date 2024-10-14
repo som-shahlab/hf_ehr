@@ -1,4 +1,8 @@
-# EHR FM Cookbook
+# Training Long Context Models on EHR Data
+
+Code for [Context Clues](TODO). 
+
+This repo allows you to take any model on HuggingFace and train it on structured EHR data. This enables fast iteration with the latest and greatest architectural advancements. This repo comes with nice Hydra configs + Wandb logging + PyTorch Lightning distributed training support built-in.
 
 **📖 Table of Contents**
 
@@ -7,24 +11,7 @@
 1. 🏋️‍♀️ [Training](#training)
 1. 📊 [Evaluation](#evaluation)
 1. ℹ️ [Other](#other)
-
-**🎯 Goals:**
-1. Build infrastructure to train off-the-shelf HuggingFace models on structured EHR data
-2. Measure how each of these modeling choices impacts model performance (in terms of **val ppl**, **EHRSHOT**, **MIMIC-IV**):
-    1. Architecture (bert, gpt, mamba, hyena)
-    2. Model size (120M, ...)
-    3. Context window length (1k, 4k, 8k, 16k)
-    4. Vocab size (32k, 64, 128k)
-    5. Tokenizer choice (DescEmb, CLMBR, Custom)
-    6. Finetuning (frozen, full, 1-layer)
-3. Some sort of generative synthetic patient timeline generations
-
-**🔗 External Links:**
-* [Wandb Home](https://wandb.ai/ehr-fm/hf_ehr?nw=nwusermiking98)
-* [Wandb Reports](https://wandb.ai/ehr-fm/hf_ehr/reportlist)
-* [Experiment Tracker](https://docs.google.com/spreadsheets/u/1/d/1YTQaoaAicntzNqe0jeUoU5yiAAh-Q6UeZBT9yBBf7mc/edit#gid=0)
-* [Manuscript Draft](https://docs.google.com/document/d/1E3Ngad7a-JWj74MeVgjnGS1WC1zakfsuN0_wPFyzlw8/edit)
-
+1. [Citation](#citation)
 
 <a name="installation" />
 
@@ -43,7 +30,7 @@ pip install -e .
 cd hf_ehr/scripts/tokenizers
 sbatch clmbr.sh # Takes ~5 seconds
 sbatch desc.sh # Takes ~30 min
-sbatch cookbook.sh # Takes TBD
+sbatch cookbook.sh # Takes many hours
 ```
 <a name="quick_start"/>
 
@@ -173,17 +160,9 @@ See the [Config README](hf_ehr/configs/README.md) for details on all config sett
     
 ## 📊 Evaluation
 
-**Evaluations:**
-1. Val/PPL on STARR-OMOP held-out 15% dataset split (canonical FEMR split)
-2. AUROC/AUPRC on EHRSHOT tasks
-3. AUROC/AUPRC on MIMIC-IV tasks
-3. **TODO** -- EHRSHOT labelers on all of STARR?
-
-### MIMIC-IV
-
-TODO
-
 ### EHRSHOT
+
+How to use this repo with EHRSHOT.
 
 #### 1. Generate Patient Representations
 This all occurs within the `hf_ehr` repo.
@@ -191,7 +170,6 @@ This all occurs within the `hf_ehr` repo.
 1. Identify the path (`<path_to_ckpt>`) to the model checkpoint you want to evaluate.
 
 2. Generate patient representations with your model. This will create a folder in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models` for this model checkpoint.
-
 
 ```bash
 cd hf_ehr/scripts/eval/
@@ -202,20 +180,10 @@ sbatch ehrshot.sh <path_to_ckpt>
 
 This all occurs within the `ehrshot-benchmark` repo.
 
-3. In `ehrshot-benchmark`, update `ehrshot/utils.py` so that your model is included in the global constants at the top of the file. Specifically, create a new entry in the `MODEL_2_INFO` dictionary at the top of the file. The **key** should be the name of the folder that's created for your model in `/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/models`, and the **value** should be similar to existing entries.
-
-4. Generate your model's AUROC/AUPRC results by running `7_eval.sh`:
+1. Generate your model's AUROC/AUPRC results by running `7_eval.sh`:
 
 ```bash
-# cd to ehrshot-benchmark/ directory
-
-# NOTE: This assumes you've already created your EHRHSOT_ENV conda environment.
-#     If you haven't, then follow the README.md here:
-#     https://github.com/som-shahlab/ehrshot-benchmark
-
-conda activate EHRSHOT_ENV
-cd ehrshot/bash_scripts/
-
+# cd to ehrshot-benchmark/ehrshot/bash_scripts/ directory
 bash 7_eval.sh --is_use_slurm
 ```
 
@@ -223,14 +191,10 @@ bash 7_eval.sh --is_use_slurm
 
 This all occurs within the `ehrshot-benchmark` repo.
 
-5. Generate plots by running: `8_make_results_plots.sh`. You might need to modify the `--model_heads` parameter in the file before running to specify what gets included in your plots.
+1. Generate plots by running: `8_make_results_plots.sh`. You might need to modify the `--model_heads` parameter in the file before running to specify what gets included in your plots.
 
 ```bash
-# cd to ehrshot-benchmark/ directory
-
-conda activate EHRSHOT_ENV
-cd ehrshot/bash_scripts/
-
+# cd to ehrshot-benchmark/ehrshot/bash_scripts/ directory
 bash 8_make_results_plots.sh
 ```
 
@@ -259,4 +223,12 @@ See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating 
 Launch tensorboard with:
 ```bash
 tensorboard --logdir="experiments/lightning_logs/"
+```
+
+## Citation
+
+If you found this work useful, please consider citing it:
+
+```
+TODO
 ```
