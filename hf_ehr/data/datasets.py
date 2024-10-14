@@ -97,69 +97,6 @@ class MEDSDataset(BaseDataset):
         ]
         return (pid, events)
 
-class SparkDataset(BaseDataset):
-    # TODO -- spark
-
-    def __init__(self, 
-                 # TODO -- add any relevant kwargs here 
-                 split: str = 'train',
-                 is_debug: bool = False,
-                 seed: int = 1):
-        assert split in ['train', 'val', 'test'], f"{split} not in ['train', 'val', 'test']"
-        self.split: str = split
-        self.is_debug: bool = is_debug
-        self.seed: int = seed
-        
-        # Set metadata -- used for tokenizer versioning later
-        # ! CAUTION: Essential that this contains all args/kwargs; otherwise get_seq_length_per_patient() in tokenizer breaks!
-        self.metadata = {
-            'cls' : 'SparkDataset',
-            'split' : split,
-            'is_debug' : is_debug,
-            'seed' : seed,
-        }
-
-        # Pre-calculate canonical splits based on patient ids
-        # TODO -- rewrite
-        self.train_pids: np.ndarray = []
-        self.val_pids: np.ndarray = []
-        self.test_pids: np.ndarray = []
-
-        # Confirm disjoint train/val/test
-        assert np.intersect1d(self.train_pids, self.val_pids).shape[0] == 0
-        assert np.intersect1d(self.train_pids, self.test_pids).shape[0] == 0
-        assert np.intersect1d(self.val_pids, self.test_pids).shape[0] == 0
-
-        # If debug, then shrink to 1k patients
-        if is_debug:
-            self.train_pids = self.train_pids[:1000]
-            self.val_pids = self.val_pids[:1000]
-            self.test_pids = self.test_pids[:1000]
-
-    def get_n_patients(self) -> int:
-        return len(self.get_pids())
-
-    def get_pids(self) -> np.ndarray:
-        """Return patient ids for this split"""
-        if self.split == 'train':
-            pids = self.train_pids
-        elif self.split == 'val':
-            pids = self.val_pids
-        elif self.split == 'test':
-            pids = self.test_pids
-        else:
-            raise ValueError(f"Invalid split: {self.split}")
-        return pids
-
-    def __len__(self) -> int:
-        return len(self.get_pids())
-    
-    def __getitem__(self, idx: int) -> Tuple[int, List[Event]]:
-        """Return all event codes for this patient at `idx` in `self.split`.
-        """
-        # TODO
-        pass
-
 class FEMRDataset(BaseDataset):
     """Dataset that returns patients in a FEMR extract.
         dataset[idx] = a specific patient, so you can only retrieve ONE sample per patient.
@@ -349,7 +286,6 @@ if __name__ == '__main__':
     # print(train_dataset[-1])
 
     # FEMRDataset
-    # TODO - sanity check that `PATH_TO_FEMR_EXTRACT_MIMIC4` works
     train_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='train')
     val_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='val')
     test_dataset = FEMRDataset(PATH_TO_FEMR_EXTRACT_MIMIC4, split='test')

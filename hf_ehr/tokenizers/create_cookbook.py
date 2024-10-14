@@ -44,12 +44,7 @@ def check_add_occurrence_count_to_codes(tokenizer_config):
     
 def main():
     start_total = time.time()
-    
-    # Parse command-line arguments
     args = parse_args()
-    # TODO -- may need to change path to PATH_TO_TOKENIZER_SPARK_CONFIG
-    PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG = PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG # TODO - remove
-    assert PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG == PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG and 'debug' in PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
 
     os.makedirs(os.path.dirname(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG), exist_ok=True)
     if os.path.exists(PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG):
@@ -74,8 +69,8 @@ def main():
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
     elif args.dataset == 'mimic4':
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_MIMIC4
-    elif args.dataset == 'spark':
-        # TODO -- whatever spark dataset needs
+    elif args.dataset == 'meds':
+        # TODO -- whatever MEDS dataset needs
         pass
     else:
         raise ValueError(f'Invalid FEMR dataset: {args.dataset}')
