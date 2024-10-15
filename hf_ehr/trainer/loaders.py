@@ -2,7 +2,7 @@ from torch.utils.data import DataLoader
 from typing import Any, Dict, Optional, Union
 from hf_ehr.trainer.samplers import ApproxBatchSampler, SortishSampler
 from omegaconf import DictConfig 
-from hf_ehr.data.datasets import FEMRDataset, BaseDataset, AllTokensFEMRDataset, SparkDataset
+from hf_ehr.data.datasets import FEMRDataset, BaseDataset, AllTokensFEMRDataset
 from hf_ehr.data.tokenization import BaseTokenizer, collate_femr_timelines
 from loguru import logger
 import numpy as np
@@ -47,8 +47,8 @@ def load_dataloaders(config: DictConfig,
             test_idx_to_seq_length: List[int] = datasets['test'].idx_to_seq_length
             is_random_shuffle_within_buckets = False # for more cache hits since we will repeatedly query the same patient for subsets of their timeline
             secondary_sort_key = [ x[0] for x in datasets['train'].idx_to_pidx_start_end ] # get patient id's to serve as a secondary sort key
-        elif dataset_name == 'SparkDataset':
-            # TODO -- spark
+        elif dataset_name == 'MEDSDataset':
+            # TODO -- MEDS
             pass
         else:
             raise ValueError(f"Unknown dataset_name: {dataset_name}")
@@ -124,8 +124,8 @@ def load_datasets(config: DictConfig, tokenizer: Optional[BaseTokenizer]) -> Dic
         train_dataset = AllTokensFEMRDataset(tokenizer, max_length, path_to_femr_extract, split='train', is_debug=is_debug, seed=seed)
         val_dataset = AllTokensFEMRDataset(tokenizer, max_length, path_to_femr_extract, split='val', is_debug=is_debug, seed=seed)
         test_dataset = AllTokensFEMRDataset(tokenizer, max_length, path_to_femr_extract, split='test', is_debug=is_debug, seed=seed)
-    elif dataset_name == 'SparkDataset':
-        # TODO -- spark
+    elif dataset_name == 'MEDSDataset':
+        # TODO -- MEDS
         pass
     else:
         raise ValueError(f"Unknown dataset_name: {dataset_name}")

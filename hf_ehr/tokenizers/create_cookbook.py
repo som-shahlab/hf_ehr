@@ -4,12 +4,12 @@ import time
 from typing import Any, Callable, Dict, List
 from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, PATH_TO_SPARK_DATASET, PATH_TO_TOKENIZER_SPARK_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG
+from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_v9, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, load_tokenizer_config_and_metadata_from_path, PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG
 from hf_ehr.tokenizers.utils import call_func_with_logging
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Generate statistics about dataset')
-    parser.add_argument('--dataset', choices=['v8', 'v9', 'mimic4', 'spark'], default='v8', help='FEMR dataset version to use: v8 or v9')
+    parser.add_argument('--dataset', choices=['v8', 'v9', 'mimic4', ], default='v8', help='FEMR dataset version to use: v8 or v9')
     parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
     parser.add_argument('--chunk_size', type=int, default=None, help='Number of pids per process')
     parser.add_argument('--is_force_refresh', action='store_true', default=False, help='If specified, will force refresh the tokenizer config')
@@ -65,16 +65,18 @@ def main():
     start = time.time()
     if args.dataset == 'v8':
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v8
+        dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     elif args.dataset == 'v9':
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
+        dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     elif args.dataset == 'mimic4':
         path_to_femr_extract = PATH_TO_FEMR_EXTRACT_MIMIC4
+        dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     elif args.dataset == 'meds':
         # TODO -- whatever MEDS dataset needs
         pass
     else:
         raise ValueError(f'Invalid FEMR dataset: {args.dataset}')
-    dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False) # TODO -- update for spark
     print(f"Time to load FEMR database: {time.time() - start:.2f}s")
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients from FEMRDataset using extract at: `{path_to_femr_extract}`")
