@@ -164,7 +164,7 @@ def eval(model: BaseModel,
                     'argmax_label' : shift_logits[token_idx].argmax().item(),
                     'argmax_log_prob' : log_probs[token_idx].max().item(),
                 } for token_idx, log_prob in enumerate(log_probs_for_labels.detach().cpu().numpy().tolist()) ]
-                print(f"pid={pid} | n_events={len(events)} | n_tokens={seq_len} | start={start_idx} | end={end_idx} | n_tokens_for_ppl_calc={log_probs_for_labels.shape[0]} | ppl={np.exp(-log_probs_for_labels.detach().cpu().numpy().mean())}")
+                # print(f"pid={pid} | n_events={len(events)} | n_tokens={seq_len} | start={start_idx} | end={end_idx} | n_tokens_for_ppl_calc={log_probs_for_labels.shape[0]} | ppl={np.exp(-log_probs_for_labels.detach().cpu().numpy().mean())}")
 
                 prev_end_idx = end_idx
                 if end_idx >= seq_len:
