@@ -20,10 +20,17 @@ stop_child_processes() {
 trap 'stop_child_processes' SIGTERM SIGINT
 
 cd ../carina
-source base.sh
+source config.sh
 cd ../../eval/
 
+# Overwrite transformers version
+conda activate /home/mwornow/llama_hf_env
+
 RUN_ARGS=(
+    # Llama
+    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+
     # Hyena
     # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-large-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
     # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-large-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
@@ -33,22 +40,17 @@ RUN_ARGS=(
     # Mamba
     # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
     # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
-    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-8192--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
-    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+    # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-8192--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+    # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/mamba-tiny-16384--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
 )
 
 # Loop over the RUN_NAMES and args
-for i in "${!RUN_NAMES[@]}"; do
-    RUN_NAME="${i}"
+for i in "${!RUN_ARGS[@]}"; do
     RUN_ARG=${RUN_ARGS[i]}
-    STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_ppl_${SLURM_JOB_ID}.out
-    STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_ppl_${SLURM_JOB_ID}.err
-    echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}' with slurm job id '${SLURM_JOB_ID}'"
-    
-    EXTRA="--split val --device cuda:${i}"
+    echo "Running with args: $RUN_ARG"
 
     # Run command
-    python3 val_ppl.py --path_to_ckpt_dir $RUN_ARG $EXTRA > $STDOUT 2> $STDERR &
+    python3 val_ppl.py --path_to_ckpt_dir $RUN_ARG &
 
     child_pids+=($!)
 done
