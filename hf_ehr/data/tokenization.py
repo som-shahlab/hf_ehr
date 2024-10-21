@@ -100,6 +100,7 @@ class BaseTokenizer(PreTrainedTokenizer):
     def convert_events_to_tokens(self, events: List[Event], **kwargs) -> List[str]:
         """Provide default implementation where one Event => one token"""
         tokens: List[str] = []
+        
         for e in events:
             token: Optional[str] = self.convert_event_to_token(e, **kwargs)
             if token is not None:
@@ -660,7 +661,6 @@ class CEHRTokenizer(BaseCodeTokenizer):
         self.is_add_visit_end: bool = self.metadata.get('is_add_visit_end', True)
         self.is_add_day_att: bool = self.metadata.get('is_add_day_att', True)
         self.is_add_day_week_month_att: bool = self.metadata.get('is_add_day_week_month_att', False)
-
         # Initialize special tokens for visits and time intervals (ATT tokens)
         self.visit_start = "[VISIT START]"
         self.visit_end = "[VISIT END]"
@@ -751,7 +751,6 @@ class CEHRTokenizer(BaseCodeTokenizer):
         tokens = []
         current_visit_end = None
         previous_visit_end = None
-
         for e in events:
             # Add visit end token if the event is after the previous visit's end
             if current_visit_end is not None and e.start > current_visit_end:
@@ -761,6 +760,18 @@ class CEHRTokenizer(BaseCodeTokenizer):
 
             # Handling visits and adding ATT tokens
             if "Visit" in e.code:
+                # Ignore visits that last 0 seconds
+                if e.start == e.end:
+                    # Visit is a point event, so ignore
+                    continue
+                
+                # If another visit is currently open (but somehow overlaps with this visit), end the previous visit
+                if current_visit_end is not None:
+                    if self.is_add_visit_end:
+                        tokens.append(self.visit_end)
+                    previous_visit_end = current_visit_end
+                    current_visit_end = None
+                
                 # Add ATT tokens between visits based on time intervals
                 if previous_visit_end is not None:
                     interval = (e.start - previous_visit_end).days
@@ -796,7 +807,11 @@ class CEHRTokenizer(BaseCodeTokenizer):
                 token = self.convert_event_to_token(e)
                 if token:
                     tokens.append(token)
-
+                    
+        # Close any visit that isn't closed by end of timeline
+        if current_visit_end is not None:
+            if self.is_add_visit_end:
+                tokens.append(self.visit_end)
         return tokens
 
 class DescTokenizer(BaseTokenizer):

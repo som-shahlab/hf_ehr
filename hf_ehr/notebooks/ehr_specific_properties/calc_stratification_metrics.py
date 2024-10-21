@@ -1,6 +1,8 @@
 """
+Calculates stratification metrics for each (patient, label)
+
 Usage:
-    python3 stratify.py --task guo_los
+    python3 calc_stratification_metrics.py --task guo_los
 """
 import datetime
 import argparse
