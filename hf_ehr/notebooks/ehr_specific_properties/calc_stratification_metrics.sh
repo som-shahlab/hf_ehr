@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Usage: 
-#     bash stratify.sh
+#     bash calc_stratification_metrics.sh
 
 labeling_functions=(
     "guo_los" 
@@ -26,6 +26,6 @@ do
     echo "----------------------------------------"
     echo $labeling_function
     echo "START | Current time: $(date +"%T")"
-    python3 stratify.py --task $labeling_function
+    python3 calc_stratification_metrics.py --task $labeling_function
     echo "END | Current time: $(date +"%T")"
 done
