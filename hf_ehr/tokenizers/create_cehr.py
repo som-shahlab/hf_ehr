@@ -78,8 +78,8 @@ if __name__ == '__main__':
     metadata = {
         'is_add_visit_start': True,
         'is_add_visit_end': True,
-        'is_add_day_att': True,
-        'is_add_day_week_month_att': False
+        'is_add_day_att': False,
+        'is_add_day_week_month_att': True
     }
     
     # Add CEHR-specific metadata for visit and ATT tokens if needed
@@ -92,7 +92,14 @@ if __name__ == '__main__':
 
     # Add ATT tokens (e.g., day, long-term tokens)
     att_tokens = [
-        CodeTCE(code=f"[DAY {i}]", description=f"Day {i} ATT token", type="code", stats=[]) for i in range(1, 1081)
+        CodeTCE(code=day_att, description=f"{day_att} ATT token", type="code", stats=[])
+        for day_att in [f"[DAY {i}]" for i in range(1, 7)]  # Days 1 to 6
+    ] + [
+        CodeTCE(code=week_att, description=f"{week_att} ATT token", type="code", stats=[])
+        for week_att in [f"[WEEK {i}]" for i in range(1, 5)]  # Weeks 1 to 4
+    ] + [
+        CodeTCE(code=month_att, description=f"{month_att} ATT token", type="code", stats=[])
+        for month_att in [f"[MONTH {i}]" for i in range(1, 13)]  # Months 1 to 12
     ] + [
         CodeTCE(code="[LONG TERM]", description="Long-term ATT token", type="code", stats=[])
     ]
