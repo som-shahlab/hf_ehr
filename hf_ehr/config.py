@@ -24,7 +24,7 @@ PATH_TO_RUNS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'runs/')
 PATH_TO_DATASET_CACHE_DIR = os.path.join(PATH_TO_CACHE_DIR, 'dataset/')
 PATH_TO_FEMR_EXTRACT_v9 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9'
 PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
-PATH_TO_FEMR_EXTRACT_MIMIC4 = '/share/pi/nigam/datasets/femr_mimic_4_extract'
+PATH_TO_FEMR_EXTRACT_MIMIC4 = '/share/pi/nigam/data/femr_mimic_4_extract'
 PATH_TO_MEDS_DATASET = '' # TODO -- meds
 
 # Tokenizers
