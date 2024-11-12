@@ -3,4 +3,4 @@
 data:
   dataset:
     name: FEMRDataset
-    path_to_femr_extract: /share/pi/nigam/datasets/femr_mimic_extract
+    path_to_femr_extract: /share/pi/nigam/data/femr_mimic_extract
