@@ -1,82 +1,10 @@
-import ast
 import pickle
 import os
-import re
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 import datetime
-import torch.nn as nn
-from sklearn.metrics import pairwise_distances
 from femr.labelers import LabeledPatients
-from loguru import logger
-
-# SPLITS
-SPLIT_SEED: int = 97
-SPLIT_TRAIN_CUTOFF: int = 70
-SPLIT_VAL_CUTOFF: int = 85
-
-LABELING_FUNCTION_2_PAPER_NAME = {
-    # Guo et al. 2023
-    "guo_los": "Long LOS",
-    "guo_readmission": "30-day Readmission",
-    "guo_icu": "ICU Admission",
-    # New diagnosis
-    "new_pancan": "Pancreatic Cancer",
-    "new_celiac": "Celiac",
-    "new_lupus": "Lupus",
-    "new_acutemi": "Acute MI",
-    "new_hypertension": "Hypertension",
-    "new_hyperlipidemia": "Hyperlipidemia",
-    # Instant lab values
-    "lab_thrombocytopenia": "Thrombocytopenia",
-    "lab_hyperkalemia": "Hyperkalemia",
-    "lab_hypoglycemia": "Hypoglycemia",
-    "lab_hyponatremia": "Hyponatremia",
-    "lab_anemia": "Anemia",
-    # # Custom tasks
-    # "chexpert": "Chest X-ray Findings",
-    # # MIMIC-IV tasks
-    # "mimic4_los" : "Long LOS (MIMIC-IV)",
-    # "mimic4_readmission" : "30-day Readmission (MIMIC-IV)",
-    # "mimic4_mortality" : "Inpatient Mortality (MIMIC-IV)",
-}
-
-TASK_GROUP_2_PAPER_NAME = {
-    "operational_outcomes": "Operational Outcomes",
-    "lab_values": "Anticipating Lab Test Results",
-    "new_diagnoses": "Assignment of New Diagnoses",
-    "chexpert": "Anticipating Chest X-ray Findings",
-}
-
-TASK_GROUP_2_LABELING_FUNCTION = {
-    "operational_outcomes": [
-        "guo_los",
-        "guo_readmission",
-        "guo_icu",
-        "mimic4_los",
-        "mimic4_mortality",
-        "mimic4_readmission",
-    ],
-    "lab_values": [
-        "lab_thrombocytopenia",
-        "lab_hyperkalemia",
-        "lab_hypoglycemia",
-        "lab_hyponatremia",
-        "lab_anemia"
-    ],
-    "new_diagnoses": [
-        "new_hypertension",
-        "new_hyperlipidemia",
-        "new_pancan",
-        "new_celiac",
-        "new_lupus",
-        "new_acutemi"
-    ],
-    "chexpert": [
-        "chexpert"
-    ],
-}
 
 def get_patient_splits_by_idx(path_to_split_csv: str, patient_ids: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Given a list of patient IDs, split into train, val, and test sets.
@@ -206,18 +134,3 @@ def get_labels_and_features(labeled_patients: LabeledPatients,
             }
     
     return label_patient_ids, label_values, label_times, featurizations
-
-def process_chexpert_labels(label_values):
-    new_labels = []
-    for label_value in label_values:
-        label_str = bin(label_value)[2:]
-        rem_bin = 14 - len(label_str)
-        label_str = "0"*rem_bin + label_str
-        label_list = [*label_str]
-        label_list = [int(label) for label in label_list]
-        new_labels.append(label_list)
-    return np.array(new_labels)
-
-def convert_multiclass_to_binary_labels(values, threshold: int = 1):
-    values[values >= threshold] = 1
-    return values

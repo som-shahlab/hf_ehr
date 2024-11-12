@@ -31,7 +31,7 @@ for task in "${tasks[@]}"
 do
     echo "----------------------------------------"
     echo "START | $task | Current time: $(date +"%T")"
-    python3 bucket_by_metric.py --task $task &
+    python3 bucket_by_metrics.py --task $task &
     echo "END | $task | Current time: $(date +"%T")"
 done
 

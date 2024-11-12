@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import argparse
 from utils import (
     get_labels_and_features, 
     get_patient_splits_by_idx
@@ -61,18 +62,18 @@ if __name__ == '__main__':
         
         # For every metric, calculate quartiles
         for strat_col in strat_cols:
-            if strat_col not in df_metrics.columns:
-                raise ValueError(f'col={strat_col} not in df_metrics columns for strat={strat}.')
-            
             # If stratifying by inter-event times, need to pivot table since 'time' and 'metric' are separate columns
             if strat == 'inter_event_times':
                 df_metrics = df_metrics.pivot_table(index=['pid', 'pid_idx', 'label_time', 'sub_task'], columns='metric', values='time').reset_index()
-            assert df_metrics.shape[0] == df_preds.shape[0], f'Number of rows in df_metrics does not match number of rows in df_preds: {df_metrics.shape[0]} != {df_preds.shape[0]}'
+
+            if strat_col not in df_metrics.columns:
+                raise ValueError(f'col={strat_col} not in df_metrics columns for strat={strat}.')
 
             # Calculate quartiles
             df_metrics['metric_name'] = f'{strat_col}'
             df_metrics['quartile'] = pd.qcut(df_metrics[strat_col].rank(method='min'), 4, labels=False)
             df_metrics = df_metrics.rename(columns={strat_col: 'metric_value'})
+            
             df_results.append(df_metrics)
             
     path_to_output_file: str = os.path.join(path_to_output_dir, f'df_bucket__{LABELING_FUNCTION}.csv')
