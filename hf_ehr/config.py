@@ -25,7 +25,7 @@ PATH_TO_DATASET_CACHE_DIR = os.path.join(PATH_TO_CACHE_DIR, 'dataset/')
 PATH_TO_FEMR_EXTRACT_v9 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9'
 PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
 PATH_TO_FEMR_EXTRACT_MIMIC4 = '/share/pi/nigam/datasets/femr_mimic_4_extract'
-PATH_TO_MEDS_DATASET = '' # TODO -- meds
+PATH_TO_MEDS_EXTRACT_DEV = '/share/pi/nigam/mwornow/meds_dev'
 
 # Tokenizers
 PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/')
@@ -63,17 +63,6 @@ def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: A
     except Exception as e:
         logging.error(f"Error in {func_name}: {str(e)}")
         raise
-
-# TODO - OLD - remove start
-class Detail(TypedDict):
-    token_2_count: Dict[str, int] # mapping [key] = token, [val] = count of that token
-    unit_2_quartiles: Optional[List[float]] # mapping [key] = unit, [val] = list of quartiles
-    is_numeric: Optional[bool] # if TRUE, then code is a lab value
-
-class Code2Detail(TypedDict):
-    """JSON file named `code_2_detail.json` which is a dict with [key] = code from FEMR, [val] = Detail dict"""
-    code: Detail
-# TODO - OLD - remove end
 
 @dataclass()
 class Event():
@@ -236,6 +225,74 @@ def load_tokenizer_config_from_path(path_to_tokenizer_config: str, is_return_met
 
 #############################################
 #
+# Evaluations
+#
+#############################################
+
+EHRSHOT_LABELING_FUNCTION_2_PAPER_NAME = {
+    # Guo et al. 2023
+    "guo_los": "Long LOS",
+    "guo_readmission": "30-day Readmission",
+    "guo_icu": "ICU Admission",
+    # New diagnosis
+    "new_pancan": "Pancreatic Cancer",
+    "new_celiac": "Celiac",
+    "new_lupus": "Lupus",
+    "new_acutemi": "Acute MI",
+    "new_hypertension": "Hypertension",
+    "new_hyperlipidemia": "Hyperlipidemia",
+    # Instant lab values
+    "lab_thrombocytopenia": "Thrombocytopenia",
+    "lab_hyperkalemia": "Hyperkalemia",
+    "lab_hypoglycemia": "Hypoglycemia",
+    "lab_hyponatremia": "Hyponatremia",
+    "lab_anemia": "Anemia",
+    # # Custom tasks
+    "chexpert": "Chest X-ray Findings",
+    # MIMIC-IV tasks
+    "mimic4_los" : "Long LOS (MIMIC-IV)",
+    "mimic4_readmission" : "30-day Readmission (MIMIC-IV)",
+    "mimic4_mortality" : "Inpatient Mortality (MIMIC-IV)",
+}
+
+EHRSHOT_TASK_GROUP_2_PAPER_NAME = {
+    "operational_outcomes": "Operational Outcomes",
+    "lab_values": "Anticipating Lab Test Results",
+    "new_diagnoses": "Assignment of New Diagnoses",
+    "chexpert": "Anticipating Chest X-ray Findings",
+}
+
+EHRSHOT_TASK_GROUP_2_LABELING_FUNCTION = {
+    "operational_outcomes": [
+        "guo_los",
+        "guo_readmission",
+        "guo_icu",
+        "mimic4_los",
+        "mimic4_mortality",
+        "mimic4_readmission",
+    ],
+    "lab_values": [
+        "lab_thrombocytopenia",
+        "lab_hyperkalemia",
+        "lab_hypoglycemia",
+        "lab_hyponatremia",
+        "lab_anemia"
+    ],
+    "new_diagnoses": [
+        "new_hypertension",
+        "new_hyperlipidemia",
+        "new_pancan",
+        "new_celiac",
+        "new_lupus",
+        "new_acutemi"
+    ],
+    "chexpert": [
+        "chexpert"
+    ],
+}
+
+#############################################
+#
 # Helper functions
 #
 #############################################
@@ -256,26 +313,39 @@ def copy_resources_to_local(base_dir: str, is_overwrite_if_exists: bool = False)
     if base_dir == GPU_BASE_DIR:
         # Don't do any copying if GPU partiton b/c just using the shared drive for now
         return
-    copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9', base_dir, is_overwrite_if_exists=False)
+    # copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9', base_dir, is_overwrite_if_exists=False)
     copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir, is_overwrite_if_exists=False)
+    copy_file('/share/pi/nigam/mwornow/meds_dev', base_dir, is_overwrite_if_exists=False)
     
 def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
     """Rewrite paths for Carina partitions to use local-scratch directories."""
     if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
         copy_resources_to_local(V100_BASE_DIR, is_overwrite_if_exists=True)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', V100_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_femr_extract'):
+            config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', V100_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_meds_reader_extract'):
+            config.data.dataset.path_to_meds_reader_extract = config.data.dataset.path_to_meds_reader_extract.replace('/share/pi/nigam/data/', V100_BASE_DIR)
         logger.info(f"Loading data from local-scratch: `{V100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-a100':
         copy_resources_to_local(A100_BASE_DIR, is_overwrite_if_exists=True)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_femr_extract'):
+            config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_meds_reader_extract'):
+            config.data.dataset.path_to_meds_reader_extract = config.data.dataset.path_to_meds_reader_extract.replace('/share/pi/nigam/data/', A100_BASE_DIR)
         logger.info(f"Loading data from local-scratch: `{A100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-h100':
         copy_resources_to_local(H100_BASE_DIR, is_overwrite_if_exists=True)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', H100_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_femr_extract'):
+            config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', H100_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_meds_reader_extract'):
+            config.data.dataset.path_to_meds_reader_extract = config.data.dataset.path_to_meds_reader_extract.replace('/share/pi/nigam/data/', H100_BASE_DIR)
         logger.info(f"Loading data from local-scratch: `{H100_BASE_DIR}`.")
     elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
         copy_resources_to_local(GPU_BASE_DIR, is_overwrite_if_exists=True)
-        config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_femr_extract'):
+            config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_meds_reader_extract'):
+            config.data.dataset.path_to_meds_reader_extract = config.data.dataset.path_to_meds_reader_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
         logger.info(f"Loading data from local-scratch: `{GPU_BASE_DIR}`.")
     else:
         logger.info("No local-scratch directory found. Using default `/share/pi/` paths.")

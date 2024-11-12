@@ -170,7 +170,7 @@ class BaseTokenizer(PreTrainedTokenizer):
         print(f"Creating new folder for this version of the tokenizer at `{path_to_new_folder}` with metadata={self.metadata}")
         return path_to_new_folder
     
-    def get_path_to_dataset_dir(self, dataset: 'FEMRDataset') -> str:
+    def get_path_to_dataset_dir(self, dataset: 'Dataset') -> str:
         """
             Example path: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizer_v8/versions/2021-08-10_15-00-00/datasets/v8/
         
@@ -199,16 +199,22 @@ class BaseTokenizer(PreTrainedTokenizer):
         print(f"Creating new folder for this dataset of this version of the tokenizer at `{path_to_new_folder}` with metadata={dataset.metadata}")
         return path_to_new_folder
 
-    def get_seq_length(self, args: Tuple['FEMRDataset', int, int]) -> List[Tuple[int, int]]:
+    def get_seq_length(self, args: Tuple['Dataset', int, int]) -> List[Tuple[int, int]]:
         """Given a dataset and a range of indices, return the sequence length of each patient in that range"""
-        from hf_ehr.data.datasets import FEMRDataset
+        from hf_ehr.data.datasets import FEMRDataset, MEDSDataset
         dataset_metadata, start_idx, end_idx = args # type is: FEMRDataset, int, int
         
+        dataset_cls = None
+        if dataset_metadata.get('cls') == 'MEDSDataset':
+            dataset_cls = MEDSDataset
+        else:
+            dataset_cls = FEMRDataset
+
         # remove extraneous keys so that we can init FEMRDataset() without errors
         for key in [ 'cls', 'tokenizer_metadata', 'max_length' ]:
             if key in dataset_metadata: del dataset_metadata[key]
 
-        dataset = FEMRDataset(**dataset_metadata)
+        dataset = dataset_cls(**dataset_metadata)
         results: List[Tuple[int, int]] = []
         for idx in range(start_idx, end_idx):
             events: List[Event] = dataset.__getitem__(idx)[1]
@@ -1031,8 +1037,8 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
                                                                             add_special_tokens=True,
                                                                             seed=seed, 
                                                                             return_tensors='pt')
-    elif dataset_name == 'FEMRDataset':
-        # For FEMRDataset, truncate timeline per usual
+    elif dataset_name in ['FEMRDataset', 'MEDSDataset']:
+        # For FEMRDataset and MEDSDataset, truncate timeline per usual
         tokens: Dict[str, Float[torch.Tensor, 'B max_length']] = tokenizer(timelines, 
                                                                             truncation=True, 
                                                                             padding=True, 

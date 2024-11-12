@@ -10,7 +10,7 @@ MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'hyena', 'mamba', 'llama', 't5' ]
 SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large', 'xlarge', 'xxlarge']
 TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_8k', 'clmbr_16k', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
 DATALOADER_CHOICES: List[str] = [ 'approx', 'batch']
-DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', ]
+DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', 'meds_dev', ]
 DEFAULT_PARTITIONS: Dict[str, str] = {
     'gpt2': "nigam-v100,gpu",
     'bert': "nigam-v100,gpu",
