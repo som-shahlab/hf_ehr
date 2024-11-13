@@ -19,7 +19,7 @@ BATCH_SIZE=$3
 # 1. Generate patient representations
 echo "Command run: '$0 $@'" | tee /dev/stderr
 python3 ../../eval/ehrshot.py \
-    --path_to_database /share/pi/nigam/datasets/femr_mimic_4_extract \
+    --path_to_database /share/pi/nigam/data/femr_mimic_4_extract \
     --path_to_labels_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_mimic4 \
     --path_to_features_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/features_mimic4 \
     --path_to_tokenized_timelines_dir /share/pi/nigam/$USER/ehrshot-benchmark/EHRSHOT_ASSETS/tokenized_timelines_mimic4 \

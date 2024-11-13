@@ -26,10 +26,10 @@ source base.sh
 # Experiment names
 RUN_NAMES=("mamba-tiny-1024--clmbr" "mamba-tiny-4096--clmbr" "mamba-tiny-8192--clmbr" "mamba-tiny-16384--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 8192 --dataloader approx --dataset v8"
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 16384 --dataloader approx --dataset v8"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 8192 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 16384 --dataloader approx --dataset v8-alltokens"
 )
 
 # Loop over the RUN_NAMES and args

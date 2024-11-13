@@ -29,10 +29,10 @@ conda activate /home/mwornow/llama_hf_env
 # Experiment names
 RUN_NAMES=( "llama-base-512--clmbr" "llama-base-1024--clmbr" "llama-base-2048--clmbr" "llama-base-4096--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8"
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8-alltokens"
 )
 
 # Loop over the RUN_NAMES and args

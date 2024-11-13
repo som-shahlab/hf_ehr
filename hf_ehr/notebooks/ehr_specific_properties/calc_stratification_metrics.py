@@ -1,6 +1,8 @@
 """
+Calculates stratification metrics for each (patient, label)
+
 Usage:
-    python3 stratify.py --task guo_los
+    python3 calc_stratification_metrics.py --task guo_los
 """
 import datetime
 import argparse
@@ -12,23 +14,21 @@ from utils import (
     get_patient_splits_by_idx
 )
 from functools import reduce
-
 from femr.datasets import PatientDatabase
 from femr.labelers import load_labeled_patients, LabeledPatients
 from starr_eda import calc_n_gram_count, calc_inter_event_times
 
+PATH_TO_DATABASE: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract'
+PATH_TO_FEATURES_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features_ehrshot'
+PATH_TO_TOKENIZED_TIMELINES_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/tokenized_timelines_ehrshot'
+PATH_TO_LABELS_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot'
+PATH_TO_SPLIT_CSV: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/splits_ehrshot/person_id_map.csv'
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, help='Type of task to perform', default='guo_los')
+    parser.add_argument('--task', type=str, help='EHRSHOT task', default='guo_los')
     args = parser.parse_args()
 
-    # Constants
-    PATH_TO_DATABASE: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract'
-    PATH_TO_FEATURES_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/features_ehrshot'
-    PATH_TO_TOKENIZED_TIMELINES_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/tokenized_timelines_ehrshot'
-    PATH_TO_LABELS_DIR: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/benchmark_ehrshot'
-    PATH_TO_SPLIT_CSV: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/splits_ehrshot/person_id_map.csv'
-    
     # Output directory
     path_to_output_dir: str = '/share/pi/nigam/mwornow/ehrshot-benchmark/ehrshot/stratify/'
     os.makedirs(path_to_output_dir, exist_ok=True)
@@ -39,8 +39,7 @@ if __name__ == '__main__':
     femr_db = PatientDatabase(PATH_TO_DATABASE)
     labeled_patients: LabeledPatients = load_labeled_patients(PATH_TO_LABELED_PATIENTS)
     
-    # Get features for patients
-    # model: str = 'gpt2-base-512--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last'
+    # Get features for patients -- use longest context model for maximum timeline length
     model: str = 'mamba-tiny-16384--clmbr_train-tokens-total_nonPAD-ckpt_val=2000000000-persist_chunk:last_embed:last'
     patient_ids, label_values, label_times, feature_matrixes = get_labels_and_features(labeled_patients, 
                                                                                         PATH_TO_FEATURES_DIR, 
