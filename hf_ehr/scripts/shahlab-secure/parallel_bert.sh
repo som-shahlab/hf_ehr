@@ -32,25 +32,49 @@ RUN_ARGS=(
     "python3 main.py --model bert --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
 )
 
-# Loop over the RUN_NAMES and args
-for i in "${!RUN_NAMES[@]}"; do
-    RUN_NAME=${RUN_NAMES[i]}
-    RUN_ARG=${RUN_ARGS[i]}
-    STDOUT=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.out
-    STDERR=/share/pi/nigam/${USER}/hf_ehr/slurm_logs/${RUN_NAME}_${SLURM_JOB_ID}.err
-    echo "Launching job #${i} for '${RUN_NAME}' with args '${RUN_ARG}' with slurm job id '${SLURM_JOB_ID}'"
-    
+# Loop over RUN_NAMES and RUN_ARGS two at a time
+for (( i=0; i<${#RUN_NAMES[@]}; i+=2 )); do
+    # First job in the pair
+    RUN_NAME_1=${RUN_NAMES[i]}
+    RUN_ARG_1=${RUN_ARGS[i]}
+    STDOUT_1=/home/${USER}/hf_ehr/slurm_logs/${RUN_NAME_1}.out
+    STDERR_1=/home/${USER}/hf_ehr/slurm_logs/${RUN_NAME_1}.err
+
+    echo "Launching job #${i} for '${RUN_NAME_1}' with args '${RUN_ARG_1}'"
+
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
-        # Overwrite
-        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/${RUN_NAME}_${SLURM_JOB_ID}/"
-        $RUN_ARG --extra "${EXTRA}" --is_run_local --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
+        EXTRA_1="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME_1} main.path_to_output_dir=/home/${USER}/hf_ehr/cache/${RUN_NAME_1}/"
+        $RUN_ARG_1 --extra "${EXTRA_1}" --is_force_refresh --is_skip_base > $STDOUT_1 2> $STDERR_1 &
     else
-        # Resume
-        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/gold/${RUN_NAME}/"
-        $RUN_ARG --extra "${EXTRA}" --is_run_local --is_skip_base > $STDOUT 2> $STDERR &
+        EXTRA_1="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME_1} main.path_to_output_dir=/home/${USER}/hf_ehr/cache/gold/${RUN_NAME_1}/"
+        $RUN_ARG_1 --extra "${EXTRA_1}" --is_skip_base > $STDOUT_1 2> $STDERR_1 &
     fi
 
     child_pids+=($!)
+
+    # Second job in the pair (if exists)
+    if [[ $((i+1)) -lt ${#RUN_NAMES[@]} ]]; then
+        RUN_NAME_2=${RUN_NAMES[i+1]}
+        RUN_ARG_2=${RUN_ARGS[i+1]}
+        STDOUT_2=/home/${USER}/hf_ehr/slurm_logs/${RUN_NAME_2}.out
+        STDERR_2=/home/${USER}/hf_ehr/slurm_logs/${RUN_NAME_2}.err
+
+        echo "Launching job #$((i+1)) for '${RUN_NAME_2}' with args '${RUN_ARG_2}'"
+
+        if [[ "$IS_FORCE_REFRESH" = true ]]; then
+            EXTRA_2="+trainer.devices=[${i+1}] logging.wandb.name=${RUN_NAME_2} main.path_to_output_dir=/home/${USER}/hf_ehr/cache/${RUN_NAME_2}/"
+            $RUN_ARG_2 --extra "${EXTRA_2}" --is_force_refresh --is_skip_base > $STDOUT_2 2> $STDERR_2 &
+        else
+            EXTRA_2="+trainer.devices=[${i+1}] logging.wandb.name=${RUN_NAME_2} main.path_to_output_dir=/home/${USER}/hf_ehr/cache/gold/${RUN_NAME_2}/"
+            $RUN_ARG_2 --extra "${EXTRA_2}" --is_skip_base > $STDOUT_2 2> $STDERR_2 &
+        fi
+
+        child_pids+=($!)
+    fi
+
+    # Wait for both jobs in the pair to finish before moving to the next pair
+    wait
 done
 
+# Wait for any remaining child processes
 wait

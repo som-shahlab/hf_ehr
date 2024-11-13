@@ -2,7 +2,7 @@
 
 source config.sh
 source /home/migufuen/miniconda3/etc/profile.d/conda.sh
-HF_ENV="hf_env"
+HF_ENV="hf_env_llama"
 
 REQUIREMENTS="../../../requirements.txt"
 
