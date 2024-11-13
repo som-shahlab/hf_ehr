@@ -474,7 +474,7 @@ def main(config: DictConfig) -> None:
     try:
         trainer.fit(model, 
                     train_dataloaders=dataloaders['train'],
-                    val_dataloaders=dataloaders['val'],
+                    # val_dataloaders=dataloaders['val'],
                     ckpt_path=path_to_resume_ckpt)
     except Exception as e:
         print("Exception during trainer.fit:")
