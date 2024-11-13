@@ -82,8 +82,6 @@ if __name__ == '__main__':
         'is_add_day_week_month_att': True
     }
     
-    # Add CEHR-specific metadata for visit and ATT tokens if needed
-    # For example, you can define visit-related tokens here and add them to the tokenizer config
     # Add visit-related tokens to the tokenizer config
     visit_tokens = [
         CodeTCE(code="[VISIT START]", description="Visit start token", type="code", stats=[]),
