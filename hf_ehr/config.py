@@ -1,5 +1,6 @@
 import datetime
 import json
+import socket
 import os
 from typing import TypedDict, Dict, Optional, List, Any, Literal, Union, Tuple, Callable
 from omegaconf import DictConfig, OmegaConf
@@ -16,6 +17,7 @@ H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
 V100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
 GPU_BASE_DIR: str = '/share/pi/nigam/hf_ehr/'
+SHAHLAB_SECURE_BASE_DIR: str = '/home/migufuen/hf_ehr/data/'
 
 PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
 PATH_TO_RUNS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'runs/')
@@ -347,6 +349,14 @@ def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
         if hasattr(config.data.dataset, 'path_to_meds_reader_extract'):
             config.data.dataset.path_to_meds_reader_extract = config.data.dataset.path_to_meds_reader_extract.replace('/share/pi/nigam/data/', GPU_BASE_DIR)
         logger.info(f"Loading data from local-scratch: `{GPU_BASE_DIR}`.")
+    elif socket.gethostname() == "bmir-p02.stanford.edu":
+        if hasattr(config.data.dataset, 'path_to_femr_extract'):
+            config.data.dataset.path_to_femr_extract = config.data.dataset.path_to_femr_extract.replace('/share/pi/nigam/data/', SHAHLAB_SECURE_BASE_DIR)
+        if hasattr(config.data.dataset, 'path_to_meds_reader_extract'):
+            config.data.dataset.path_to_meds_reader_extract = config.data.dataset.path_to_meds_reader_extract.replace('/share/pi/nigam/data/', SHAHLAB_SECURE_BASE_DIR)
+        if hasattr(config.data.tokenizer, 'path_to_config'):
+            config.data.tokenizer.path_to_config = config.data.tokenizer.path_to_config.replace('/share/pi/nigam/mwornow/hf_ehr/cache/', SHAHLAB_SECURE_BASE_DIR)
+        logger.info(f"Loading data from /home/migufuen: `{SHAHLAB_SECURE_BASE_DIR}`.")
     else:
         logger.info("No local-scratch directory found. Using default `/share/pi/` paths.")
     return config

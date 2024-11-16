@@ -2,8 +2,15 @@
 
 source config.sh
 
-source /share/sw/open/anaconda/3.10.2/etc/profile.d/conda.sh
+HOSTNAME=$(hostname)
 
+if [[ "$HOSTNAME" == "bmir-p02.stanford.edu" ]]; then
+    source /share/sw/open/anaconda/3.10.2/etc/profile.d/conda.sh
+else
+    soruce /home/migufuen/miniconda3/etc/profile.d/conda.sh
+
+if [[ "$HOSTNAME" == "bmir-p02.stanford.edu" ]]; then
+    HF_ENV="hf_env"
 if [[ "$USER" == "mwornow" ]]; then
     ENV_NAME="hf_env"
 elif [[ "$USER" == "suhana" ]]; then
@@ -16,7 +23,10 @@ fi
 
 REQUIREMENTS="../../../requirements.txt"
 
-if [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
+if [[ "$HOSTNAME" == "bmir-p02.stanford.edu" ]]; then
+    echo "Detected shahlab-secure Node"
+    conda activate /home/migufuen/miniconda3/envs/$HF_ENV
+elif [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
     echo "Detected H100 Partition"
     if [[ ! -e "/local-scratch/nigam/users/hf_ehr/$ENV_NAME" && "$USER" != "suhana" ]]; then
         conda create --prefix=/local-scratch/nigam/users/hf_ehr/$ENV_NAME python=3.10 -y # one-time setup
@@ -53,7 +63,7 @@ fi
 
 # Install hf_ehr + Python packages
 python -m pip install -r $REQUIREMENTS
-# python -m pip install -e ../../../
+python -m pip install -e ../../../
 
 # Some a100 / h100 specific installs
 if [[ "$SLURM_JOB_PARTITION" == "nigam-a100" ]] || [[ "$SLURM_JOB_PARTITION" == "nigam-h100" ]]; then
