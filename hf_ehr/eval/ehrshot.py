@@ -155,13 +155,14 @@ def process_in_batches(run_name, database, patient_ids, label_times, tokenizer, 
     for batch_idx, batch_start in enumerate(tqdm(range(0, total_patients, batch_size), desc='Processing batches')):
         batch_end = min(batch_start + batch_size, total_patients)
         batch_patient_ids = patient_ids[batch_start:batch_end]
+        total_batch = len(batch_patient_ids)
         batch_label_times = label_times[batch_start:batch_end]
         
         # Create batch-specific patient_id_2_events
         batch_patient_id_2_events: Dict[str, List[Event]] = collections.defaultdict(list)
         
         # Cache events for current batch of patients
-        for pid in batch_patient_ids:
+        for pid in tqdm(batch_patient_ids, desc='Caching patient events', total=total_batch):
             if pid not in batch_patient_id_2_events:
                 for e in database[pid].events:
                     batch_patient_id_2_events[pid].append(
@@ -171,7 +172,7 @@ def process_in_batches(run_name, database, patient_ids, label_times, tokenizer, 
         
         # Process each patient in the current batch
         batch_tokenized_timelines = []
-        for pid, l_time in zip(batch_patient_ids, batch_label_times):
+        for pid, l_time in tqdm(zip(batch_patient_ids, batch_label_times), desc='Tokenizing timelines', total=total_batch):
             # Create patient timeline
             valid_events = [
                 e for e in batch_patient_id_2_events[pid]
@@ -203,7 +204,7 @@ def process_in_batches(run_name, database, patient_ids, label_times, tokenizer, 
         
         # Store batch metadata
         batch_metadata['batches'].append({
-            'batch_id': f'{batch_idx}:04d',
+            'batch_id': f'{batch_idx}',
             'file': batch_file,
             'start_idx': int(batch_start),
             'end_idx': int(batch_end),
@@ -329,6 +330,8 @@ def main():
     database = femr.datasets.PatientDatabase(PATH_TO_PATIENT_DATABASE, read_all=True)
     logger.info(f"Loading Config from `{PATH_TO_MODEL}`")
     config = load_config_from_path(PATH_TO_MODEL)
+    logger.info(config)
+    
 
     logger.info(f"Loading Tokenizer from `{PATH_TO_MODEL}")
     tokenizer = load_tokenizer_from_path(PATH_TO_MODEL)
@@ -358,14 +361,14 @@ def main():
             patient_ids.append(patient_id)
             label_values.append(label.value)
             label_times.append(label.time)
-
+    logger.info(f"Total patient ids: {len(patient_ids)}")
     # Generate patient representations
     max_length: int = model.config.data.dataloader.max_length
     pad_token_id: int = tokenizer.token_2_idx['[PAD]']
     
     
     # Cache tokenized timelines for this sequence length
-    run_name = f"chunk_strat={CHUNK_STRAT},max_length={max_length}" + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + "_tokenized_timelines"
+    run_name = f"chunk_strat={CHUNK_STRAT},max_length={max_length}_{config.data.tokenizer.name}" + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + "_tokenized_timelines"
     path_to_tokenized_timelines_metadata_file: str = os.path.join(PATH_TO_TOKENIZED_TIMELINES_DIR, f'{run_name}.json')
     if os.path.exists(path_to_tokenized_timelines_metadata_file):
         # Cache hit
@@ -380,7 +383,7 @@ def main():
             tokenizer=tokenizer,
             max_length=max_length,
             output_dir=PATH_TO_TOKENIZED_TIMELINES_DIR,
-            run_name=f"chunk_strat={CHUNK_STRAT},max_length={max_length}" + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + "_tokenized_timelines",
+            run_name=run_name,
             pad_token_id=pad_token_id,
             batch_size=8000
         )
@@ -414,9 +417,9 @@ def main():
     shutil.copy(PATH_TO_MODEL, path_to_model_ehrshot_dir)
     ## Copy logging files over
     logger.critical(f"Copying logs from `{os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/')}` to `{path_to_model_ehrshot_dir}/logs`")
-    shutil.copytree(os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/'), os.path.join(path_to_model_ehrshot_dir, 'logs/'))
+    # shutil.copytree(os.path.join(os.path.dirname(PATH_TO_MODEL), '../logs/'), os.path.join(path_to_model_ehrshot_dir, 'logs/'))
     ## Copy tokenized timelines over into EHRSHOT cache dir and associate with this model
-    signature = model_signature + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + f"_tokenized_timelines_{batch_dict['batch_id']}.npz"
+    signature = model_signature + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + f"_tokenized_timelines.npz"
     path_to_tokenized_timelines_ehrshot_file: str = os.path.join(PATH_TO_TOKENIZED_TIMELINES_DIR, signature)
     logger.critical(f"Copying tokenized timelines from to `{path_to_tokenized_timelines_ehrshot_file}`")
     save_tokenized_timelines([metadata['file'] for metadata in batch_metadata['batches']], path_to_tokenized_timelines_ehrshot_file)
@@ -439,7 +442,7 @@ def main():
         'path_to_ckpt_orig' : PATH_TO_MODEL,
     }
 
-    path_to_features_pkl: str = PATH_TO_OUTPUT_FILE + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + '_features.pkl'
+    path_to_features_pkl: str = PATH_TO_OUTPUT_FILE + (f'--start_idx={patient_idx_start}' if patient_idx_start else '') + (f'--end_idx={patient_idx_end}' if patient_idx_end else '') + '_features_1.pkl'
     logger.critical(f"Saving results to `{path_to_features_pkl}`")
     with open(path_to_features_pkl, 'wb') as f:
         pickle.dump(results, f)
