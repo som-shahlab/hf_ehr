@@ -220,6 +220,9 @@ pip install --no-cache-dir \
     torchaudio==2.1.2 \
     --index-url https://download.pytorch.org/whl/cu118 --no-cache-dir
 
+# TODO -- install FLA triton kernel
+pip install -U git+https://github.com/sustcsonglin/flash-linear-attention
+
 pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2' --no-build-isolation --no-cache-dir
 pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2#subdirectory=csrc/fused_dense_lib'  --no-build-isolation --no-cache-dir
 pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2#subdirectory=csrc/layer_norm' --no-build-isolation --no-cache-dir
