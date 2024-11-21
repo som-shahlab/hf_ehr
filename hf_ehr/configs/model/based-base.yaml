@@ -1,0 +1,47 @@
+# @package _global_
+
+defaults:
+  - ../architecture/based
+
+data:
+  dataloader:
+    max_length: 1024
+
+model:
+  config_kwargs:
+    n_positions: ${data.dataloader.max_length}
+    n_layer: 16
+    n_head: 12
+    n_embd: 768
+    n_inner: 1536
+    activation_function: "swiglu"
+    mixer: 
+      l_max: ${data.dataloader.max_length}
+      use_bias: true
+      expand_proj: 4
+      kernel_sizes: 3
+      _target_: based.models.mixers.convolution.BaseConv
+    alt_mixer:
+      l_max: ${data.dataloader.max_length}
+      _target_: based.models.mixers.linear_attention.LinearAttention
+      num_heads: 16
+      feature_dim: 16
+      feature_map:
+        _target_: based.models.mixers.linear_attention.TaylorExp
+        input_dim: 16
+    alt_mixer_layers:
+      - 1
+      - 4
+      - 8
+      - 12
+    residual_in_fp32: true
+    # alt_mixer_2:
+    #   causal: true
+    #   _target_: based.models.mixers.slide_attention.SlidingAttention
+    #   num_heads: 16
+    #   window_size: 128
+    alt_mixer_2_layers:
+      - 2
+      - 5
+      - 9
+      - 13

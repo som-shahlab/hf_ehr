@@ -1,0 +1,19 @@
+# @package _global_
+
+model:
+  name: based
+  # Name/path to pass to HF.from_pretrained()
+  hf_name: hazyresearch/based-360m
+  # If TRUE, then keep pretrained weights
+  is_keep_pretrained_weights: False
+
+# Default trainer
+trainer:
+  optimizer:
+    lr: 8e-4
+
+  scheduler:
+    num_warmup_steps: 20_000
+    num_decay_steps: 4_000_000
+    initial_lr: 1e-6
+    final_lr: 8e-5
