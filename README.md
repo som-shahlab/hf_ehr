@@ -20,7 +20,7 @@ This repo allows you to take any model on HuggingFace and train it on structured
 1. Install packages
 ```bash
 conda create -n hf_env python=3.10 -y
-conda activate hf_env
+[conda activate hf_env
 pip install -r requirements.txt --no-cache-dir
 pip install -e .
 ```
