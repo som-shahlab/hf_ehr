@@ -21,6 +21,7 @@ from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.llama import LlamaLanguageModel
+from hf_ehr.models.based import BasedLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
@@ -352,6 +353,8 @@ def main(config: DictConfig) -> None:
         model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'llama' in model_name:
         model = LlamaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+    elif 'based' in model_name:
+        model = BasedLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
         model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
