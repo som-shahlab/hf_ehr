@@ -14,9 +14,17 @@ class LlamaLanguageModel(BaseModel):
 
     def __init__(self, config: DictConfig, vocab_size, pad_token_id) -> None:
         super(LlamaLanguageModel, self).__init__(config, vocab_size, pad_token_id)
+        
+        # Enable flash attention
+        if torch.cuda.get_device_capability('cuda')[0] >= 8:
+            kwargs = {
+                'attn_implementation': 'flash_attention_2',
+            }
+        else:
+            kwargs = {}
 
         # Model specs
-        model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True)
+        model_config = AutoConfig.from_pretrained(config.model.hf_name, trust_remote_code=True, use_cache=False, **kwargs)
         model_config.vocab_size = vocab_size
         for key, val in config.model.config_kwargs.items():
             assert hasattr(model_config, key), f"Config for HF model {config.model.hf_name if hasattr(config.model, 'hf_name') else ''} does not have attribute {key}"
@@ -25,7 +33,7 @@ class LlamaLanguageModel(BaseModel):
         self.hidden_size = model_config.hidden_size
 
         # Model
-        self.model = AutoModelForCausalLM.from_config(model_config)
+        self.model = AutoModelForCausalLM.from_config(model_config, **kwargs)
         
         # Run any post-init handlers from super()
         self.post_init()
