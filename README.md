@@ -20,7 +20,7 @@ This repo allows you to take any model on HuggingFace and train it on structured
 1. Install packages
 ```bash
 conda create -n hf_env python=3.10 -y
-conda activate hf_env
+[conda activate hf_env
 pip install -r requirements.txt --no-cache-dir
 pip install -e .
 ```
@@ -201,6 +201,36 @@ bash 8_make_results_plots.sh
 <a name="other" />
 
 ## ℹ️ Other
+
+### Based
+To get the **based** model to run, you need to do the following installations on an A100 or above node:
+
+```bash
+pip install -v \
+    --disable-pip-version-check \
+    --no-cache-dir \
+    --no-build-isolation \
+    --config-settings "--build-option=--cpp_ext" \
+    --config-settings "--build-option=--cuda_ext" \
+    'git+https://github.com/NVIDIA/apex@b496d85'  --no-cache-dir
+
+pip install --no-cache-dir \
+    torch==2.1.2 \
+    torchvision==0.16.2 \
+    torchaudio==2.1.2 \
+    --index-url https://download.pytorch.org/whl/cu118 --no-cache-dir
+
+# TODO -- install FLA triton kernel
+pip install -U git+https://github.com/sustcsonglin/flash-linear-attention
+
+pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2' --no-build-isolation --no-cache-dir
+pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2#subdirectory=csrc/fused_dense_lib'  --no-build-isolation --no-cache-dir
+pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2#subdirectory=csrc/layer_norm' --no-build-isolation --no-cache-dir
+
+git clone git@github.com:HazyResearch/based.git
+cd based
+pip install -e . --no-cache-dir
+```
 
 ### Creating a Model
 
