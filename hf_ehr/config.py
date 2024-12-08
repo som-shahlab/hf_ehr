@@ -16,7 +16,7 @@ SPLIT_VAL_CUTOFF: float = 85
 H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
 A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
 V100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
-GPU_BASE_DIR: str = '/share/pi/nigam/hf_ehr/'
+GPU_BASE_DIR: str = '/share/pi/nigam/data/'
 SHAHLAB_SECURE_BASE_DIR: str = '/home/migufuen/hf_ehr/data/'
 
 PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'

@@ -24,12 +24,16 @@ source config.sh
 cd ../../eval/
 
 # Overwrite transformers version
-conda activate /home/mwornow/llama_hf_env
+conda activate /home/mwornow/hf_env
 
 RUN_ARGS=(
     # Llama
-    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
-    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+    # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-512--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+    # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+
+    # GPT-rope
+    # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-2048-rope-rebuttal/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
+    "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/gpt-512-rope-rebuttal/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"
 
     # Hyena
     # "/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/hyena-large-1024--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=2000000000-persist.ckpt"

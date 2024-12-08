@@ -3,7 +3,7 @@
 #SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/llama_parallel_%A.out
 #SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/llama_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-v100,gpu,nigam-h100,nigam-a100
+#SBATCH --partition=nigam-h100
 #SBATCH --mem=200G
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:4
@@ -23,16 +23,16 @@ trap 'stop_child_processes' SIGTERM SIGINT
 
 source config.sh
 
-# Overwrite transformers version
+# Overwrite transformers version -- must be transformers==4.44.2
 conda activate /home/mwornow/llama_hf_env
 
 # Experiment names
-RUN_NAMES=( "llama-base-512--clmbr" "llama-base-1024--clmbr" "llama-base-2048--clmbr" "llama-base-4096--clmbr" )
+RUN_NAMES=( "llama-base-512_att--clmbr" "llama-base-1024_att--clmbr" "llama-base-2048_att--clmbr" "llama-base-4096_att--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8-alltokens"
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8-alltokens"
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8-alltokens"
-    "python3 main.py --model llama --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model llama --size base --tokenizer cehr --context_length 512 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer cehr --context_length 1024 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer cehr --context_length 2048 --dataloader approx --dataset v8"
+    "python3 main.py --model llama --size base --tokenizer cehr --context_length 4096 --dataloader approx --dataset v8"
 )
 
 # Loop over the RUN_NAMES and args

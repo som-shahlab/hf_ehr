@@ -26,10 +26,10 @@ source base.sh
 # Experiment names
 RUN_NAMES=("mamba-tiny-1024--clmbr" "mamba-tiny-4096--clmbr" "mamba-tiny-8192--clmbr" "mamba-tiny-16384--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8-alltokens"
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8-alltokens"
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 8192 --dataloader approx --dataset v8-alltokens"
-    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 16384 --dataloader approx --dataset v8-alltokens"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8-alltokens +trainer.scheduler.num_warmup_steps=4_000"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8-alltokens +trainer.scheduler.num_warmup_steps=4_000"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 8192 --dataloader approx --dataset v8-alltokens +trainer.scheduler.num_warmup_steps=4_000"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 16384 --dataloader approx --dataset v8-alltokens +trainer.scheduler.num_warmup_steps=4_000"
 )
 
 # Loop over the RUN_NAMES and args
@@ -42,7 +42,19 @@ for i in "${!RUN_NAMES[@]}"; do
     
     if [[ "$IS_FORCE_REFRESH" = true ]]; then
         # Overwrite
-        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/${RUN_NAME}_${SLURM_JOB_ID}/"
+
+        # ## LR trainer.scheduler
+        # EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/${RUN_NAME}_${SLURM_JOB_ID}/"
+        # if [[ "$RUN_ARG" == *"context_length 16384"* ]]; then
+        #     EXTRA="${EXTRA} +trainer.scheduler.num_warmup_steps=2_000"
+        # elif [[ "$RUN_ARG" == *"context_length 8192"* ]]; then
+        #     EXTRA="${EXTRA} +trainer.scheduler.num_warmup_steps=4_000"
+        # elif [[ "$RUN_ARG" == *"context_length 4096"* ]]; then
+        #     EXTRA="${EXTRA} +trainer.scheduler.num_warmup_steps=4_000"
+        # elif [[ "$RUN_ARG" == *"context_length 1024"* ]]; then
+        #     EXTRA="${EXTRA} +trainer.scheduler.num_warmup_steps=4_000"
+        # fi
+
         $RUN_ARG --extra "${EXTRA}" --is_run_local --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
     else
         # Resume

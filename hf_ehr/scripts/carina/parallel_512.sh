@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=based-parallel
-#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/based_parallel_%A.out
-#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/based_parallel_%A.err
+#SBATCH --job-name=gpt-parallel
+#SBATCH --output=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt_parallel_%A.out
+#SBATCH --error=/share/pi/nigam/mwornow/hf_ehr/slurm_logs/gpt_parallel_%A.err
 #SBATCH --time=48:00:00
-#SBATCH --partition=nigam-a100,nigam-h100,gpu
+#SBATCH --partition=gpu
 #SBATCH --mem=200G
-#SBATCH --cpus-per-task=10
-#SBATCH --gres=gpu:1
-#SBATCH --exclude=secure-gpu-1,secure-gpu-2
+#SBATCH --cpus-per-task=20
+#SBATCH --gres=gpu:3
+#SBATCH --nodelist=secure-gpu-17
 
 IS_FORCE_REFRESH=false
 
@@ -20,17 +20,15 @@ stop_child_processes() {
 }
 
 trap 'stop_child_processes' SIGTERM SIGINT
-source config.sh
-conda activate /home/mwornow/llama_hf_env
+
+source base.sh
 
 # Experiment names
-# RUN_NAMES=( "based-base-512--clmbr" "based-base-1024--clmbr" "based-base-2048--clmbr" "based-base-4096--clmbr" )
-RUN_NAMES=( "based-base-512--clmbr"  )
+RUN_NAMES=( "gpt-base-512--clmbr" "mamba-tiny-512--clmbr" "hyena-large-512--clmbr" )
 RUN_ARGS=(
-    "python3 main.py --model based --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
-    # "python3 main.py --model based --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8"
-    # "python3 main.py --model based --size base --tokenizer clmbr --context_length 2048 --dataloader approx --dataset v8"
-    # "python3 main.py --model based --size base --tokenizer clmbr --context_length 4096 --dataloader approx --dataset v8"
+    "python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
+    "python3 main.py --model mamba --size tiny --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
+    "python3 main.py --model hyena --size large --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8"
 )
 
 # Loop over the RUN_NAMES and args
@@ -47,7 +45,7 @@ for i in "${!RUN_NAMES[@]}"; do
         $RUN_ARG --extra "${EXTRA}" --is_run_local --is_force_refresh --is_skip_base > $STDOUT 2> $STDERR &
     else
         # Resume
-        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/gold/${RUN_NAME}/"
+        EXTRA="+trainer.devices=[${i}] logging.wandb.name=${RUN_NAME} main.path_to_output_dir=/share/pi/nigam/${USER}/hf_ehr/cache/gold_512/${RUN_NAME}/"
         $RUN_ARG --extra "${EXTRA}" --is_run_local --is_skip_base > $STDOUT 2> $STDERR &
     fi
 

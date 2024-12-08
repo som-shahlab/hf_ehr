@@ -1,5 +1,8 @@
 # How to Run
 
+## EHRSHOT
+
+### Few-shot
 Usage: `sbatch ehrshot.sh <path_to_ckpt> <model_name> <batch_size> <device>`
 
 where...
@@ -40,6 +43,21 @@ sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-204
 sbatch ehrshot.sh /share/pi/nigam/suhana/hf_ehr/cache/runs_backup/llama-base-4096--clmbr/ckpts/train-tokens-total_nonPAD-ckpt_val=100000000-persist.ckpt llama-base-4096--clmbr 1
 ```
 
+### Zero-shot
+
+Need to run `7b_eval_zero_shot.sh` from the `ehrshot-benchmark` repo.
+
+Timings on GPU node:
+- gpt2-512: 0.5hr per rollout over 2195 test patients in guo_los (batch_size=8)
+- gpt2-4k: 12hr per rollout over 2192 test patients in guo_los (batch_size=8)
+
+Timings on a100 node:
+- mamba-16k: 6hr per rollout over 2195 test patients in guo_los (batch_size=1)
+
+Timings on h100 node:
+- mamba-1k: 0.25hr per rollout over 2195 test patients in guo_los (batch_size=64)
+- mamba-16k: 4hr per rollout over 2195 test patients in guo_los (batch_size=8)
+- llama-4k: 1hr per rollout over 2195 test patients in guo_los (batch_size=16)
 
 ## MIMIC-4
 
