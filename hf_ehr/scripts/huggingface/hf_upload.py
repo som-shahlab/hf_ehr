@@ -31,7 +31,7 @@ extra_gated_fields:
 
 # {model_name}
 
-This is a **{base_model}** model with context length **{ctx_length}** with **{param_count}** parameters from the [Context Clues paper](TODO).
+This is a **{base_model}** model with context length **{ctx_length}** with **{(param_count // 1e6):.2f}M** parameters from the [Context Clues paper](TODO).
 
 It is a foundation model trained from scratch on the structured data within 2.57 million deidentified EHRs from Stanford Medicine.
 
