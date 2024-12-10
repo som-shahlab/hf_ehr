@@ -248,13 +248,6 @@ Let's say we want to create a new model called `{model}` of size `{size}`.
 
 See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating tokenizers and how they are stored on the file system.
 
-### Tensorboard:
-
-Launch tensorboard with:
-```bash
-tensorboard --logdir="experiments/lightning_logs/"
-```
-
 ## Citation
 
 If you found this work useful, please consider citing it:
