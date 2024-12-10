@@ -14,7 +14,7 @@ It currently supports EHR data defined using the [MEDS data standard](https://gi
 1. 🏋️‍♀️ [Training](#training)
 1. 📊 [Evaluation](#evaluation)
 1. ℹ️ [Other](#other)
-1. [Citation](#citation)
+1. 🎓 [Citation](#citation)
 
 <a name="models" />
 
@@ -262,7 +262,7 @@ Let's say we want to create a new model called `{model}` of size `{size}`.
 
 See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating tokenizers and how they are stored on the file system.
 
-## Citation
+## 🎓 Citation
 
 If you found this work useful, please consider citing it:
 
