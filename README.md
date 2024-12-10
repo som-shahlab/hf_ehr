@@ -18,28 +18,39 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 
 ## 🤗 Pretrained HuggingFace Models
 
-Please see our [HuggingFace Space](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to access all of the pretrained models used in the [Context Clues paper](TODO).
+Please see our [HuggingFace Space](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to download the following models pretrained from scratch on 2 billion tokens of deidentified structured EHR data:
+
+| Model | Context Lengths |
+| ----- | ------------- |
+| gpt | 512, 1024, 2048, 4096 |
+| llama | 512, 1024, 2048, 4096 |
+| mamba | 1024, 4096, 8192, 16384 |
+| hyena | 1024, 4096, 8192, 16384 |
 
 <a name="installation" />
 
 ## 📀 Installation
 
-1. Install packages
+Direct install:
+```bash
+pip install hf-ehr
+```
+
+Development install:
 ```bash
 conda create -n hf_env python=3.10 -y
-[conda activate hf_env
+conda activate hf_env
 pip install -r requirements.txt --no-cache-dir
 pip install -e .
 ```
 
-2. [Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
+[Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
 ```bash
 cd hf_ehr/scripts/tokenizers
 sbatch clmbr.sh # Takes ~5 seconds
 sbatch desc.sh # Takes ~30 min
 sbatch cookbook.sh # Takes many hours
 ```
-
 
 <a name="quick_start"/>
 

@@ -39,9 +39,9 @@ As input, this model expects a sequence of coded medical events that have been m
 
 ## Usage
 
-First, install the `hf_ehr` package:
+First, install the `hf-ehr` package:
 ```bash
-pip install transformers torch hf_ehr
+pip install transformers torch hf-ehr
 ```
 
 Second, run this Python script to do inference on a patient representation:
