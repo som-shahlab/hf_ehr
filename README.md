@@ -1,10 +1,8 @@
 # Training Long Context Models on EHR Data
 
-This repo contains code and pretrained models for the [Context Clues paper](TODO). 
+This repo contains code and pretrained models for the [**Context Clues paper**](TODO). It is designed to enable **training any model on HuggingFace on structured EHR data.** It comes with Hydra configs + Wandb logging + PyTorch Lightning distributed training support.
 
-It is designed to enable training any model on HuggingFace on structured EHR data. It comes with Hydra configs + Wandb logging + PyTorch Lightning distributed training support.
-
-It currently supports EHR data defined using the [MEDS data standard](https://github.com/Medical-Event-Data-Standard/) or [FEMR package](https://github.com/som-shahlab/femr).
+It currently supports EHR data defined using the [**MEDS data standard**](https://github.com/Medical-Event-Data-Standard/) or [**FEMR package**](https://github.com/som-shahlab/femr).
 
 **📖 Table of Contents**
 
