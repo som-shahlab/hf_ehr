@@ -1,17 +1,26 @@
 # Training Long Context Models on EHR Data
 
-Code for [Context Clues](TODO). 
+This repo contains code and pretrained models for the [Context Clues paper](TODO). 
 
-This repo allows you to take any model on HuggingFace and train it on structured EHR data. This enables fast iteration with the latest and greatest architectural advancements. This repo comes with nice Hydra configs + Wandb logging + PyTorch Lightning distributed training support built-in.
+It is designed to enable training any model on HuggingFace on structured EHR data. It comes with Hydra configs + Wandb logging + PyTorch Lightning distributed training support.
+
+It currently supports EHR data defined using the [MEDS data standard](https://github.com/Medical-Event-Data-Standard/) or [FEMR package](https://github.com/som-shahlab/femr).
 
 **📖 Table of Contents**
 
+1. 🤗 [Pretrained HuggingFace Models](#models)
 1. 📀 [Installation](#installation)
 1. 🚀 [Quick Start](#quick_start)
 1. 🏋️‍♀️ [Training](#training)
 1. 📊 [Evaluation](#evaluation)
 1. ℹ️ [Other](#other)
 1. [Citation](#citation)
+
+<a name="models" />
+
+## 🤗 Pretrained HuggingFace Models
+
+Please see our [HuggingFace Space](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to access all of the pretrained models used in the [Context Clues paper](TODO).
 
 <a name="installation" />
 
@@ -32,6 +41,8 @@ sbatch clmbr.sh # Takes ~5 seconds
 sbatch desc.sh # Takes ~30 min
 sbatch cookbook.sh # Takes many hours
 ```
+
+
 <a name="quick_start"/>
 
 ## 🚀 Quick Start
@@ -202,6 +213,9 @@ bash 8_make_results_plots.sh
 
 ## ℹ️ Other
 
+### Llama
+The **llama** model checkpoints we saved only work with transformers 4.44.2.
+
 ### Based
 To get the **based** model to run, you need to do the following installations on an A100 or above node:
 
@@ -242,7 +256,7 @@ Let's say we want to create a new model called `{model}` of size `{size}`.
 
 3. Create the model itself by creating a new file `hf_ehr/models/{model}.py`. Copy the contents of `models/bert.py` and modify as needed.
 
-4. Add your model to `hf_ehr/scripts/run.py` above the line **raise ValueError(f"Model `{config.model.name}` not supported.")**
+4. Add your model to `hf_ehr/scripts/run.py` above the line `raise ValueError(f"Model `{config.model.name}` not supported.")`
 
 ### Creating a Tokenizer
 
