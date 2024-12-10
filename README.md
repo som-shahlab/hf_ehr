@@ -18,7 +18,7 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 
 ## 🤗 Pretrained HuggingFace Models
 
-Please see our [HuggingFace Space](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to download the following models pretrained from scratch on 2 billion tokens of deidentified structured EHR data:
+Please see our [HuggingFace Collection](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to download the following models pretrained from scratch on 2 billion tokens of deidentified structured EHR data:
 
 | Model | Context Lengths |
 | ----- | ------------- |
