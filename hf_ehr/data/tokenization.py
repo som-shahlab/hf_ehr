@@ -93,6 +93,29 @@ class BaseTokenizer(PreTrainedTokenizer):
         assert isinstance(self.metadata, dict), f"ERROR - `self.metadata` must be a dict, but got {type(self.metadata)}"
         self.path_to_tokenizer_version_dir: str = self.get_path_to_tokenizer_version_dir() # trigger creation of version folder if it doesn't exist
 
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path: str, **kwargs):
+        """Override the default `from_pretrained()` method to allow for custom tokenizer config files"""
+        from huggingface_hub import hf_hub_download
+        # Download the tokenizer config file from Hugging Face
+        path_to_tokenizer_config = hf_hub_download(
+            repo_id=pretrained_model_name_or_path,
+            filename="tokenizer_config.json" # NOTE: Hardcoded
+        )
+
+        # Load the configuration
+        with open(path_to_tokenizer_config, "r") as f:
+            tokenizer_config = json.load(f)
+
+        # Extract `path_to_tokenizer_config` and `metadata` from the config
+        metadata = tokenizer_config.get("metadata", {})
+        
+        # Initialize the tokenizer
+        tokenizer = cls(
+            path_to_tokenizer_config=path_to_tokenizer_config,
+            **kwargs,
+        )
+        return tokenizer
     
     ########################################################
     # Tokenization helpers
