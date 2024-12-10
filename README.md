@@ -4,7 +4,7 @@ This repo contains code and pretrained models for the [**Context Clues paper**](
 
 It currently supports EHR data defined using the [**MEDS data standard**](https://github.com/Medical-Event-Data-Standard/) or [**FEMR package**](https://github.com/som-shahlab/femr).
 
-**📖 Table of Contents**
+### 📖 Table of Contents
 
 1. 🤗 [Pretrained HuggingFace Models](#models)
 1. 📀 [Installation](#installation)
@@ -270,6 +270,9 @@ Let's say we want to create a new model called `{model}` of size `{size}`.
 ### Creating a Tokenizer
 
 See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating tokenizers and how they are stored on the file system.
+
+
+<a name="citation" />
 
 ## 🎓 Citation
 
