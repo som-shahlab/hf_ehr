@@ -10,7 +10,7 @@ MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'based', 'hyena', 'mamba', 'llama',
 SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large', 'xlarge', 'xxlarge']
 TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_8k', 'clmbr_16k', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
 DATALOADER_CHOICES: List[str] = [ 'approx', 'batch']
-DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', 'meds_dev', ]
+DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', 'meds_dev', 'meds_mimiciv_demo', ]
 DEFAULT_PARTITIONS: Dict[str, str] = {
     'gpt2': "nigam-v100,gpu",
     'based' : "nigam-a100,nigam-h100,gpu",
@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--model", choices=MODEL_CHOICES, required=True, help=f"Architecture ({MODEL_CHOICES})")
     parser.add_argument("--size", choices=SIZE_CHOICES, required=True, help=f"Model size ({SIZE_CHOICES})")
     parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, required=True, help=f"Tokenizer to use ({TOKENIZER_CHOICES})")
-    parser.add_argument("--dataset", choices=DATASET_CHOICES, required=True, help=f"Dataset mode ({DATASET_CHOICES})")
+    parser.add_argument("--dataset", required=True, help=f"Dataset mode ({DATASET_CHOICES})")
     parser.add_argument("--dataloader", choices=DATALOADER_CHOICES, required=True, help=f"Dataloader mode ({DATALOADER_CHOICES})")
     parser.add_argument("--context_length", type=int, required=True, help="Context length")
     parser.add_argument("--extra", help="Extra argument if any. Passed verbatim to run.py as a string")
