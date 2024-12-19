@@ -3,4 +3,4 @@
 data:
   dataset:
     name: MEDSDataset
-    path_to_meds_reader_extract: /share/pi/nigam/mwornow/meds_dev_reader
+    path_to_meds_reader_extract: /share/pi/nigam/suhana/hf_ehr_repo/hf_ehr/mimic-iv-demo-meds-reader
