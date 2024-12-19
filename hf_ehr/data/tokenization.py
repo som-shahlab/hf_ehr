@@ -234,9 +234,8 @@ class BaseTokenizer(PreTrainedTokenizer):
             dataset_cls = FEMRDataset
 
         # remove extraneous keys so that we can init FEMRDataset() without errors
-        for key in [ 'cls', 'tokenizer_metadata', 'max_length' ]:
-            if key in dataset_metadata: del dataset_metadata[key]
-
+        dataset_metadata = { key: val for key, val in dataset_metadata.items() if key not in [ 'cls', 'tokenizer_metadata', 'max_length' ] }
+        
         dataset = dataset_cls(**dataset_metadata)
         results: List[Tuple[int, int]] = []
         for idx in range(start_idx, end_idx):
@@ -273,6 +272,7 @@ class BaseTokenizer(PreTrainedTokenizer):
                 print(f"No `seq_length_per_patient.json` found at `{path_to_cache_file}` for split=`{dataset.split}`. Generating `seq_length_per_patient.json` now...")
 
         # Calculate seq lengths in parallel
+        n_procs = 1 # TODO - remove
         if n_procs == 1:
             tasks: List[Tuple] = [(dataset.metadata, start, min(dataset.get_n_patients(), start + 1),) for start in range(0, dataset.get_n_patients(), 1) ]
             results: List[List[Tuple[int,int]]] = [ self.get_seq_length(t) for t in tqdm(tasks, total=len(tasks), desc=f"tokenizer.get_seq_length_per_patient() | n_procs={n_procs}") ]
@@ -338,6 +338,10 @@ class BaseCodeTokenizer(BaseTokenizer):
         # Second, add special tokens (if applicable)
         if kwargs.get("add_special_tokens", False):
             batch = [ [ self.cls_token, self.bos_token ] + x + [ self.eos_token ] for x in batch ]
+
+        # NOTE: When `is_split_into_words=True`, then __call__() will fail when a list of tokens has length 0.
+        # Replace those lists with length 0 with a list of length 1 (i.e. [self.pad_token_id])
+        batch = [ x if len(x) > 0 else [ self.pad_token ] for x in batch ]
 
         # Third, tokenize the batch
         if is_truncation_random:

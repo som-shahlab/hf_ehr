@@ -299,7 +299,6 @@ if __name__ == '__main__':
     print(f"Number of patients in validation dataset: {num_val_patients}")
     print(f"Number of patients in test dataset: {num_test_patients}")
     
-    #breakpoint()
     t1 = time.time()
     event_count = 0
     for pid in tqdm(train_dataset.get_pids()[:100000]):

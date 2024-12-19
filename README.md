@@ -65,7 +65,7 @@ python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024
 Launch a Llama run on a MEDS dataset:
 ```bash
 cd hf_ehr/scripts/carina
-python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_mimiciv_demo --is_run_local --is_force_refresh
+python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_mimic4_demo --is_run_local --is_force_refresh
 ```
 
 To launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):
