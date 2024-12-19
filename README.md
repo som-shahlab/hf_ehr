@@ -227,9 +227,11 @@ bash 8_make_results_plots.sh
 
 ## 💊 MEDS Demo
 
-We support training and inference on [MEDS formatted datasets](https://github.com/Medical-Event-Data-Standard/meds/). Here is a quick tutorial using the publicly available MIMIC-IV demo dataset (inspired by [this tutorial](https://colab.research.google.com/drive/1R1LrDIzhQyWldQWM0lyfjeF_n9I_iZT3)).
+We support training and inference on [MEDS formatted datasets](https://github.com/Medical-Event-Data-Standard/meds/). 
 
-1. Download the [MIMIC-IV demo dataset](https://physionet.org/content/mimiciv-demo/1.4/) from PhysioNet.
+Here is a quick tutorial using the publicly available **MIMIC-IV demo dataset** (inspired by [this tutorial](https://colab.research.google.com/drive/1R1LrDIzhQyWldQWM0lyfjeF_n9I_iZT3)).
+
+1. **Download** the [MIMIC-IV demo dataset](https://physionet.org/content/mimiciv-demo/1.4/) from PhysioNet.
 
 ```bash
 export PATH_TO_DOWNLOAD=mimic4_demo
@@ -239,27 +241,27 @@ export PATH_TO_MEDS_READER=meds_mimic4_demo_reader
 !wget -q -r -N -c --no-host-directories --cut-dirs=1 -np -P $PATH_TO_DOWNLOAD https://physionet.org/files/mimic-iv-demo/2.2/
 ```
 
-2. Convert the MIMIC-IV demo dataset to [MEDS](https://github.com/Medical-Event-Data-Standard/meds/).
+2. **Convert** the MIMIC-IV demo dataset to [**MEDS format**](https://github.com/Medical-Event-Data-Standard/meds/).
 
 ```bash
 rm -rf $PATH_TO_MEDS 2>/dev/null
 meds_etl_mimic $PATH_TO_DOWNLOAD $PATH_TO_MEDS
 ```
 
-3. Create a [MEDS Reader](https://github.com/som-shahlab/meds_reader) for this dataset (to enable faster data ingestion during training).
+3. **Convert** the MEDS dataset into a [**MEDS Reader Database**](https://github.com/som-shahlab/meds_reader) (to enable faster data ingestion during training).
 
 ```bash
 rm -rf $PATH_TO_MEDS_READER 2>/dev/null
 meds_reader_convert $PATH_TO_MEDS $PATH_TO_MEDS_READER --num_threads 4
 ```
 
-4. Verify everything worked.
+4. **Verify** everything worked.
 
 ```bash
 meds_reader_verify $PATH_TO_MEDS $PATH_TO_MEDS_READER
 ```
 
-5. Create 80/10/10 train/test/val **splits** by running this Python script:
+5. **Create train/val/test splits** (80/10/10) by running this Python script:
 ```python
 import meds_reader
 import polars as pl
@@ -275,14 +277,14 @@ df = pl.DataFrame(splits, schema=["split", "subject_id"])
 df.write_parquet(os.path.join(os.environ["PATH_TO_MEDS_READER"], 'metadata', 'subject_splits.parquet'))
 ```
 
-6. Create a **Hydra config** for your dataset.
+6. **Create** a **Hydra config** for your dataset.
 
 ```bash
 cp hf_ehr/configs/data/meds_mimic4_demo.yaml hf_ehr/configs/meds/meds_mimic4_demo_custom.yaml
 sed -i 's|/share/pi/nigam/mwornow/mimic-iv-demo-meds-reader|$PATH_TO_MEDS_READER|g' hf_ehr/configs/meds/meds_mimic4_demo_custom.yaml
 ```
 
-7. Train a **Llama model** on the dataset.
+7. **Train** a **Llama model** on the dataset.
 
 ```bash
 cd hf_ehr/scripts/carina
