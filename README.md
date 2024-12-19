@@ -11,6 +11,7 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 1. 🚀 [Quick Start](#quick_start)
 1. 🏋️‍♀️ [Training](#training)
 1. 📊 [Evaluation](#evaluation)
+1. 💊 [MEDS Demo](#meds_demo)
 1. ℹ️ [Other](#other)
 1. 🎓 [Citation](#citation)
 
@@ -22,10 +23,10 @@ Please see our [HuggingFace Space](https://huggingface.co/collections/StanfordSh
 
 | Model | Context Lengths |
 | ----- | ------------- |
-| gpt | 512, 1024, 2048, 4096 |
-| llama | 512, 1024, 2048, 4096 |
-| mamba | 1024, 4096, 8192, 16384 |
-| hyena | 1024, 4096, 8192, 16384 |
+| gpt | [512](https://huggingface.co/StanfordShahLab/gpt-base-512-clmbr), [1024](https://huggingface.co/StanfordShahLab/gpt-base-1024-clmbr), [2048](https://huggingface.co/StanfordShahLab/gpt-base-2048-clmbr), [4096](https://huggingface.co/StanfordShahLab/gpt-base-4096-clmbr) |
+| llama | [512](https://huggingface.co/StanfordShahLab/llama-base-512-clmbr), [1024](https://huggingface.co/StanfordShahLab/llama-base-1024-clmbr), [2048](https://huggingface.co/StanfordShahLab/llama-base-2048-clmbr), [4096](https://huggingface.co/StanfordShahLab/llama-base-4096-clmbr) |
+| mamba | [1024](https://huggingface.co/StanfordShahLab/mamba-tiny-1024-clmbr), [4096](https://huggingface.co/StanfordShahLab/mamba-tiny-4096-clmbr), [8192](https://huggingface.co/StanfordShahLab/mamba-tiny-8192-clmbr), [16384](https://huggingface.co/StanfordShahLab/mamba-tiny-16384-clmbr) |
+| hyena | [1024](https://huggingface.co/StanfordShahLab/hyena-large-1024-clmbr), [4096](https://huggingface.co/StanfordShahLab/hyena-large-4096-clmbr), [8192](https://huggingface.co/StanfordShahLab/hyena-large-8192-clmbr), [16384](https://huggingface.co/StanfordShahLab/hyena-large-16384-clmbr) |
 
 <a name="installation" />
 
@@ -42,10 +43,8 @@ conda create -n hf_env python=3.10 -y
 conda activate hf_env
 pip install -r requirements.txt --no-cache-dir
 pip install -e .
-```
 
-[Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
-```bash
+# [Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
 cd hf_ehr/scripts/tokenizers
 sbatch clmbr.sh # Takes ~5 seconds
 sbatch desc.sh # Takes ~30 min
@@ -61,6 +60,12 @@ Launch a GPT training run with the ability to configure common hyperparameters:
 ```bash
 cd hf_ehr/scripts/carina
 python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8 --is_run_local --is_force_refresh
+```
+
+Launch a Llama run on a MEDS dataset:
+```bash
+cd hf_ehr/scripts/carina
+python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_mimiciv_demo --is_run_local --is_force_refresh
 ```
 
 To launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):
@@ -218,6 +223,73 @@ This all occurs within the `ehrshot-benchmark` repo.
 bash 8_make_results_plots.sh
 ```
 
+<a name="meds_demo"/>
+
+## 💊 MEDS Demo
+
+We support training and inference on [MEDS formatted datasets](https://github.com/Medical-Event-Data-Standard/meds/). Here is a quick tutorial using the publicly available MIMIC-IV demo dataset.
+
+1. Download the [MIMIC-IV demo dataset](https://physionet.org/content/mimiciv-demo/1.4/) from PhysioNet.
+
+```bash
+export PATH_TO_DOWNLOAD=mimic4_demo
+export PATH_TO_MEDS=meds_mimic4_demo
+export PATH_TO_MEDS_READER=meds_mimic4_demo_reader
+
+!wget -q -r -N -c --no-host-directories --cut-dirs=1 -np -P $PATH_TO_DOWNLOAD https://physionet.org/files/mimic-iv-demo/2.2/
+```
+
+2. Convert the MIMIC-IV demo dataset to [MEDS](https://github.com/Medical-Event-Data-Standard/meds/).
+
+```bash
+rm -rf $PATH_TO_MEDS 2>/dev/null
+meds_etl_mimic $PATH_TO_DOWNLOAD $PATH_TO_MEDS
+```
+
+3. Create a [MEDS Reader](https://github.com/som-shahlab/meds_reader) for this dataset (to enable faster data ingestion during training).
+
+```bash
+rm -rf $PATH_TO_MEDS_READER 2>/dev/null
+meds_reader_convert $PATH_TO_MEDS $PATH_TO_MEDS_READER --num_threads 4
+```
+
+4. Verify everything worked.
+
+```bash
+meds_reader_verify $PATH_TO_MEDS $PATH_TO_MEDS_READER
+```
+
+5. Create 80/10/10 train/test/val **splits** by running this Python script:
+```python
+import meds_reader
+import polars as pl
+import os
+
+database = meds_reader.SubjectDatabase(os.environ["PATH_TO_MEDS_READER"])
+subject_ids = list(database)
+splits = [
+    ('train' if idx < 80 else 'tuning' if idx < 90 else 'held_out', subject_ids[idx])
+    for idx in range(len(subject_ids))
+]
+df = pl.DataFrame(splits, schema=["split", "subject_id"])
+df.write_parquet(os.path.join(os.environ["PATH_TO_MEDS_READER"], 'metadata', 'subject_splits.parquet'))
+```
+
+6. Create a **Hydra config** for your dataset.
+
+```bash
+cp hf_ehr/configs/data/meds_mimic4_demo.yaml hf_ehr/configs/meds/meds_mimic4_demo_custom.yaml
+sed -i 's|/share/pi/nigam/mwornow/mimic-iv-demo-meds-reader|$PATH_TO_MEDS_READER|g' hf_ehr/configs/meds/meds_mimic4_demo_custom.yaml
+```
+
+7. Train a **Llama model** on the dataset.
+
+```bash
+cd hf_ehr/scripts/carina
+python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_mimic4_demo_custom --is_run_local --is_force_refresh
+``` 
+
+
 <a name="other" />
 
 ## ℹ️ Other
@@ -255,7 +327,7 @@ cd based
 pip install -e . --no-cache-dir
 ```
 
-### Creating a Model
+### 🤖 Creating a Model
 
 Let's say we want to create a new model called `{model}` of size `{size}`.
 
@@ -267,9 +339,13 @@ Let's say we want to create a new model called `{model}` of size `{size}`.
 
 4. Add your model to `hf_ehr/scripts/run.py` above the line `raise ValueError(f"Model `{config.model.name}` not supported.")`
 
-### Creating a Tokenizer
+### ✂️ Creating a Tokenizer
 
 See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating tokenizers and how they are stored on the file system.
+
+### 🤗 Uploading a Model to Hugging Face
+
+See the [Hugging Face README](hf_ehr/scripts/huggingface/README.md) for details on uploading models to Hugging Face.
 
 ## 🎓 Citation
 

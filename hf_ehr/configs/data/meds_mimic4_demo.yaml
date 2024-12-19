@@ -1,0 +1,6 @@
+# @package _global_
+
+data:
+  dataset:
+    name: MEDSDataset
+    path_to_meds_reader_extract: /share/pi/nigam/mwornow/mimic-iv-demo-meds-reader
