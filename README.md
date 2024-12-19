@@ -4,7 +4,7 @@ This repo contains code and pretrained models for the [**Context Clues paper**](
 
 It currently supports EHR data defined using the [**MEDS data standard**](https://github.com/Medical-Event-Data-Standard/) or [**FEMR package**](https://github.com/som-shahlab/femr).
 
-**📖 Table of Contents**
+### 📖 Table of Contents
 
 1. 🤗 [Pretrained HuggingFace Models](#models)
 1. 📀 [Installation](#installation)
@@ -19,7 +19,7 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 
 ## 🤗 Pretrained HuggingFace Models
 
-Please see our [HuggingFace Space](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to download the following models pretrained from scratch on 2 billion tokens of deidentified structured EHR data:
+Please see our [HuggingFace Collection](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to download the following models pretrained from scratch on 2 billion tokens of deidentified structured EHR data:
 
 | Model | Context Lengths |
 | ----- | ------------- |
@@ -346,6 +346,8 @@ See the [Tokenizer README](hf_ehr/tokenizers/README.md) for details on creating 
 ### 🤗 Uploading a Model to Hugging Face
 
 See the [Hugging Face README](hf_ehr/scripts/huggingface/README.md) for details on uploading models to Hugging Face.
+
+<a name="citation" />
 
 ## 🎓 Citation
 
