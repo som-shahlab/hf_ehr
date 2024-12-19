@@ -1,3 +1,11 @@
+"""
+Usage:
+    python hf_download.py
+
+Purpose:
+    Test if we can download an hf_ehr model+tokenizer from Hugging Face.
+"""
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from hf_ehr.data.tokenization import CLMBRTokenizer
 from hf_ehr.config import Event

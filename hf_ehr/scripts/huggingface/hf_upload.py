@@ -1,3 +1,11 @@
+"""
+Usage:
+    python hf_upload.py
+
+Purpose:
+    Upload an hf_ehr model+tokenizer to Hugging Face Hub.
+"""
+
 import json
 import os
 import torch
@@ -233,7 +241,7 @@ for model_name in tqdm(models):
     model_name = model_name.replace('--', '-')
 
     # Save model + tokenizer to local directory
-    path_to_local_dir = "./hf_model_for_upload"
+    path_to_local_dir = "../../../cache/hf_model_for_upload"
     os.makedirs(path_to_local_dir, exist_ok=True)
     ## Model
     model.save_pretrained(path_to_local_dir, safe_serialization=False)
