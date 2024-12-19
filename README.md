@@ -227,7 +227,7 @@ bash 8_make_results_plots.sh
 
 ## 💊 MEDS Demo
 
-We support training and inference on [MEDS formatted datasets](https://github.com/Medical-Event-Data-Standard/meds/). Here is a quick tutorial using the publicly available MIMIC-IV demo dataset.
+We support training and inference on [MEDS formatted datasets](https://github.com/Medical-Event-Data-Standard/meds/). Here is a quick tutorial using the publicly available MIMIC-IV demo dataset (inspired by [this tutorial](https://colab.research.google.com/drive/1R1LrDIzhQyWldQWM0lyfjeF_n9I_iZT3)).
 
 1. Download the [MIMIC-IV demo dataset](https://physionet.org/content/mimiciv-demo/1.4/) from PhysioNet.
 
