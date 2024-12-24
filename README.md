@@ -356,7 +356,7 @@ See the [Hugging Face README](hf_ehr/scripts/huggingface/README.md) for details 
 If you found this work useful, please consider citing it:
 
 ```
-@misc{wornow2024contextclues,
+@article{wornow2024contextclues,
       title={Context Clues: Evaluating Long Context Models for Clinical Prediction Tasks on EHRs}, 
       author={Michael Wornow and Suhana Bedi and Miguel Angel Fuentes Hernandez and Ethan Steinberg and Jason Alan Fries and Christopher Ré and Sanmi Koyejo and Nigam H. Shah},
       year={2024},
