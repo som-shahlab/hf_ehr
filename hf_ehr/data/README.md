@@ -6,7 +6,7 @@ Helper functions for...
 
 ## Supported Formats
 
-### MEDS
+### 💊 MEDS
 
 [Please see here](https://github.com/som-shahlab/long_context_clues?tab=readme-ov-file#meds_demo) for instructions for loading MEDS formatted data.
 
@@ -15,7 +15,7 @@ Example command:
 python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_dev --is_run_local --is_force_refresh
 ```
 
-### FEMR
+### 🦴 FEMR
 
 Example command:
 
