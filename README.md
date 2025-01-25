@@ -1,6 +1,6 @@
 # Training Long Context Models on EHR Data
 
-This repo contains code and pretrained models for the [**Context Clues paper**](TODO). It is designed to enable **training any model on HuggingFace on structured EHR data.** It comes with Hydra configs + Wandb logging + PyTorch Lightning distributed training support.
+This repo contains code and pretrained models for the [**Context Clues paper**](https://arxiv.org/abs/2412.16178). It is designed to enable **training any model on HuggingFace on structured EHR data.** It comes with Hydra configs + Wandb logging + PyTorch Lightning distributed training support.
 
 It currently supports EHR data defined using the [**MEDS data standard**](https://github.com/Medical-Event-Data-Standard/) or [**FEMR package**](https://github.com/som-shahlab/femr).
 
@@ -317,7 +317,7 @@ pip install --no-cache-dir \
     torchaudio==2.1.2 \
     --index-url https://download.pytorch.org/whl/cu118 --no-cache-dir
 
-# TODO -- install FLA triton kernel
+# Install FLA triton kernel
 pip install -U git+https://github.com/sustcsonglin/flash-linear-attention
 
 pip install 'git+https://github.com/HazyResearch/flash-attention@v2.5.2' --no-build-isolation --no-cache-dir
@@ -356,5 +356,11 @@ See the [Hugging Face README](hf_ehr/scripts/huggingface/README.md) for details 
 If you found this work useful, please consider citing it:
 
 ```
-TODO
+@article{wornow2024contextclues,
+      title={Context Clues: Evaluating Long Context Models for Clinical Prediction Tasks on EHRs}, 
+      author={Michael Wornow and Suhana Bedi and Miguel Angel Fuentes Hernandez and Ethan Steinberg and Jason Alan Fries and Christopher Ré and Sanmi Koyejo and Nigam H. Shah},
+      year={2024},
+      eprint={2412.16178},
+      url={https://arxiv.org/abs/2412.16178}, 
+}
 ```
