@@ -37,6 +37,11 @@ Direct install:
 pip install hf-ehr
 ```
 
+For faster Mamba runs, install:
+```bash
+pip install mamba-ssm causal-conv1d
+```
+
 Development install:
 ```bash
 conda create -n hf_env python=3.10 -y
