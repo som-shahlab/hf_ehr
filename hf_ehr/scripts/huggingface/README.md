@@ -16,14 +16,16 @@ This script will:
 
 ## Usage
 
-An example of how to use a pretrained `hf_ehr` model+tokenizer from Hugging Face to run inference on a patient can be found in `hf_download.py`. Simply run:
+An example of how to use a pretrained `hf_ehr` model+tokenizer from Hugging Face to run inference on a patient can be found in `hf_test.py`. Simply run:
 
 ```bash
-python hf_download.py
+python hf_test.py
 ```
 
-This script will:
+For every model that we upload to Hugging Face, this script will:
 1. Download the model+tokenizer from Hugging Face Hub
 2. Tokenize a patient
 3. Run inference on the patient
 4. Print the patient representation
+
+If the model is not working, it will be printed out as part of the `bad_models` list.
