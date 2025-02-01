@@ -9,6 +9,7 @@ data:
 
 model:
   config_kwargs:
+    n_ctx: ${data.dataloader.max_length}
     n_positions: ${data.dataloader.max_length}
     n_layer: 12
     n_head: 12
