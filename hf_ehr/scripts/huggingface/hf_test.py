@@ -14,22 +14,22 @@ import torch
 from tqdm import tqdm
 
 models = [ 
-    # 'gpt-base-512--clmbr',
-    # 'gpt-base-1024--clmbr',
-    # 'gpt-base-2048--clmbr',
-    # 'gpt-base-4096--clmbr',
+    'gpt-base-512--clmbr',
+    'gpt-base-1024--clmbr',
+    'gpt-base-2048--clmbr',
+    'gpt-base-4096--clmbr',
     'hyena-large-1024--clmbr',
     'hyena-large-4096--clmbr',
     'hyena-large-8192--clmbr',
     'hyena-large-16384--clmbr',
-    # 'mamba-tiny-1024--clmbr',
-    # 'mamba-tiny-4096--clmbr',
-    # 'mamba-tiny-8192--clmbr',
-    # 'mamba-tiny-16384--clmbr', 
-    # 'llama-base-512--clmbr',
-    # 'llama-base-1024--clmbr',
-    # 'llama-base-2048--clmbr',
-    # 'llama-base-4096--clmbr',
+    'mamba-tiny-1024--clmbr',
+    'mamba-tiny-4096--clmbr',
+    'mamba-tiny-8192--clmbr',
+    'mamba-tiny-16384--clmbr', 
+    'llama-base-512--clmbr',
+    'llama-base-1024--clmbr',
+    'llama-base-2048--clmbr',
+    'llama-base-4096--clmbr',
 ]
 
 def run_test(model_name: str):
