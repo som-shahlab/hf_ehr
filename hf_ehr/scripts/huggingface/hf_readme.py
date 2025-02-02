@@ -7,8 +7,8 @@ logits = model(**batch).logits
 '''
     elif 'hyena' in model_name:
         section__run_model = f'''batch.pop("token_type_ids", None) # ! NOTE: Must remove 'token_type_ids' for llama model
-        batch.pop("attention_mask", None) # ! NOTE: Must remove 'attention_mask' for hyena model
-        logits = model(**batch).logits
+batch.pop("attention_mask", None) # ! NOTE: Must remove 'attention_mask' for hyena model
+logits = model(**batch).logits
 # > logits.shape = torch.Size([1, 9, 39818])
 '''
     else:

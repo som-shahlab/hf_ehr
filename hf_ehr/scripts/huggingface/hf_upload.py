@@ -31,18 +31,18 @@ models = [
     # 'gpt-base-1024--clmbr',
     # 'gpt-base-2048--clmbr',
     # 'gpt-base-4096--clmbr',
-    # 'hyena-large-1024--clmbr',
-    # 'hyena-large-4096--clmbr',
-    # 'hyena-large-8192--clmbr',
-    # 'hyena-large-16384--clmbr',
+    'hyena-large-1024--clmbr',
+    'hyena-large-4096--clmbr',
+    'hyena-large-8192--clmbr',
+    'hyena-large-16384--clmbr',
     # 'mamba-tiny-1024--clmbr',
     # 'mamba-tiny-4096--clmbr',
     # 'mamba-tiny-8192--clmbr',
     # 'mamba-tiny-16384--clmbr', 
-    'llama-base-512--clmbr',
-    'llama-base-1024--clmbr',
-    'llama-base-2048--clmbr',
-    'llama-base-4096--clmbr',
+    # 'llama-base-512--clmbr',
+    # 'llama-base-1024--clmbr',
+    # 'llama-base-2048--clmbr',
+    # 'llama-base-4096--clmbr',
 ]
 
 for model_name in tqdm(models):
@@ -72,7 +72,7 @@ for model_name in tqdm(models):
     # Model-specific configs
     if 'gpt' in model_name:
         config['model']['config_kwargs']['n_ctx'] = config['model']['config_kwargs']['n_positions']
-    if 'llama' in model_name:
+    elif 'llama' in model_name:
         config['model']['config_kwargs']['rope_scaling'] = {
             "factor": 8.0,
             "low_freq_factor": 1.0,
@@ -83,6 +83,12 @@ for model_name in tqdm(models):
             "original_max_position_embeddings": config['model']['config_kwargs']['max_position_embeddings'],
         }
         config['model']['config_kwargs']['head_dim'] = config['model']['config_kwargs']['hidden_size'] // config['model']['config_kwargs']['num_attention_heads']
+    elif 'hyena' in model_name:
+        # NOTE: By default, Hyena sets `pad_vocab_size_multiple` to 8
+        # This increases our vocab size from 39818 => 39824, which makes `lm_head.weight.shape = (39824, 768)`
+        # See: https://huggingface.co/LongSafari/hyenadna-medium-450k-seqlen-hf/blob/42dedd4d374eac0fb8168549e546a3472fbd27ae/configuration_hyena.py#L27
+        # Here, we undo this.
+        config['model']['config_kwargs']['pad_vocab_size_multiple'] = 1
 
     # Instantiate model and load weights
     new_state_dict = ckpt['state_dict']
@@ -90,6 +96,13 @@ for model_name in tqdm(models):
         new_state_dict = {k.replace('model.', ''): v for k, v in new_state_dict.items()}
     elif 'hyena' in model_name:
         new_state_dict = {k.replace('model.', ''): v for k, v in new_state_dict.items()}
+        # NOTE: By default, Hyena sets `pad_vocab_size_multiple` to 8
+        # This increases our vocab size from 39818 => 39824, which makes `lm_head.weight.shape = (39824, 768)`
+        # See: https://huggingface.co/LongSafari/hyenadna-medium-450k-seqlen-hf/blob/42dedd4d374eac0fb8168549e546a3472fbd27ae/configuration_hyena.py#L27
+        # Here, we undo this.
+        vocab_size: int = config['model']['config_kwargs']['vocab_size']
+        new_state_dict['lm_head.weight'] = new_state_dict['lm_head.weight'][:vocab_size]
+        new_state_dict['hyena.backbone.embeddings.word_embeddings.weight'] = new_state_dict['hyena.backbone.embeddings.word_embeddings.weight'][:vocab_size]
     elif 'mamba' in model_name:
         new_state_dict = {k.replace('model.', ''): v for k, v in new_state_dict.items()}
     elif 'llama' in model_name:
