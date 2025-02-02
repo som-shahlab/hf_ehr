@@ -313,8 +313,7 @@ class BaseCodeTokenizer(BaseTokenizer):
             mask_token='[MASK]',
         )
         self.add_tokens(self.non_special_tokens)
-
-
+        self.clean_up_tokenization_spaces = False # to avoid HuggingFace deprecation warning
     
     def __call__(self, 
                  batch_of_events: Union[List[Event], List[List[Event]]],
