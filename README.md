@@ -356,6 +356,12 @@ See the [Hugging Face README](hf_ehr/scripts/huggingface/README.md) for details 
 
 <a name="citation" />
 
+### 📦 Package for PyPi
+
+```bash
+make release
+```
+
 ## 🎓 Citation
 
 If you found this work useful, please consider citing it:
