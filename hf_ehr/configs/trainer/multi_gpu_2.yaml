@@ -1,0 +1,9 @@
+# @package _global_
+
+trainer:
+  devices: [0, 1]
+  distributed_backend: ddp
+
+data:
+  dataloader:
+    n_workers: 4

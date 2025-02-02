@@ -26,6 +26,7 @@ from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
+import torch.distributed as dist
 
 class GradNormCallback(Callback):
     """
@@ -95,7 +96,11 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
     def on_train_batch_end(self, trainer, *args, **kwargs):
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
-        
+
+        # Add periodic debug logging
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        print(f"[GPU {rank}] Running on_train_batch_end with metric={metric_value} for {self.metric_name}")
+
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
             self.last_ckpt_metric_value = metric_value
@@ -424,14 +429,14 @@ def main(config: DictConfig) -> None:
     if getattr(config.callbacks.model_checkpointing, 'every_n_train_nonPAD_tokens', None) not in [None, "None"]:
         # Save checkpoint every `every_n_train_nonPAD_tokens` steps; persists all models
         logger.critical("Adding MetricBasedCheckpoint for non-PAD tokens...")
-        callbacks += [ 
-            MetricBasedCheckpoint(
-                dirpath=path_to_ckpt_dir,
-                metric_name="train/tokens/total_nonPAD",
-                is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
-                is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
-            ),
-        ]
+        # callbacks += [ 
+        #     MetricBasedCheckpoint(
+        #         dirpath=path_to_ckpt_dir,
+        #         metric_name="train/tokens/total_nonPAD",
+        #         is_valid_metric_func=lambda x,y: train_token_metric_func(x, y, config),
+        #         is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
+        #     ),
+        # ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
         logger.error(f"Skipping FLOPs checkpoint b/c incorrectly calculated")
         # Save checkpoint every `every_n_flops` FLOPs; persists all models

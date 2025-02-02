@@ -39,16 +39,16 @@ class BaseModel(L.LightningModule):
         self.pad_token_id: int = pad_token_id
         self.flops_per_token = None
         
-        # Metrics
-        self.sum_metrics: Dict[str, SumMetric] = torch.nn.ModuleDict({
-            'train_total_examples': SumMetric(),
-            'train_total_tokens_PAD': SumMetric(),
-            'train_total_tokens_nonPAD': SumMetric(),
-        })
-        self.cat_metrics: Dict[str, CatMetric] = torch.nn.ModuleDict({
-            'val_batch_loss': CatMetric(),
-            'val_batch_tokens_nonPAD': CatMetric(),
-        })
+        # Metric
+        self.sum_metrics: Dict[str, int] = {
+            'train_total_examples': torch.zeros(1),
+            'train_total_tokens_PAD': torch.zeros(1),
+            'train_total_tokens_nonPAD': torch.zeros(1),
+        }
+        self.cat_metrics: Dict[str, List] = {
+            'val_batch_loss' : [],
+            'val_batch_tokens_nonPAD' : [],
+        }
     
     def post_init(self):
         """Post-initialization method to be called by subclass."""
@@ -90,9 +90,9 @@ class BaseModel(L.LightningModule):
     def on_save_checkpoint(self, checkpoint):
         """Save each metric's state in the checkpoint."""
         for key, metric in self.sum_metrics.items():
-            checkpoint[key] = metric.compute()
+            checkpoint[key] = metric
         for key, metric in self.cat_metrics.items():
-            checkpoint[key] = metric.compute()
+            checkpoint[key] = metric
         checkpoint['batch_idx'] = self.batch_idx
         checkpoint['wandb_run_id'] = wandb.run.id if wandb and wandb.run else None
 
@@ -101,12 +101,12 @@ class BaseModel(L.LightningModule):
         super().on_load_checkpoint(checkpoint)
         # Sum Metrics
         for key, metric in self.sum_metrics.items():
-            self.sum_metrics[key].update(checkpoint[key])
-            logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.sum_metrics[key].cuda().compute()}`")
+            self.sum_metrics[key] += checkpoint[key]
+            logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.sum_metrics[key]}`")
         # Cat Metrics
         for key, metric in self.cat_metrics.items():
-            self.cat_metrics[key].update(checkpoint[key])
-            logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.cat_metrics[key].cuda().compute()}`")
+            self.cat_metrics[key] += checkpoint[key]
+            logger.info(f"Loaded metric `{key}` from checkpoint with value: `{self.cat_metrics[key]}`")
         self.batch_idx: int = checkpoint.get('batch_idx', 0)
         logger.info(f"Loaded `batch_idx` from checkpoint with value: `{self.batch_idx}`")
 
@@ -187,13 +187,13 @@ class BaseModel(L.LightningModule):
 
     def on_validation_start(self):
         # When we restart validation, reset # of tokens that have gone into the val loss calculation to 0
-        self.cat_metrics['val_batch_loss'].reset()
-        self.cat_metrics['val_batch_tokens_nonPAD'].reset()
+        self.cat_metrics['val_batch_loss'] = torch.tensor(0)
+        self.cat_metrics['val_batch_tokens_nonPAD'] = torch.tensor(0)
 
     def on_validation_epoch_end(self):
         # Calculate per-token val loss and perplexity
-        val_batch_loss: torch.Tensor = self.cat_metrics['val_batch_loss'].compute()  # Loss/token across all validation batches
-        val_batch_tokens_nonPAD: torch.Tensor = self.cat_metrics['val_batch_tokens_nonPAD'].compute()  # Tokens/batch across all validation batches
+        val_batch_loss: torch.Tensor = self.cat_metrics['val_batch_loss']  # Loss/token across all validation batches
+        val_batch_tokens_nonPAD: torch.Tensor = self.cat_metrics['val_batch_tokens_nonPAD']  # Tokens/batch across all validation batches
 
         # Calculate the weighted average loss per token
         total_loss = torch.sum(val_batch_loss * val_batch_tokens_nonPAD)  # Sum of weighted losses
@@ -208,48 +208,64 @@ class BaseModel(L.LightningModule):
         self.log('val/ppl', torch.clamp(ppl, max=100).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
 
         # Log training metrics to sync val/loss to training metrics
-        self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
-        self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
-        self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
+        # self.log('val/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'] + self.sum_metrics['train_total_tokens_nonPAD']).to(torch.float32), on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'], on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'], on_step=False, on_epoch=True, sync_dist=True)
 
     def log_validation_step(self, loss: torch.Tensor, tokens: Dict[str, Any]):
         # NOTE: Assumes `loss` has been scaled per-token already
         val_batch_tokens_nonPAD: int = (tokens['input_ids'] != self.pad_token_id).sum().detach().cpu().item()
-        self.cat_metrics['val_batch_loss'].update(loss)  # Corrected to use cat_metrics
-        self.cat_metrics['val_batch_tokens_nonPAD'].update(val_batch_tokens_nonPAD)
+        # self.cat_metrics['val_batch_loss'] += [ loss ]  # Corrected to use cat_metrics
+        # self.cat_metrics['val_batch_tokens_nonPAD'] += [ val_batch_tokens_nonPAD ]
 
     def log_training_step(self, loss: torch.Tensor, B: int, tokens: Dict[str, Any], lr: float):
-        """
-            B: batch size
-        """
+        # Metrics
+        train_batch_examples: int = B
+        pad_token_id: int = self.pad_token_id
+        input_ids: torch.Tensor = tokens['input_ids']
+        train_batch_tokens_PAD: torch.Tensor = (input_ids == pad_token_id).sum()
+        train_batch_tokens_nonPAD: torch.Tensor = (input_ids != pad_token_id).sum()
+
+        rank = dist.get_rank() if dist.is_initialized() else 0
+
+        # REDUCE metrics across GPUs
+        train_total_examples = torch.tensor([0], dtype=torch.int, device=self.device)
+        train_total_tokens_PAD = torch.tensor([0], dtype=torch.int, device=self.device)
+        train_total_tokens_nonPAD = torch.tensor([0], dtype=torch.int, device=self.device)
+        print(f"[GPU {rank}] Skipping logging | ", train_total_examples, train_batch_examples)
+        train_total_examples += train_batch_examples
+        train_total_tokens_PAD += train_batch_tokens_PAD
+        train_total_tokens_nonPAD += train_batch_tokens_nonPAD
+        dist.all_reduce(train_total_examples, op=dist.ReduceOp.SUM)
+        dist.all_reduce(train_total_tokens_PAD, op=dist.ReduceOp.SUM)
+        dist.all_reduce(train_total_examples, op=dist.ReduceOp.SUM)
+
+        # Only log from GPU 0
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        if not self.trainer.is_global_zero:
+            # Add periodic debug logging
+            print(f"[GPU {rank}] Skipping logging")
+            return
+        print(f"[GPU {rank}] Logging")
+
+        self.sum_metrics['train_total_examples'] += train_total_examples.cpu()
+        self.sum_metrics['train_total_tokens_PAD'] += train_total_tokens_PAD.cpu()
+        self.sum_metrics['train_total_tokens_nonPAD'] += train_total_tokens_nonPAD.cpu()
+
+        # Calculate loss
         loss = loss.detach()
         ppl: torch.Tensor = torch.exp(loss)
 
-        # Metrics
-        train_batch_examples: int = B
-        self.sum_metrics['train_total_examples'].update(train_batch_examples)
+        # Batch metrics
         self.log('optim/lr', lr)
         self.log('train/loss', loss, prog_bar=True)
         self.log('train/ppl', torch.clamp(ppl, max=100).to(torch.float32))  # artificially cap to 100 so that charts look prettier
         self.log('train/examples/batch', torch.tensor(B, dtype=torch.float32))
-        self.log('train/examples/total', self.sum_metrics['train_total_examples'].compute().to(torch.float32), sync_dist=True)
+        self.log('train/examples/total', self.sum_metrics['train_total_examples'])
 
-        if 'hyena' in self.model_name:
-            # Hyena doesn't have `attention_mask` in the input, so manually calculate number of PAD tokens
-            pad_token_id = self.pad_token_id
-            input_ids = tokens['input_ids']
-            train_batch_tokens_PAD = (input_ids == pad_token_id).sum()
-            train_batch_tokens_nonPAD = (input_ids != pad_token_id).sum()
-        else:
-            train_batch_tokens_PAD: torch.Tensor = (1 - tokens['attention_mask']).sum()
-            train_batch_tokens_nonPAD: torch.Tensor = tokens['attention_mask'].sum()
-
-        # Update cumulative metrics
-        self.sum_metrics['train_total_tokens_PAD'].update(train_batch_tokens_PAD)
-        self.sum_metrics['train_total_tokens_nonPAD'].update(train_batch_tokens_nonPAD)
+        # Total metrics
         self.log('train/tokens/batch_all', (train_batch_tokens_PAD + train_batch_tokens_nonPAD).to(torch.float32))
         self.log('train/tokens/batch_PAD', train_batch_tokens_PAD.to(torch.float32))
         self.log('train/tokens/batch_nonPAD', train_batch_tokens_nonPAD.to(torch.float32))
-        self.log('train/tokens/total_all', (self.sum_metrics['train_total_tokens_PAD'].compute() + self.sum_metrics['train_total_tokens_nonPAD'].compute()).to(torch.float32))
-        self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'].compute().to(torch.float32))
-        self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'].compute().to(torch.float32))
+        self.log('train/tokens/total_PAD', self.sum_metrics['train_total_tokens_PAD'])
+        self.log('train/tokens/total_nonPAD', self.sum_metrics['train_total_tokens_nonPAD'])

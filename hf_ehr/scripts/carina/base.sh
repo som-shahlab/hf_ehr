@@ -7,7 +7,7 @@ HOSTNAME=$(hostname)
 if [[ "$HOSTNAME" == "bmir-p02.stanford.edu" ]]; then
     source /share/sw/open/anaconda/3.10.2/etc/profile.d/conda.sh
 else
-    soruce /home/migufuen/miniconda3/etc/profile.d/conda.sh
+    source /home/migufuen/miniconda3/etc/profile.d/conda.sh
 
 if [[ "$HOSTNAME" == "bmir-p02.stanford.edu" ]]; then
     HF_ENV="hf_env"
