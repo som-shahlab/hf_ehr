@@ -96,7 +96,6 @@ class HyenaLanguageModel(BaseModel):
     def training_step(self, 
                       batch: Dict[str, Any],
                       batch_idx: int) -> Optional[torch.Tensor]:
-        # TODO (@Suhana) -- adapt for Hyena
         tokens: Dict[str, Float[torch.Tensor, 'B L']] = batch['tokens'].copy()
         B: int = tokens['input_ids'].shape[0]
         
