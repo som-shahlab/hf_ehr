@@ -1,4 +1,22 @@
-readme_text = lambda model_name, base_model, ctx_length, param_count: f"""
+def readme_text(model_name, base_model, ctx_length, param_count):
+    # "Run Model" section
+    if 'llama' in model_name:
+        section__run_model = f'''batch.pop("token_type_ids", None) # ! NOTE: Must remove 'token_type_ids' for llama model
+logits = model(**batch).logits
+# > logits.shape = torch.Size([1, 9, 39818])
+'''
+    elif 'hyena' in model_name:
+        section__run_model = f'''batch.pop("token_type_ids", None) # ! NOTE: Must remove 'token_type_ids' for llama model
+        batch.pop("attention_mask", None) # ! NOTE: Must remove 'attention_mask' for hyena model
+        logits = model(**batch).logits
+# > logits.shape = torch.Size([1, 9, 39818])
+'''
+    else:
+        section__run_model = f'''logits = model(**batch).logits
+# > logits.shape = torch.Size([1, 9, 39818])'''
+
+    # README content
+    return f"""
 ---
 license: cc-by-nc-4.0
 library_name: {model_name}
@@ -41,7 +59,7 @@ import torch
 
 ####################################
 # 1. Load model and tokenizer
-model = AutoModelForCausalLM.from_pretrained("StanfordShahLab/{model_name}")
+model = AutoModelForCausalLM.from_pretrained("StanfordShahLab/{model_name}"{', trust_remote_code=True) # NOTE: Must trust remote code for Hyena' if 'hyena' in model_name else ')' }
 tokenizer = CLMBRTokenizer.from_pretrained("StanfordShahLab/{model_name}")
 
 ####################################
@@ -68,8 +86,7 @@ textual_tokens: List[str] = tokenizer.convert_events_to_tokens(patient)
 
 ####################################
 # 4. Run model
-logits = model(**batch).logits
-# > logits.shape = torch.Size([1, 9, 39818])
+{section__run_model}
 
 ####################################
 # 5. Get patient representation for finetuning (usually we choose the last token's logits)

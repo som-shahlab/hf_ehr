@@ -27,18 +27,18 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 base_dir: str = '/share/pi/nigam/suhana/hf_ehr/cache/runs_backup/'
 models = [ 
-    'gpt-base-512--clmbr',
-    'gpt-base-1024--clmbr',
-    'gpt-base-2048--clmbr',
-    'gpt-base-4096--clmbr',
-    'hyena-large-1024--clmbr',
-    'hyena-large-4096--clmbr',
-    'hyena-large-8192--clmbr',
-    'hyena-large-16384--clmbr',
-    'mamba-tiny-1024--clmbr',
-    'mamba-tiny-4096--clmbr',
-    'mamba-tiny-8192--clmbr',
-    'mamba-tiny-16384--clmbr', 
+    # 'gpt-base-512--clmbr',
+    # 'gpt-base-1024--clmbr',
+    # 'gpt-base-2048--clmbr',
+    # 'gpt-base-4096--clmbr',
+    # 'hyena-large-1024--clmbr',
+    # 'hyena-large-4096--clmbr',
+    # 'hyena-large-8192--clmbr',
+    # 'hyena-large-16384--clmbr',
+    # 'mamba-tiny-1024--clmbr',
+    # 'mamba-tiny-4096--clmbr',
+    # 'mamba-tiny-8192--clmbr',
+    # 'mamba-tiny-16384--clmbr', 
     'llama-base-512--clmbr',
     'llama-base-1024--clmbr',
     'llama-base-2048--clmbr',
@@ -68,8 +68,21 @@ for model_name in tqdm(models):
     config['model']['config_kwargs']['pad_token_id'] = 4
     config['model']['config_kwargs']['cls_token_id'] = 5
     config['model']['config_kwargs']['mask_token_id'] = 6
+    
+    # Model-specific configs
     if 'gpt' in model_name:
         config['model']['config_kwargs']['n_ctx'] = config['model']['config_kwargs']['n_positions']
+    if 'llama' in model_name:
+        config['model']['config_kwargs']['rope_scaling'] = {
+            "factor": 8.0,
+            "low_freq_factor": 1.0,
+            "high_freq_factor": 4.0,
+            "rope_type": "llama3",
+            # NOTE: Setting original == max will cause this warning to throw: https://github.com/huggingface/transformers/blob/62db3e6ed67a74cc1ed1436acd9973915c0a4475/src/transformers/modeling_rope_utils.py#L534-L538
+            # But we can ignore this b/c it will just cause the attention_factor to be set to 1.0
+            "original_max_position_embeddings": config['model']['config_kwargs']['max_position_embeddings'],
+        }
+        config['model']['config_kwargs']['head_dim'] = config['model']['config_kwargs']['hidden_size'] // config['model']['config_kwargs']['num_attention_heads']
 
     # Instantiate model and load weights
     new_state_dict = ckpt['state_dict']
