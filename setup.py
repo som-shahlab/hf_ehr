@@ -12,7 +12,7 @@ setup(
     python_requires=">=3.10",
     install_requires=[
         "polars==1.1",
-        "transformers==4.39.3",
+        "transformers==4.48.2",
         "trl==0.10.1",
         "datasets==2.14.5",
         "pandas==2.2",
