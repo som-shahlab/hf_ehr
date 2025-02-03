@@ -45,5 +45,5 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/som-shahlab/long_context_clues/"
 
-[tool.setuptools]
-packages = ["hf_ehr"]
+[tool.setuptools.packages.find]
+include = ["hf_ehr*"]
