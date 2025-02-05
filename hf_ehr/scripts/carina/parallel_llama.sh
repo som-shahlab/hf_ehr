@@ -21,10 +21,7 @@ stop_child_processes() {
 
 trap 'stop_child_processes' SIGTERM SIGINT
 
-source config.sh
-
-# Overwrite transformers version -- must be transformers==4.44.2
-conda activate /home/mwornow/llama_hf_env
+source base.sh
 
 # Experiment names
 RUN_NAMES=( "llama-base-512_att--clmbr" "llama-base-1024_att--clmbr" "llama-base-2048_att--clmbr" "llama-base-4096_att--clmbr" )
