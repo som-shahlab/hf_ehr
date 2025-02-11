@@ -93,7 +93,7 @@ class BaseModel(L.LightningModule):
             checkpoint[key] = metric.compute()
         for key, metric in self.cat_metrics.items():
             checkpoint[key] = metric.compute()
-        checkpoint['batch_idx'] = self.batch_idx
+        checkpoint['batch_idx'] = self.batch_idx if hasattr(self, 'batch_idx') else 0
         checkpoint['wandb_run_id'] = wandb.run.id if wandb and wandb.run else None
 
     def on_load_checkpoint(self, checkpoint):

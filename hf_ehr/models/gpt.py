@@ -22,8 +22,8 @@ class GPTLanguageModel(BaseModel):
         # Enable flash attention
         if torch.cuda.get_device_capability('cuda')[0] >= 8:
             kwargs = {
-                'attn_implementation': 'flash_attention_2',
-                'torch_dtype': torch.bfloat16,
+                # 'attn_implementation': 'flash_attention_2',
+                # 'torch_dtype': torch.bfloat16,
             }
         else:
             kwargs = {}

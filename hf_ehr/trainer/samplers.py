@@ -16,42 +16,59 @@ class SortishSampler(Sampler):
                  is_random_shuffle_across_buckets: bool = False, 
                  is_random_shuffle_within_buckets: bool = False,
                  secondary_sort_key: Optional[List[int]] = None,
-                 n_replicas: int = 1):
+                 n_samples_per_batch: Optional[List[int]] = None,
+                 n_replicas: int = 1,
+                 rank: Optional[int] = None):
         if secondary_sort_key is not None:
             self.data: np.ndarray = np.lexsort((np.array(secondary_sort_key), -1 * np.array(sequence_lengths))) # sort longest -> shortest; break ties by considering `secondary_sort_key`; useful if `secondary_sort_key` is patient_id for the AllTokensFEMRDataset so that we keep all subsequences from the same patient together
         else:
             self.data: np.ndarray = np.argsort(-1 * np.array(sequence_lengths)) # sort longest -> shortest; NOTE: keep so that if we blow out memory, we do so earlier rather than later
         self.n_replicas: int = n_replicas
-        self.num_samples: int = int(math.ceil(len(self.data) * 1.0 / self.n_replicas))
         self.bucket_size: int = bucket_size
-        n_buckets: int = int(np.ceil(len(self.data) / self.bucket_size))
-        self.data = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
+        n_buckets: int = int(np.ceil(len(sequence_lengths) / self.bucket_size))
+        self.bucketed_data = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
         self.epoch: int = 0
-        self.total_size: int = self.num_samples * self.n_replicas
+
+        self.n_samples_per_batch: Optional[List[int]] = n_samples_per_batch # [idx] = batch idx, [value] = number of samples in that batch
+        if self.n_samples_per_batch is not None:
+            # We've been told explicitly the number of samples per batch. Use this to split batches across GPUs.
+            # This allows for the possibility that there is a diff number of samples per batch 
+            # e.g. if we're filling batches by token counts, and each sequence has a different length.
+            # That means we need to track the number of samples we allocate to each GPU in order to get an 
+            # even # of batches per GPU, b/c batches will be formed based on token counts rather than samples. 
+            # If we don't evenly allocate the # of batches across GPUs, then torch trainer with DDP will stall
+            self.n_batches_per_gpu: int = int(math.floor(len(self.n_samples_per_batch) * 1.0 / self.n_replicas))
+            self.n_samples_per_gpu: List[int] = [ sum(self.n_samples_per_batch[x * self.n_batches_per_gpu: (x + 1) * self.n_batches_per_gpu]) for x in range(self.n_replicas) ] # [idx] = GPU idx, [value] = number of samples on that GPU
+        else:
+            # We don't know the number of samples per batch, so we'll just split samples evenly across GPUs
+            # Assume even number of samples per batch, so can evenly split samples across GPUs to get even # of batches per GPU
+            self.n_batches_per_gpu: int = int(math.floor(len(sequence_lengths) * 1.0 / self.n_replicas))
+            self.n_samples_per_gpu: List[int] = [ self.n_batches_per_gpu ] * self.n_replicas # [idx] = GPU idx, [value] = number of samples on that GPU
+
+        assert len(self.n_samples_per_gpu) == self.n_replicas, f"ERROR: len(self.n_samples_per_gpu) ({len(self.n_samples_per_gpu)}) != self.n_replicas ({self.n_replicas})"
         self.is_random_shuffle_across_buckets: bool = is_random_shuffle_across_buckets
         self.is_random_shuffle_within_buckets: bool = is_random_shuffle_within_buckets
+        self.rank: int = rank if rank is not None else torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
 
     def __iter__(self):
         """This gets called once at the start of every epoch."""
-        np.random.seed(self.epoch)
-        self.rank = torch.distributed.get_rank() if torch.distributed.is_initialized() else 0
+        np.random.seed(0)
+        data = np.copy(self.bucketed_data) # copy to prevent modifying the original data; for deterministic shuffling between epochs
         if self.is_random_shuffle_within_buckets:
-            for bucket in self.data:
+            for bucket in data:
                 np.random.shuffle(bucket)
         if self.is_random_shuffle_across_buckets:
-            np.random.shuffle(self.data)
-        indices = [item for sublist in self.data for item in sublist]
-        indices += indices[:(self.total_size - len(indices))]
-        assert len(indices) == self.total_size
-        # subsample
-        start = self.rank * self.num_samples
-        end = start + self.num_samples
+            np.random.shuffle(data)
+        indices = [item for sublist in data for item in sublist]
+        # subsample for this GPU. NOTE: the value of `start - end` might be different for each GPU 
+        # b/c batches might be formed based on token counts rather than samples
+        start: int = sum(self.n_samples_per_gpu[:self.rank])
+        end: int = start + self.n_samples_per_gpu[self.rank]
         indices = indices[start:end]
-        assert len(indices) == self.num_samples
         return iter(indices)
 
     def __len__(self) -> int:
-        return self.num_samples
+        return self.n_samples_per_gpu[self.rank]
 
     def set_epoch(self, epoch: int):
         """Ensures different shuffling for each epoch"""
@@ -91,9 +108,10 @@ class ApproxBatchSampler(BatchSampler):
         self.max_examples: int = max_examples # max examples per batch
         self.batch_mult: int = batch_mult # make batch sizes a multiple of this
         self.drop_last: bool = drop_last
-        self.length = None # result of len(self)
-        self.last_length_epoch_calc = None # for tracking self.length caching
-        self.start_batch_idx: int = 0 # batch idx to start yielding at;used for resuming samping from the last index saved in a checkpoint
+        self.length: int = None # result of len(self)
+        self.n_samples_per_batch: List[int] = None # for tracking # of samples per batch -- used in Multi-GPU training to evenly distribute sample (b/c hard to know apriori how many samples are in a batch if splitting batches by max token limits)
+        self.last_length_epoch_calc: int = None # for tracking self.length caching
+        self.start_batch_idx: int = 0 # batch idx to start yielding at; used for resuming samping from the last index saved in a checkpoint
         assert self.max_tokens >= self.model_context_window, f"ERROR: max_tokens ({self.max_tokens}) must be >= model_context_window ({self.model_context_window}). Otherwise, you could get a sequence that is too long to be included in any batch, i.e. len(seq) == model_context_window > max_tokens, which means some batches will return empty which throws an error. It doesn't make sense to limit the batch size to be less than the model context window, b/c then you'll never fully fill the model's context window."
 
     def __len__(self):
@@ -101,9 +119,15 @@ class ApproxBatchSampler(BatchSampler):
             # Calculate length of batch sampler
             self.last_length_epoch_calc = self.sampler.epoch
             length = 0
-            for __ in iter(self):
+            n_samples_per_batch: List[int] = []
+            for batch in iter(self):
                 length += 1
+                n_samples_per_batch.append(len(batch))
             self.length = length
+            self.n_samples_per_batch = n_samples_per_batch
+        rank: int = self.sampler.rank
+        assert sum(self.n_samples_per_batch) == self.sampler.n_samples_per_gpu[rank], f"ERROR: sum(n_samples_per_batch) ({sum(self.n_samples_per_batch)}) != self.sampler.n_samples_per_gpu[rank] ({self.sampler.n_samples_per_gpu[rank]})"
+        assert len(self.n_samples_per_batch) == self.length, f"ERROR: len(n_samples_per_batch) ({len(self.n_samples_per_batch)}) != self.length ({self.length})"
         return self.length
 
     def __iter__(self) -> Generator[List[int], None, None]:
@@ -132,8 +156,19 @@ class ApproxBatchSampler(BatchSampler):
                 batch = batch[rounded_n:] + [sampler_idx]
                 max_length = max([min(self.sample_lengths[i], self.model_context_window) for i in batch])
                 batch_counter += 1
+            # if batch_counter >= self.sampler.n_batches_per_gpu:
+            #     # If we've yielded the max number of batches for this GPU, then stop
+            #     # This is needed to keep the batch counts consistent across GPUs
+            #     print(f"Breaking out of ranking {self.sampler.rank} at batch_counter={batch_counter} and n_batches_per_gpu={self.sampler.n_batches_per_gpu}")
+            #     break
         if len(batch) > 0:
             yield batch
+            batch_counter += 1
+        if self.sampler.n_samples_per_batch is not None:
+            # NOTE: Only do this check if we know aprior what the `self.sampler.n_samples_per_batch` will be (i.e. we've already run __len__ on this ApproxBatchSampler)
+            # Otherwise, `self.sampler.n_batches_per_gpu` won't be accurate (will be the # of examples rather than the # of batches) b/c we haven't updated it 
+            # with `self.sampler.n_samples_per_batch` in the __init__ of SortishSampler yet
+            assert batch_counter == self.sampler.n_batches_per_gpu, f"ERROR: batch_counter ({batch_counter}) != self.sampler.n_batches_per_gpu ({self.sampler.n_batches_per_gpu})"
 
     def set_epoch(self, epoch: int):
         """Ensures different shuffling for each epoch"""
@@ -150,18 +185,60 @@ if __name__ == '__main__':
         14, 15,         # 10,11
         20,             # 12
         22,             # 13 
-        30,             # 14
+        29,             # 14
+        30,             # 15
+    ]
+
+    # Multi-GPU distributed setup
+    n_gpus: int = 2
+    ## First, determine total # of batches in epoch
+    sampler = SortishSampler(sequence_lengths, 10, False, False, None, n_replicas=1, rank=0)
+    assert len(sampler) == 16
+    assert len(sampler.bucketed_data) == 2
+    assert sampler.n_samples_per_gpu == [16]
+    assert [ x for x in sampler ] ==[15, 14, 13, 12, 11, 9, 10, 8, 7, 6, 5, 4, 3, 2, 1, 0], f"sampler={[ x for x in sampler ]}"
+    approx = ApproxBatchSampler(sequence_lengths, sampler, 30, 30, 99999999, 1, True)
+    assert len(approx) == 9
+    assert approx.n_samples_per_batch == [1, 1, 1, 1, 2, 2, 2, 4, 2]
+    assert [ x for x in approx ] == [[15], [14], [13], [12], [11, 9], [10, 8], [7, 6], [5, 4, 3, 2], [1, 0]]
+    n_samples_per_batch = approx.n_samples_per_batch
+    ## Second, split across GPUs
+    sampler0 = SortishSampler(sequence_lengths, 10, False, False, None, n_samples_per_batch=n_samples_per_batch, n_replicas=n_gpus, rank=0)
+    assert sampler0.n_samples_per_gpu == [4, 10], f"sampler0.n_samples_per_gpu={sampler0.n_samples_per_gpu}"
+    sampler1 = SortishSampler(sequence_lengths, 10, False, False, None, n_samples_per_batch=n_samples_per_batch, n_replicas=n_gpus, rank=1)
+    assert sampler1.n_samples_per_gpu == [4, 10], f"sampler1.n_samples_per_gpu={sampler1.n_samples_per_gpu}"
+    assert all(np.array(sampler0.n_samples_per_batch) == np.array(sampler1.n_samples_per_batch)), f"ERROR: sampler0.n_samples_per_batch ({sampler0.n_samples_per_batch}) != sampler1.n_samples_per_batch ({sampler1.n_samples_per_batch})"
+    approx0 = ApproxBatchSampler(sequence_lengths, sampler0, 30, 30, 99999999, 1, True)
+    assert len(approx0) == 4
+    assert approx0.sampler.n_batches_per_gpu == 4
+    assert approx0.n_samples_per_batch == [1, 1, 1, 1]
+    assert [ x for x in approx0 ] == [[15], [14], [13], [12]]
+    approx1 = ApproxBatchSampler(sequence_lengths, sampler1, 30, 30, 99999999, 1, True)
+    assert len(approx1) == 4
+    assert approx1.sampler.n_batches_per_gpu == 4
+    assert approx1.n_samples_per_batch == [2, 2, 2, 4]
+    assert [ x for x in approx1 ] == [[11, 9], [10, 8], [7, 6], [5, 4, 3, 2]]
+    
+    # Confirm buckets of size 10 are sorted properly
+    sequence_lengths = [ # NOTE: Sort descending, so we batch in reverse order (i.e. starting from bottom)
+        4, 4,           # 0,1
+        5, 5, 6, 7,     # 2,3,4,5
+        10, 13,         # 6,7
+        14, 14,         # 8,9
+        14, 15,         # 10,11
+        20,             # 12
+        22,             # 13 
+        29,             # 14
     ]
     sampler = SortishSampler(sequence_lengths,
                              10,
                             False,
                             False,
                             None,
-                            1)
-    # Confirm buckets of size 10 are sorted properly
-    assert all(sampler.data[0] == [ 14, 13, 12, 11, 9, 8, 10, 7, 6, 5, ])
-    assert all(sampler.data[1] == [ 4, 2, 3, 0, 1 ])
-    print("Buckets:", sampler.data)
+                            n_replicas=1)
+    assert all(sampler.bucketed_data[0] == [ 14, 13, 12, 11, 9, 8, 10, 7, 6, 5, ])
+    assert all(sampler.bucketed_data[1] == [ 4, 2, 3, 0, 1 ])
+    print("Buckets:", sampler.bucketed_data)
     
     approx = ApproxBatchSampler(sequence_lengths,
                                 sampler, 

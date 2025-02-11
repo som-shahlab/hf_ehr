@@ -359,7 +359,17 @@ See the [Hugging Face README](hf_ehr/scripts/huggingface/README.md) for details 
 ### 📦 Package for PyPi
 
 ```bash
+git add . && git commit -m "New version"
 make release
+```
+
+### MEDS-DEV
+
+First, create a tokenizer from the MEDS extract. This takes 834 seconds.
+
+```bash
+cd hf_ehr/tokenizers
+python create_cookbook.py --dataset meds_dev --n_procs 5 --chunk_size 10000 --is_force_refresh
 ```
 
 ## 🎓 Citation

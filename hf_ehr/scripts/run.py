@@ -21,10 +21,12 @@ from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.llama import LlamaLanguageModel
+from hf_ehr.models.based import BasedLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
+import torch.distributed as dist
 
 class GradNormCallback(Callback):
     """
@@ -94,7 +96,7 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
     def on_train_batch_end(self, trainer, *args, **kwargs):
         metrics = trainer.callback_metrics
         metric_value = metrics.get(self.metric_name)
-        
+
         if metric_value is not None:
             is_ckpt, true_val, ckpt_val = self.is_valid_metric_func(metric_value, self.last_ckpt_metric_value)
             self.last_ckpt_metric_value = metric_value
@@ -102,31 +104,10 @@ class MetricBasedCheckpoint(pl.callbacks.Callback):
                 filepath = os.path.join(self.dirpath, f"{self.metric_name.replace('/', '-')}-ckpt_val={ckpt_val}-persist.ckpt")
                 logger.info(f"Checkpoint starting to save at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
                 trainer.save_checkpoint(filepath)
-                logger.info(f"Checkpoint saved at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
+                logger.info(f"Checkpoint finished saving at {filepath} with `MetricBasedCheckpoint` for {self.metric_name}={metric_value}")
                 if self.is_run_val:
                     logger.info(f"Validation start | Step {trainer.global_step} | Caused by metric `{self.metric_name}` with value: ckpt_val={ckpt_val} (true_val={true_val})")
-                    # Synchronize GPUs
-                    # torch.cuda.synchronize()
-                    # # Pausing other GPUs
-                    # current_device = torch.cuda.current_device()
-                    # for i in range(torch.cuda.device_count()):
-                    #     if i != current_device:
-                    #         torch.cuda.set_device(i)
-                    #         torch.cuda.synchronize()
-                    # # Run validation on the primary GPU
-                    # torch.cuda.set_device(current_device)
-                    
-                    # Run validation
                     trigger_validation(trainer)
-                    
-                    # # Resume other GPUs
-                    # for i in range(torch.cuda.device_count()):
-                    #     if i != current_device:
-                    #         torch.cuda.set_device(i)
-                    #         torch.cuda.synchronize()
-                    
-                    # # Set back to the original device
-                    # torch.cuda.set_device(current_device)
         
     @property
     def state_key(self) -> str:
@@ -352,6 +333,8 @@ def main(config: DictConfig) -> None:
         model = MambaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 'llama' in model_name:
         model = LlamaLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
+    elif 'based' in model_name:
+        model = BasedLanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     elif 't5' in model_name:
         model = T5LanguageModel(config, tokenizer.vocab_size, tokenizer.pad_token_id)
     else:
@@ -430,16 +413,8 @@ def main(config: DictConfig) -> None:
             ),
         ]
     if getattr(config.callbacks.model_checkpointing, 'every_n_flops', None) not in [None, "None"]:
-        logger.error(f"Skipping FLOPs checkpoint b/c incorrectly calculated")
         # Save checkpoint every `every_n_flops` FLOPs; persists all models
-        # callbacks += [ 
-        #     MetricBasedCheckpoint(
-        #         dirpath=path_to_ckpt_dir,
-        #         metric_name="train/total_flops",
-        #         is_valid_metric_func=lambda x,y: train_flops_metric_func(x, y, config),
-        #         is_run_val=config.callbacks.model_checkpointing.is_run_eval_on_checkpoint,
-        #     ),
-        # ]
+        logger.error(f"Skipping FLOPs checkpoint b/c incorrectly calculated")
         
     if is_log_grad_norm:
         callbacks += [ GradNormCallback() ]
@@ -472,10 +447,12 @@ def main(config: DictConfig) -> None:
 
     # Run
     try:
-        trainer.fit(model, 
-                    train_dataloaders=dataloaders['train'],
-                    val_dataloaders=dataloaders['val'],
-                    ckpt_path=path_to_resume_ckpt)
+        trainer.fit(
+            model, 
+            train_dataloaders=dataloaders['train'],
+            val_dataloaders=dataloaders['val'],
+            ckpt_path=path_to_resume_ckpt
+        )
     except Exception as e:
         print("Exception during trainer.fit:")
         print(e)
