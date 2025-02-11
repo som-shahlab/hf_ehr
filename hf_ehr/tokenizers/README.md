@@ -17,7 +17,10 @@ python3 tokenizers/create_clmbr.py # Takes ~5 seconds
 python3 tokenizers/create_desc.py  # Takes ~30 mins
 
 # Create CookbookTokenizer
-python3 tokenizers/create_cookbook.py # TBD
+python3 tokenizers/create_cookbook.py # Takes ~10 mins
+
+# Create CookbookTokenizer with top-10k codes
+python3 tokenizers/create_cookbook.py --k 10 && python3 tokenizers/create_cookbook_k.py --k 10 # Takes ~1 mins
 ```
 
 ## How to Create a Tokenizer
@@ -50,6 +53,12 @@ To generate the `CookbookTokenizer` based on the v8 dataset using 10 CPUs, run:
 
 ```bash
 python3 create_cookbook.py --dataset v8 --n_procs 10
+```
+
+To limit to the top `k` thousand most frequently occurring codes, run:
+
+```bash
+python3 create_cookbook_k.py --dataset v8 --k 10 --stat count_occurrences
 ```
 
 ## File Structure
