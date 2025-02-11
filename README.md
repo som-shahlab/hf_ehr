@@ -301,9 +301,6 @@ python3 main.py --model llama --size base --tokenizer clmbr --context_length 102
 
 ## ℹ️ Other
 
-### Llama
-The **llama** model checkpoints we saved only work with transformers 4.44.2.
-
 ### Based
 To get the **based** model to run, you need to do the following installations on an A100 or above node:
 
