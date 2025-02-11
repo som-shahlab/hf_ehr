@@ -285,11 +285,13 @@ df.write_parquet(os.path.join(os.environ["PATH_TO_MEDS_READER"], 'metadata', 'su
 6. **Create** a **Hydra config** for your dataset.
 
 ```bash
-cp hf_ehr/configs/data/meds_mimic4_demo.yaml hf_ehr/configs/meds/meds_mimic4_demo_custom.yaml
-sed -i 's|/share/pi/nigam/mwornow/mimic-iv-demo-meds-reader|$PATH_TO_MEDS_READER|g' hf_ehr/configs/meds/meds_mimic4_demo_custom.yaml
+cp hf_ehr/configs/data/meds_mimic4_demo.yaml hf_ehr/configs/data/meds_mimic4_demo_custom.yaml
+sed -i 's|/share/pi/nigam/mwornow/mimic-iv-demo-meds-reader|$PATH_TO_MEDS_READER|g' hf_ehr/configs/data/meds_mimic4_demo_custom.yaml
 ```
 
 7. **Train** a **Llama model** on the dataset.
+- You need to exchange line 315 in `scripts/carina/main.py`, with your desired output dir.
+- By default, this uses WandB to track the run, please configure it beforehand by calling `wandb init` and then changing `scripts/run.py` at line 294 (and possibly elsewhere) entity and project.
 
 ```bash
 cd hf_ehr/scripts/carina
