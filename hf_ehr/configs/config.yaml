@@ -81,7 +81,7 @@ trainer:
   # Limits val to `N` batches if `int`, or `N%` of batches if `float`
   limit_val_batches: 1
   # How often we check the validation set within an epoch - `int` is every N batches and `float` is a fraction of the training dataset
-  val_check_interval: 0
+  val_check_interval: 1.0
   # Log val at end of every epoch
   check_val_every_n_epoch: 0
   # OPTIMIZER

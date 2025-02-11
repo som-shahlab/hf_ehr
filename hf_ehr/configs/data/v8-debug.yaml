@@ -5,3 +5,8 @@ data:
     name: FEMRDataset
     path_to_femr_extract: /share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes
     is_debug: True
+
+trainer:
+  limit_val_batches: 1
+  check_val_every_n_epoch: 1
+  max_epochs: 5
