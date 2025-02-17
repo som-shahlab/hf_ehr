@@ -29,6 +29,51 @@ Please see our [HuggingFace Collection](https://huggingface.co/collections/Stanf
 | mamba | [1024](https://huggingface.co/StanfordShahLab/mamba-tiny-1024-clmbr), [4096](https://huggingface.co/StanfordShahLab/mamba-tiny-4096-clmbr), [8192](https://huggingface.co/StanfordShahLab/mamba-tiny-8192-clmbr), [16384](https://huggingface.co/StanfordShahLab/mamba-tiny-16384-clmbr) |
 | hyena | [1024](https://huggingface.co/StanfordShahLab/hyena-large-1024-clmbr), [4096](https://huggingface.co/StanfordShahLab/hyena-large-4096-clmbr), [8192](https://huggingface.co/StanfordShahLab/hyena-large-8192-clmbr), [16384](https://huggingface.co/StanfordShahLab/hyena-large-16384-clmbr) |
 
+Here's a quick tutorial on how to use these models directly in your own code (i.e. outside of this repo's infra):
+
+```python
+from transformers import AutoModelForCausalLM
+from hf_ehr.data.tokenization import CLMBRTokenizer
+from hf_ehr.config import Event
+from typing import List, Dict
+import torch
+
+####################################
+# 1. Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained("StanfordShahLab/gpt-base-512-clmbr")
+tokenizer = CLMBRTokenizer.from_pretrained("StanfordShahLab/gpt-base-512-clmbr")
+
+####################################
+# 2. Define patient as sequence of `Event` objects. Only `code` is required.
+patient: List[Event] = [
+    Event(code='SNOMED/3950001', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='Gender/F', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='Ethnicity/Hispanic', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='SNOMED/609040007', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='LOINC/2236-8', value=-3.0, unit=None, start=None, end=None, omop_table=None),
+    Event(code='SNOMED/12199005', value=26.3, unit=None, start=None, end=None, omop_table=None),        
+]
+
+####################################
+# 3. Tokenize patient
+batch: Dict[str, torch.Tensor] = tokenizer([ patient ], add_special_tokens=True, return_tensors='pt')
+# > batch = {
+#     'input_ids': tensor([[ 5, 0, 7, 9, 27, 2049, 6557, 22433, 1]]), 
+#     'token_type_ids': tensor([[0, 0, 0, 0, 0, 0, 0, 0, 0]]), 
+#     'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1]])
+# }
+textual_tokens: List[str] = tokenizer.convert_events_to_tokens(patient)
+# > textual_tokens = ['SNOMED/3950001', 'Gender/F', 'Ethnicity/Hispanic', 'SNOMED/609040007', 'LOINC/2236-8 || None || -1.7976931348623157e+308 - 4.0', 'SNOMED/12199005 || None || 26.0 - 28.899999618530273']
+
+####################################
+# 4. Run model
+logits = model(**batch).logits
+# > logits.shape = torch.Size([1, 9, 39818])
+
+####################################
+# 5. Get patient representation for finetuning (usually we choose the last token's logits)
+representation = logits[:, -1, :]
+```
 <a name="installation" />
 
 ## 📀 Installation
