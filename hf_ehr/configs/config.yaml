@@ -83,7 +83,7 @@ trainer:
   # How often we check the validation set within an epoch - `int` is every N batches and `float` is a fraction of the training dataset
   val_check_interval: 1.0
   # Log val at end of every epoch
-  check_val_every_n_epoch: 0
+  check_val_every_n_epoch: 1
   # OPTIMIZER
   optimizer:
     # type
