@@ -10,7 +10,8 @@ MODEL_CHOICES: List[str] = [ 'gpt2', 'bert', 'based', 'hyena', 'mamba', 'llama',
 SIZE_CHOICES: List[str] = [ 'base', 'tiny', 'small', 'medium', 'large', 'xlarge', 'xxlarge']
 TOKENIZER_CHOICES: List[str] = [ 'clmbr', 'cookbook', 'desc', 'clmbr_8k', 'clmbr_16k', 'clmbr_64k', 'clmbr_96k', 'clmbr_118k', ]
 DATALOADER_CHOICES: List[str] = [ 'approx', 'batch']
-DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', 'meds_dev', 'meds_mimiciv_demo', ]
+DATASET_CHOICES: List[str] = [ 'v8', 'v8-alltokens', 'v9', 'v9-alltokens', 'meds_dev', 'meds_mimiciv_demo', 'truven', ]
+TRAINER_CHOICES: List[str] = [ 'single_gpu', 'multi_gpu_2', 'multi_gpu_4', ]
 DEFAULT_PARTITIONS: Dict[str, str] = {
     'gpt2': "nigam-v100,gpu",
     'based' : "nigam-a100,nigam-h100,gpu",
@@ -25,6 +26,7 @@ def parse_args():
     parser.add_argument("--model", choices=MODEL_CHOICES, required=True, help=f"Architecture ({MODEL_CHOICES})")
     parser.add_argument("--size", choices=SIZE_CHOICES, required=True, help=f"Model size ({SIZE_CHOICES})")
     parser.add_argument("--tokenizer", choices=TOKENIZER_CHOICES, required=True, help=f"Tokenizer to use ({TOKENIZER_CHOICES})")
+    parser.add_argument("--trainer", choices=TRAINER_CHOICES, required=True, help=f"Trainer to use ({TRAINER_CHOICES})")
     parser.add_argument("--dataset", required=True, help=f"Dataset mode ({DATASET_CHOICES})")
     parser.add_argument("--dataloader", choices=DATALOADER_CHOICES, required=True, help=f"Dataloader mode ({DATALOADER_CHOICES})")
     parser.add_argument("--context_length", type=int, required=True, help="Context length")
@@ -205,8 +207,12 @@ def map_model_partition_to_batch_size(partitions: str, model: str, size: int, co
     elif model == 'llama':
         if "nigam-h100" in partitions or "nigam-a100" in partitions:
             if size == "base":
-                if context_length == 1024:
+                if context_length == 512:
                     max_tokens = 32768
+                    batch_size = 128
+                elif context_length == 1024:
+                    max_tokens = 32768
+                    batch_size = 64
                 elif context_length == 2048:
                     max_tokens = 32768
                 elif context_length == 4096:
@@ -299,7 +305,7 @@ def main():
     # Construct Python command
     command = [
         "python3", os.path.abspath(os.path.join(__file__, "../../run.py")),
-        "+trainer=single_gpu",
+        f"+trainer={args.trainer}",
         f"+data={args.dataset}",
         f"+model={args.model}-{args.size}",
         f"+tokenizer={args.tokenizer}",

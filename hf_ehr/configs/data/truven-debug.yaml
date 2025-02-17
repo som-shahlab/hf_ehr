@@ -1,0 +1,13 @@
+# @package _global_
+
+data:
+  dataset:
+    name: MEDSDataset
+    # NOTE: This is the path for nigam-h100
+    path_to_meds_reader_extract: /local-scratch/nigam/users/mwornow/truven-meds-reader
+    is_debug: True
+
+trainer:
+  limit_val_batches: 1
+  check_val_every_n_epoch: 1
+  max_epochs: 5
