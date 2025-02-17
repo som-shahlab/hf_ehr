@@ -12,7 +12,7 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 1. 🏋️‍♀️ [Training](#training)
 1. 📊 [Evaluation](#evaluation)
 1. 💊 [MEDS Demo](#meds_demo)
-1. Ⓜ️ [Truven/Merative Demo](#truven_demo)
+1. Ⓜ️ [Merative/Truven/MarketScan Demo](#truven_demo)
 1. ℹ️ [Other](#other)
 1. 🎓 [Citation](#citation)
 
@@ -343,11 +343,11 @@ python3 main.py --model llama --size base --tokenizer clmbr --context_length 102
 
 <a name="truven_demo"/>
 
-## 💊 Merative/Truven/MarketScan Demo
+## Ⓜ️ Merative/Truven/MarketScan Demo
 
-We support training and inference on the 2017 Merative MarketScan Commercial Claims and Encounters Database (OMOP CDMv5 formatted) dataset.
+We support training and inference on the 2017 Merative MarketScan Commercial Claims and Encounters Database (OMOP CDMv5 formatted) dataset, aka "Truven" or "MarketScan".
 
-1. **Download** the [Truven OMOP CDMv5 dataset](https://console.cloud.google.com/storage/browser/truven_backup/TRUVEN_CDMv5;tab=objects?authuser=1&project=som-nero-phi-nigam-starr). *Note: This takes ~10 mins to download and takes up 347 GB of space.*
+1. **Download** the [Merative OMOP CDMv5 dataset](https://console.cloud.google.com/storage/browser/truven_backup/TRUVEN_CDMv5;tab=objects?authuser=1&project=som-nero-phi-nigam-starr). *Note: This takes ~10 mins to download and takes up 347 GB of space.*
 
 ```bash
 export PATH_TO_DOWNLOAD=truven-omop
