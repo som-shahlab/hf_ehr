@@ -107,8 +107,12 @@ logging:
   wandb:
     # If true, then turn ON wandb logging
     is_wandb: True
-    # Run name
+    # Wandb run name (if NULL, then will use wandb's default random namep)
     name: null
+    # Wandb entity name (i.e. name of wandb organization)
+    entity: ehr-fm
+    # Wandb project name
+    project: hf_ehr
     # DEFAULT behavior (FALSE) is if resuming from a checkpoint, then resume the existing wandb run from the last step in that model's checkpoint
     # If TRUE, then create a new wandb run from scratch (even if resuming from a checkpoint)
     # Setting to TRUE is helpful for quick debugging b/c resuming logging from an existing run can be slow (wandb needs to re-upload all data from previous run)
@@ -118,6 +122,8 @@ logging:
     is_mlflow: False
     # Run name
     name: null
+    # MLFlow experiment name
+    project: hf_ehr
   # If TRUE, then calculate + log grad norm over all params (slows down training)
   is_log_grad_norm: False
   # Log every N steps

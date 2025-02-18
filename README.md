@@ -106,17 +106,23 @@ sbatch cookbook.sh # Takes many hours
 
 ## 🚀 Quick Start
 
-Launch a GPT training run with the ability to configure common hyperparameters:
+Launch a GPT training run with the ability to configure common hyperparameters (using `main.py`)
 
 ```bash
 cd hf_ehr/scripts/carina
 python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8 --is_run_local --is_force_refresh
 ```
 
-Launch a Llama run on a MEDS dataset:
+Launch a Llama run on a MEDS dataset with more customization over configs (using `run.py`):
 ```bash
 cd hf_ehr/scripts/carina
-python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_mimic4_demo --is_run_local --is_force_refresh
+python3 run.py \
+    +data=meds_mimic4_demo \
+    +trainer=single_gpu \
+    +model=llama-base \
+    +tokenizer=clmbr \
+    data.dataloader.mode=approx \
+    data.dataloader.approx_batch_sampler.max_tokens=16384
 ```
 
 To launch 4 GPT-base runs on one SLURM node (in parallel), and 4 Mamba runs on another SLURM node (in parallel):

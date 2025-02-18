@@ -71,10 +71,13 @@ Default settings for all Hydra configs. Anything in this file can be overridden 
     * `wandb`
         * `is_wandb`: bool *= True* -- If TRUE, then log to wandb
         * `name`: Optional[str] *= null* -- Name of wandb run; If NULL, then wandb will auto-generate a random name
+        * `entity`: str *= ehr-fm* -- Name of wandb organization
+        * `project`: str *= hf_ehr* -- Name of wandb project
         * `is_force_create_wandb_run_from_scratch`: bool *= False* -- If FALSE and resuming from a checkpoint, then resume the existing wandb run from the last step in that model's checkpoint; If TRUE, then create a new wandb run from scratch (even if resuming from a checkpoint); Setting to TRUE is helpful for quick debugging b/c resuming logging from an existing run can be slow (wandb needs to re-upload all data from previous run)
     * `mlflow`
         * `is_mlflow`: bool *= False* -- If TRUE, then log to mlflow
         * `name`: Optional[str] *= null* -- Name of mlflow run
+        * `project`: str *= hf_ehr* -- Name of mlflow experiment
     * `is_log_grad_norm`: bool *= False* -- If TRUE, then calculate + log grad norm over all params (!! slows down training a lot)
     * `log_every_n_steps`: int *= 1* -- Log every **N** steps
 

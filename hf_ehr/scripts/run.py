@@ -209,7 +209,7 @@ def main(config: DictConfig) -> None:
                 mlflow_run_id: str = f.read()
             logger.info(f"Found existing mlflow run: `{mlflow_run_id}`")
             loggers += [ 
-                    MLFlowLogger(experiment_name='hf_ehr',
+                    MLFlowLogger(experiment_name=config.logging.mlflow.project,
                                     run_id=mlflow_run_id,
                                     log_model='all',
                                     save_dir=f"{path_to_log_dir}",
@@ -217,7 +217,7 @@ def main(config: DictConfig) -> None:
             ]
         else:
             loggers += [ 
-                    MLFlowLogger(experiment_name='hf_ehr',
+                    MLFlowLogger(experiment_name=config.logging.mlflow.project,
                                     run_name=config.logging.mlflow.name,
                                     log_model='all',
                                     save_dir=f"{path_to_log_dir}",
@@ -249,8 +249,8 @@ def main(config: DictConfig) -> None:
                 if config.logging.wandb.is_force_create_wandb_run_from_scratch:
                     logger.critical(f"Creating new wandb run from scratch")
                     run = wandb.init(
-                        entity='ehr-fm',
-                        project='hf_ehr', 
+                        entity=config.logging.wandb.entity,
+                        project=config.logging.wandb.project, 
                         dir=path_to_log_dir, 
                         name=config.logging.wandb.name,
                         resume='never',
@@ -258,12 +258,12 @@ def main(config: DictConfig) -> None:
                     wandb_run_id = run.id
                 else:
                     logger.critical(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
-                    wandb_relogger = WandbRelogger('hf_ehr', 'ehr-fm')
+                    wandb_relogger = WandbRelogger(config.logging.wandb.project, config.logging.wandb.entity)
                     run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
                     wandb_run_id = run.id
             
             loggers += [ 
-                WandbLogger(project='hf_ehr',
+                WandbLogger(project=config.logging.wandb.project,
                             log_model=False,
                             save_dir=path_to_log_dir,
                             resume='allow',
@@ -272,13 +272,13 @@ def main(config: DictConfig) -> None:
         else:
             if rank_zero_only.rank == 0:
                 run = wandb.init(
-                    entity='ehr-fm',
-                    project='hf_ehr', 
+                    entity=config.logging.wandb.entity,
+                    project=config.logging.wandb.project, 
                     dir=path_to_log_dir, 
                     name=config.logging.wandb.name
                 )
             loggers += [ 
-                WandbLogger(project='hf_ehr',
+                WandbLogger(project=config.logging.wandb.project,
                             log_model=False,
                             save_dir=path_to_log_dir,
                             name=config.logging.wandb.name)
