@@ -1,0 +1,7 @@
+# @package _global_
+
+data:
+  dataset:
+    name: MEDSDataset
+    # NOTE: This is the path for nigam-h100
+    path_to_meds_reader_extract: /local-scratch/nigam/users/mwornow/truven-meds-reader

@@ -12,6 +12,7 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 1. 🏋️‍♀️ [Training](#training)
 1. 📊 [Evaluation](#evaluation)
 1. 💊 [MEDS Demo](#meds_demo)
+1. Ⓜ️ [Merative/Truven/MarketScan Demo](#truven_demo)
 1. ℹ️ [Other](#other)
 1. 🎓 [Citation](#citation)
 
@@ -28,6 +29,51 @@ Please see our [HuggingFace Collection](https://huggingface.co/collections/Stanf
 | mamba | [1024](https://huggingface.co/StanfordShahLab/mamba-tiny-1024-clmbr), [4096](https://huggingface.co/StanfordShahLab/mamba-tiny-4096-clmbr), [8192](https://huggingface.co/StanfordShahLab/mamba-tiny-8192-clmbr), [16384](https://huggingface.co/StanfordShahLab/mamba-tiny-16384-clmbr) |
 | hyena | [1024](https://huggingface.co/StanfordShahLab/hyena-large-1024-clmbr), [4096](https://huggingface.co/StanfordShahLab/hyena-large-4096-clmbr), [8192](https://huggingface.co/StanfordShahLab/hyena-large-8192-clmbr), [16384](https://huggingface.co/StanfordShahLab/hyena-large-16384-clmbr) |
 
+Here's a quick tutorial on how to use these models directly in your own code (i.e. outside of this repo's infra):
+
+```python
+from transformers import AutoModelForCausalLM
+from hf_ehr.data.tokenization import CLMBRTokenizer
+from hf_ehr.config import Event
+from typing import List, Dict
+import torch
+
+####################################
+# 1. Load model and tokenizer
+model = AutoModelForCausalLM.from_pretrained("StanfordShahLab/gpt-base-512-clmbr")
+tokenizer = CLMBRTokenizer.from_pretrained("StanfordShahLab/gpt-base-512-clmbr")
+
+####################################
+# 2. Define patient as sequence of `Event` objects. Only `code` is required.
+patient: List[Event] = [
+    Event(code='SNOMED/3950001', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='Gender/F', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='Ethnicity/Hispanic', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='SNOMED/609040007', value=None, unit=None, start=None, end=None, omop_table=None),
+    Event(code='LOINC/2236-8', value=-3.0, unit=None, start=None, end=None, omop_table=None),
+    Event(code='SNOMED/12199005', value=26.3, unit=None, start=None, end=None, omop_table=None),        
+]
+
+####################################
+# 3. Tokenize patient
+batch: Dict[str, torch.Tensor] = tokenizer([ patient ], add_special_tokens=True, return_tensors='pt')
+# > batch = {
+#     'input_ids': tensor([[ 5, 0, 7, 9, 27, 2049, 6557, 22433, 1]]), 
+#     'token_type_ids': tensor([[0, 0, 0, 0, 0, 0, 0, 0, 0]]), 
+#     'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1, 1, 1]])
+# }
+textual_tokens: List[str] = tokenizer.convert_events_to_tokens(patient)
+# > textual_tokens = ['SNOMED/3950001', 'Gender/F', 'Ethnicity/Hispanic', 'SNOMED/609040007', 'LOINC/2236-8 || None || -1.7976931348623157e+308 - 4.0', 'SNOMED/12199005 || None || 26.0 - 28.899999618530273']
+
+####################################
+# 4. Run model
+logits = model(**batch).logits
+# > logits.shape = torch.Size([1, 9, 39818])
+
+####################################
+# 5. Get patient representation for finetuning (usually we choose the last token's logits)
+representation = logits[:, -1, :]
+```
 <a name="installation" />
 
 ## 📀 Installation
@@ -266,20 +312,10 @@ meds_reader_convert $PATH_TO_MEDS $PATH_TO_MEDS_READER --num_threads 4
 meds_reader_verify $PATH_TO_MEDS $PATH_TO_MEDS_READER
 ```
 
-5. **Create train/val/test splits** (80/10/10) by running this Python script:
-```python
-import meds_reader
-import polars as pl
-import os
-
-database = meds_reader.SubjectDatabase(os.environ["PATH_TO_MEDS_READER"])
-subject_ids = list(database)
-splits = [
-    ('train' if idx < 80 else 'tuning' if idx < 90 else 'held_out', subject_ids[idx])
-    for idx in range(len(subject_ids))
-]
-df = pl.DataFrame(splits, schema=["split", "subject_id"])
-df.write_parquet(os.path.join(os.environ["PATH_TO_MEDS_READER"], 'metadata', 'subject_splits.parquet'))
+5. **Create train/val/test splits** (80/10/10) by running the below Python script:
+```bash
+cd hf_ehr/scripts/datasets
+python split_meds_dataset.py --path_to_meds_reader $PATH_TO_MEDS_READER --train_split_size 0.8 --val_split_size 0.1
 ```
 
 6. **Create** a **Hydra config** for your dataset.
@@ -289,13 +325,71 @@ cp hf_ehr/configs/data/meds_mimic4_demo.yaml hf_ehr/configs/data/meds_mimic4_dem
 sed -i 's|/share/pi/nigam/mwornow/mimic-iv-demo-meds-reader|$PATH_TO_MEDS_READER|g' hf_ehr/configs/data/meds_mimic4_demo_custom.yaml
 ```
 
-7. **Train** a **Llama model** on the dataset.
+7. **Train** a tokenizer on the dataset. Limit our vocabulary to the top-$k$ most frequently occurring codes.
+
+```bash
+cd hf_ehr/tokenizers
+python create_cookbook.py --dataset meds_mimic4_demo --n_procs 5 --chunk_size 10000 --is_force_refresh
+python create_cookbook_k.py --dataset meds_mimic4_demo --k 32 --stat count_occurrences
+```
+
+8. **Train** a **Llama model** on the dataset.
 - You need to exchange line 315 in `scripts/carina/main.py`, with your desired output dir.
 - By default, this uses WandB to track the run, please configure it beforehand by calling `wandb init` and then changing `scripts/run.py` at line 294 (and possibly elsewhere) entity and project.
 
 ```bash
 cd hf_ehr/scripts/carina
 python3 main.py --model llama --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset meds_mimic4_demo_custom --is_run_local --is_force_refresh
+``` 
+
+
+<a name="truven_demo"/>
+
+## Ⓜ️ Merative/Truven/MarketScan Demo
+
+We support training and inference on the 2017 Merative MarketScan Commercial Claims and Encounters Database (OMOP CDMv5 formatted) dataset, aka "Truven" or "MarketScan".
+
+1. **Download** the [Merative OMOP CDMv5 dataset](https://console.cloud.google.com/storage/browser/truven_backup/TRUVEN_CDMv5;tab=objects?authuser=1&project=som-nero-phi-nigam-starr). *Note: This takes ~10 mins to download and takes up 347 GB of space.*
+
+```bash
+export PATH_TO_DOWNLOAD=truven-omop
+export PATH_TO_MEDS=truven-meds
+export PATH_TO_MEDS_READER=truven-meds-reader
+gsutil -m cp -r gs://truven_backup/TRUVEN_CDMv5 $PATH_TO_DOWNLOAD
+```
+
+2. **Convert** the Truven OMOP CDMv5 dataset to [**MEDS format**](https://github.com/Medical-Event-Data-Standard/meds/). *Note: This takes ~4.25 hrs to run and takes up 698MB of space.*
+
+```bash
+meds_etl_omop $PATH_TO_DOWNLOAD $PATH_TO_MEDS
+```
+
+3. **Convert** the MEDS dataset into a [**MEDS Reader Database**](https://github.com/som-shahlab/meds_reader) (to enable faster data ingestion during training). *Note: This takes ~15 mins to run and takes up 26GB of space.*
+
+```bash
+meds_reader_convert $PATH_TO_MEDS $PATH_TO_MEDS_READER --num_threads 10
+meds_reader_verify $PATH_TO_MEDS $PATH_TO_MEDS_READER
+```
+
+4. **Create train/val/test splits** (80/10/10) by running the below Python script. *Note: This takes ~1 min to run.*
+```bash
+cd hf_ehr/scripts/datasets
+python split_meds_dataset.py --path_to_meds_reader $PATH_TO_MEDS_READER --train_split_size 0.8 --val_split_size 0.1
+```
+
+5. **Train** a tokenizer on the dataset. Limit our vocabulary to the top-$k$ most frequently occurring codes. **TODO**
+
+```bash
+cd hf_ehr/tokenizers
+python create_cookbook.py --dataset truven --n_procs 5 --chunk_size 10000 --is_force_refresh
+python create_cookbook_k.py --dataset truven --k 32 --stat count_occurrences
+```
+
+6. **Train** a **Llama model** on the dataset using 2 GPUs. *Note: This takes ~5 hrs per epoch with 2 H100's.*
+
+```bash
+cd hf_ehr/scripts/carina
+python3 main.py --model llama --size base --tokenizer clmbr --context_length 512 --dataloader batch --dataset truven --trainer multi_gpu_2 --is_run_local --is_force_refresh
 ``` 
 
 

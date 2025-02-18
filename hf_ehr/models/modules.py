@@ -140,7 +140,8 @@ class BaseModel(L.LightningModule):
 
     def on_train_epoch_end(self):
         # Needed for ApproxBatchSampler to reset random seed after every epoch
-        self.trainer.train_dataloader.batch_sampler.set_epoch(self.current_epoch + 1)
+        if self.config.data.dataloader.mode == 'approx':
+            self.trainer.train_dataloader.batch_sampler.set_epoch(self.current_epoch + 1)
 
     def on_train_start(self):
         if rank_zero_only.rank == 0 and wandb and wandb.run:
