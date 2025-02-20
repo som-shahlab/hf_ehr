@@ -5,10 +5,11 @@ from torch.utils.data import DataLoader
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from omegaconf import OmegaConf
 import os
-from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8
 from typing import Dict, List
 from tqdm import tqdm
 import json
+ 
+PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
  
 # dataset_name: str = 'FEMRDataset'
 dataset_name: str = 'AllTokensFEMRDataset'

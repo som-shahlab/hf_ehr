@@ -5,7 +5,12 @@ from typing import List, Tuple, Any, Dict, Optional
 import torch
 import uuid
 import hashlib
-from hf_ehr.config import PATH_TO_TOKENIZER_CLMBR_v8_CONFIG
+import yaml
+
+
+def get_rel_path(path: str) -> str:
+    """Get the relative path from the root of the project"""
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), path)
 
 def convert_lab_value_to_token_from_ranges(code: str, unit: str, value: float, ranges: List[Tuple[float, float]], is_tokenize_out_of_range: bool = False) -> Optional[str]:
     # Given a list of ranges (i.e. tuples of [start, end] values), remaps the code to the index in the `ranges` array corresponds
@@ -118,37 +123,6 @@ def load_config_from_ckpt(ckpt) -> Dict[str, Any]:
     recurse(config)
     return config
 
-def load_tokenizer_old_from_config(config):
-    """Load tokenizer from config."""
-    from hf_ehr.data.tokenization_old import FEMRTokenizer, DescTokenizer
-    from transformers import AutoTokenizer
-    
-    # Load config
-    tokenizer__excluded_vocabs: Optional[List[str]] = config.data.tokenizer.excluded_vocabs
-    tokenizer__min_code_count: Optional[int] = getattr(config.data.tokenizer, 'min_code_count', None)
-    tokenizer__is_remap_numerical_codes: bool = getattr(config.data.tokenizer, 'is_remap_numerical_codes', False)
-    tokenizer__is_clmbr: bool = getattr(config.data.tokenizer, 'is_clmbr', False)
-    tokenizer__is_remap_codes_to_desc: bool = getattr(config.data.tokenizer, 'is_remap_codes_to_desc', False)
-    tokenizer__desc_emb_tokenizer: bool = getattr(config.data.tokenizer, 'desc_emb_tokenizer', False)
-    tokenizer__path_to_code_2_detail: str = config.data.tokenizer.path_to_code_2_detail.replace('/local-scratch/nigam/users/hf_ehr/', '/share/pi/nigam/mwornow/hf_ehr/cache/')
-
-    if tokenizer__is_clmbr:
-        # CLMBR
-        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
-                                  excluded_vocabs=tokenizer__excluded_vocabs,
-                                  is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                                  min_code_count=tokenizer__min_code_count)
-    elif tokenizer__is_remap_codes_to_desc:
-        # DescTokenizer
-        tokenizer = DescTokenizer(AutoTokenizer.from_pretrained(tokenizer__desc_emb_tokenizer))
-    else:
-        # FEMRTokenizer
-        tokenizer = FEMRTokenizer(tokenizer__path_to_code_2_detail, 
-                                    excluded_vocabs=tokenizer__excluded_vocabs,
-                                    is_remap_numerical_codes=tokenizer__is_remap_numerical_codes,
-                                    min_code_count=tokenizer__min_code_count)
-    return tokenizer
-
 def load_tokenizer_from_config(config):
     """Load tokenizer from config."""
     from hf_ehr.data.tokenization import CookbookTokenizer, CLMBRTokenizer, DescTokenizer, CEHRTokenizer
@@ -179,12 +153,6 @@ def load_tokenizer_from_config(config):
         tokenizer = CEHRTokenizer(path_to_config, config.get('data', {}).get('tokenizer', {}).get('metadata', {}))
     return tokenizer
 
-def load_tokenizer_old_from_path(path_to_ckpt: str):
-    """Given a path to a model checkpoint, load the tokenizer."""
-    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
-    config: Dict[str, Any] = load_config_from_ckpt(ckpt)
-    return load_tokenizer_old_from_config(config)
-
 def load_tokenizer_from_path(path_to_ckpt: str):
     """Given a path to a model checkpoint, load the tokenizer."""
     ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
@@ -196,41 +164,6 @@ def load_config_from_path(path_to_ckpt: str) -> Dict[str, Any]:
     ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
     config: Dict[str, Any] = load_config_from_ckpt(ckpt)
     return config
-
-
-def load_model_old_from_path(path_to_ckpt: str) -> torch.nn.Module:
-    """Given a path to a model checkpoint, load the model."""
-    from hf_ehr.models.gpt import GPTLanguageModel
-    from hf_ehr.models.bert import BERTLanguageModel
-    from hf_ehr.models.hyena import HyenaLanguageModel
-    from hf_ehr.models.mamba import MambaLanguageModel
-    from hf_ehr.models.llama import LlamaLanguageModel
-    from hf_ehr.models.t5 import T5LanguageModel
-
-    # Load checkpoint
-    ckpt: Dict[str, Any] = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
-    config: Dict[str, Any] = load_config_from_ckpt(ckpt)
-    
-    # Load tokenizer
-    tokenizer = load_tokenizer_old_from_path(path_to_ckpt)
-
-    # Determine type of model based on config.model.name
-    model_map = {
-        'bert': BERTLanguageModel,
-        'gpt': GPTLanguageModel,
-        'hyena': HyenaLanguageModel,
-        'mamba': MambaLanguageModel,
-        'llama': LlamaLanguageModel,
-        't5': T5LanguageModel
-    }
-    model_name: str = config['model']['name']
-    model_class = next((m for k, m in model_map.items() if k in model_name), None)
-    if not model_class: raise ValueError(f"Model `{model_name}` not supported.")
-
-    # Load model
-    model = model_class(**ckpt['hyper_parameters'], vocab_size=tokenizer.vocab_size, pad_token_id=tokenizer.pad_token_id)
-    model.load_state_dict(ckpt['state_dict'])
-    return model
 
 def load_ckpt(path_to_ckpt: str) -> Dict[str, Any]:
     """Given a path to a model checkpoint, load the checkpoint."""
@@ -288,3 +221,45 @@ def get_most_recent_ckpt_from_output_dir(path_to_output_dir: str) -> Optional[st
             assert max_ckpt is not None, f"Error -- max_ckpt is None. Couldn't find most recent ckpt."
             return max_ckpt
     return None
+
+def get_tokenizer_info_from_config_yaml(path_to_config_yaml: str) -> Tuple[str, str]:
+    """Given the path to a tokenizer config .yaml file, load the .yaml file and return the path to the tokenizer_config.json and type of tokenizer.
+    
+    Args:
+        path_to_config_yaml (str): The path to the tokenizer config .yaml file. Usually found in `hf_ehr/configs/tokenizer/`.
+
+    Returns:
+        Tuple[str, str]: A tuple containing the path to the tokenizer_config.json and the type of tokenizer.
+    """
+    config_tokenizer: str = yaml.safe_load(open(args.path_to_tokenizer_config, 'r'))
+    assert 'data' in config_tokenizer, f"Expected 'data' in config_tokenizer, got {config_tokenizer.keys()}"
+    assert 'tokenizer' in config_tokenizer['data'], f"Expected 'tokenizer' in config_tokenizer['data'], got {config_tokenizer['data'].keys()}"
+    assert 'path_to_config' in config_tokenizer['data']['tokenizer'], f"Expected 'path_to_config' in config_tokenizer['data']['tokenizer'], got {config_tokenizer['data']['tokenizer'].keys()}"
+    assert 'name' in config_tokenizer['data']['tokenizer'], f"Expected 'name' in config_tokenizer['data']['tokenizer'], got {config_tokenizer['data']['tokenizer'].keys()}"
+    path_to_tokenizer_config: str = config_tokenizer['data']['tokenizer']['path_to_config']
+    tokenizer_name: str = config_tokenizer['data']['tokenizer']['name']
+    return path_to_tokenizer_config, tokenizer_name
+
+def get_dataset_info_from_config_yaml(path_to_config_yaml: str) -> Tuple[str, str]:
+    """Given the path to a dataset config .yaml file, load the .yaml file and return the type of dataset and the path to the extract.
+    
+    Args:
+        path_to_config_yaml (str): The path to the dataset config .yaml file. Usually found in `hf_ehr/configs/data/`.
+
+    Returns:
+        Tuple[str, str]: A tuple containing the path to the extract and the type of dataset.
+    """
+    config_dataset: str = yaml.safe_load(open(args.path_to_dataset_config, 'r'))
+    assert 'data' in config_dataset, f"Expected 'data' in config_dataset, got {config_dataset.keys()}"
+    assert 'dataset' in config_dataset['data'], f"Expected 'dataset' in config_dataset['data'], got {config_dataset['data'].keys()}"
+    assert 'name' in config_dataset['data']['dataset'], f"Expected 'name' in config_dataset['data']['dataset'], got {config_dataset['data']['dataset'].keys()}"
+    dataset_cls: str = config_dataset['data']['dataset']['name']
+    
+    if dataset_cls == 'FEMRDataset':
+        path_to_extract: str = config_dataset['data']['dataset']['path_to_femr_extract']
+    elif dataset_cls == 'MEDSDataset':
+        path_to_extract: str = config_dataset['data']['dataset']['path_to_meds_reader_extract']
+    else:
+        raise NotImplementedError(f'Dataset `{dataset_cls}` not yet implemented in `get_dataset_info_from_config_yaml()` function.')
+    
+    return path_to_extract, dataset_cls

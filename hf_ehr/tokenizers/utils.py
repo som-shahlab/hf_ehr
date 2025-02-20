@@ -20,8 +20,6 @@ from hf_ehr.config import (
 from hf_ehr.data.tokenization import CookbookTokenizer
 import time
 
-PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/create_cookbook/'
-
 def load_results_from_cache(path_to_cache_dir: Optional[str], filename: str) -> Optional[Any]:
     """Load results from cached .pkl file (if cache dir is provided)."""
     if path_to_cache_dir is None:
@@ -47,12 +45,12 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, category) in dataset."""
     path_to_cache_dir: Optional[str] = args[0]
     path_to_extract: str = args[1]
-    dataset_type: str = args[2]
+    dataset_cls: str = args[2]
     pids: List[int] = args[3]
-    if dataset_type == 'femr':
+    if dataset_cls == 'FEMRDataset':
         import femr.datasets
         femr_db = femr.datasets.PatientDatabase(path_to_extract)
-    elif dataset_type == 'meds':
+    elif dataset_cls == 'MEDSDataset':
         import meds_reader
         femr_db = meds_reader.SubjectDatabase(path_to_extract)
 
@@ -65,14 +63,14 @@ def calc_categorical_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     results: Set[Tuple[str, List[str]]] = set()
     for pid in pids:
         for event in femr_db[pid].events:
-            if dataset_type == 'femr':  
+            if dataset_cls == 'FEMRDataset':  
                 if (
                     event.value is not None # `value` is not None
                     and event.value != '' # `value` is not blank
                     and isinstance(event.value, str) # `value` is textual
                 ):
                     results.add((event.code, (event.value,)))
-            elif dataset_type == 'meds':
+            elif dataset_cls == 'MEDSDataset':
                 if (
                     hasattr(event, 'text_value') # `value` exists
                     and event.text_value is not None # `value` is not None
@@ -100,12 +98,12 @@ def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     """Return all (code, start_range, end_range) in dataset."""
     path_to_cache_dir: Optional[str] = args[0]
     path_to_extract: str = args[1]
-    dataset_type: str = args[2]
+    dataset_cls: str = args[2]
     pids: List[int] = args[3]
-    if dataset_type == 'femr':
+    if dataset_cls == 'FEMRDataset':
         import femr.datasets
         femr_db = femr.datasets.PatientDatabase(path_to_extract)
-    elif dataset_type == 'meds':
+    elif dataset_cls == 'MEDSDataset':
         import meds_reader
         femr_db = meds_reader.SubjectDatabase(path_to_extract)
 
@@ -118,7 +116,7 @@ def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
     results: Dict[str, List[float]] = {}
     for pid in pids:
         for event in femr_db[pid].events:
-            if dataset_type == 'femr':
+            if dataset_cls == 'FEMRDataset':
                 if (
                     event.value is not None  # `value` is not None
                     and (  # `value` is numeric
@@ -131,7 +129,7 @@ def calc_numerical_range_codes(args: Tuple) -> Set[Tuple[str, List[str]]]:
                     if key not in results:
                         results[key] = []
                     results[key].append(float(event.value))  # Ensure values are stored as float
-            elif dataset_type == 'meds':
+            elif dataset_cls == 'MEDSDataset':
                 if (
                     hasattr(event, 'numeric_value') # `value` exists
                     and event.numeric_value is not None # `value` is not None
@@ -165,12 +163,12 @@ def calc_unique_codes(args: Tuple) -> Set[str]:
     """Return all unique codes in dataset."""
     path_to_cache_dir: Optional[str] = args[0]
     path_to_extract: str = args[1]
-    dataset_type: str = args[2]
+    dataset_cls: str = args[2]
     pids: List[int] = args[3]
-    if dataset_type == 'femr':
+    if dataset_cls == 'FEMRDataset':
         import femr.datasets
         femr_db = femr.datasets.PatientDatabase(path_to_extract)
-    elif dataset_type == 'meds':
+    elif dataset_cls == 'MEDSDataset':
         import meds_reader
         femr_db = meds_reader.SubjectDatabase(path_to_extract)
     
@@ -206,12 +204,12 @@ def calc_code_2_unique_patient_count(args: Tuple) -> Dict:
     """Given a code, count # of unique patients have it."""
     path_to_cache_dir: Optional[str] = args[0]
     path_to_extract: str = args[1]
-    dataset_type: str = args[2]
+    dataset_cls: str = args[2]
     pids: List[int] = args[3]
-    if dataset_type == 'femr':
+    if dataset_cls == 'FEMRDataset':
         import femr.datasets
         femr_db = femr.datasets.PatientDatabase(path_to_extract)
-    elif dataset_type == 'meds':
+    elif dataset_cls == 'MEDSDataset':
         import meds_reader
         femr_db = meds_reader.SubjectDatabase(path_to_extract)
     path_to_tokenizer_config = args[4] # TODO -- need to take direct tokenizer config entry, then check if numerical_range / categorical code matches this code
@@ -239,16 +237,14 @@ def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
     """Given a list of patient IDs, count the occurrences of each token using CookbookTokenizer."""
     path_to_cache_dir: Optional[str] = args[0]
     path_to_extract: str = args[1]
-    dataset_type: str = args[2]
+    dataset_cls: str = args[2]
     pids: List[int] = args[3]
     path_to_tokenizer_config = args[4]
     
     # Load from cached file (if exists)
     signature: str = f"start={pids[0]}_end={pids[-1]}_len={len(pids)}"
     if (cache := load_results_from_cache(path_to_cache_dir, signature)) is not None:
-        pass
-        # TODO
-        # return cache
+        return cache
 
     # Adding the print statement to indicate the start of the function
     print(f"\nStarting calc_code_2_occurrence_count() with path_to_extract: {path_to_extract}, pids: {len(pids)}, and path_to_tokenizer_config: {path_to_tokenizer_config}")
@@ -263,15 +259,15 @@ def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
     tokenizer = CookbookTokenizer(path_to_tokenizer_config, metadata=metadata)
     print(f"Finish | CookbookTokenizer | Time= {datetime.datetime.now() - start_time}s")
 
-    print(f"Loading {dataset_type} PatientDatabase")
+    print(f"Loading {dataset_cls} PatientDatabase")
     start_time = datetime.datetime.now()
-    if dataset_type == 'femr':
+    if dataset_cls == 'FEMRDataset':
         import femr.datasets
         femr_db = femr.datasets.PatientDatabase(path_to_extract)
-    elif dataset_type == 'meds':
+    elif dataset_cls == 'MEDSDataset':
         import meds_reader
         femr_db = meds_reader.SubjectDatabase(path_to_extract)
-    print(f"Finish | {dataset_type} PatientDatabase | Time= {datetime.datetime.now() - start_time}s")
+    print(f"Finish | {dataset_cls} PatientDatabase | Time= {datetime.datetime.now() - start_time}s")
 
     # Process events
     print("Start | Processing events")
@@ -279,9 +275,9 @@ def calc_code_2_occurrence_count(args: Tuple) -> Dict[str, int]:
     results: Dict[str, int] = collections.defaultdict(int)
     for pid in tqdm(pids, total=len(pids), desc='pids'):
         for event in femr_db[pid].events:
-            if dataset_type == 'femr':
+            if dataset_cls == 'FEMRDataset':
                 e = event
-            elif dataset_type == 'meds':
+            elif dataset_cls == 'MEDSDataset':
                 unit: str = event.code.split("//")[-1] if event.numeric_value is not None else None
                 value = event.text_value if event.text_value is not None else (event.numeric_value if event.numeric_value is not None else None)
                 e = Event(
@@ -318,13 +314,16 @@ def merge_code_2_occurrence_count(results: List[Dict[str, int]]) -> Dict[str, in
 # Discrete modifiers of tokenizer_config.json
 #
 ################################################
-def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_type: str, pids: List[int], N: int, **kwargs):
-    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config."""
-    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, "add_numerical_range_codes")
+def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_cls: str, pids: List[int], N: int, path_to_cache_dir: str, **kwargs):
+    """For each unique (code, numerical range) in dataset, add NumericalRangeTCEs to tokenizer config.
+    Creates `N` buckets for each code, and adds a NumericalRangeTCE for each bucket.
+        e.g. If N = 10, then we create 10 buckets (i.e. deciles) for each code.
+    """
+    path_to_cache_dir: str = os.path.join(path_to_cache_dir, "add_numerical_range_codes")
     os.makedirs(path_to_cache_dir, exist_ok=True)
     
     # Step 1: Collect all numerical values for each code
-    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_extract, dataset_type, pids, path_to_cache_dir, **kwargs)
+    results = run_helper(calc_numerical_range_codes, merge_numerical_range_codes, path_to_extract, dataset_cls, pids, path_to_cache_dir, **kwargs)
 
     # Step 2: Calculate the range for each code and update the tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
@@ -357,13 +356,13 @@ def add_numerical_range_codes(path_to_tokenizer_config: str, path_to_extract: st
     metadata['is_already_run']['add_numerical_range_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-def add_unique_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_type: str, pids: List[int], **kwargs):
+def add_unique_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_cls: str, pids: List[int], path_to_cache_dir: str, **kwargs):
     """For each unique code in dataset, add a CodeTCE to tokenizer config."""
-    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, "add_unique_codes")
+    path_to_cache_dir: str = os.path.join(path_to_cache_dir, "add_unique_codes")
     os.makedirs(path_to_cache_dir, exist_ok=True)
     
     # Run function in parallel    
-    results = run_helper(calc_unique_codes, merge_unique_codes, path_to_extract, dataset_type, pids, path_to_cache_dir, **kwargs)
+    results = run_helper(calc_unique_codes, merge_unique_codes, path_to_extract, dataset_cls, pids, path_to_cache_dir, **kwargs)
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
@@ -381,13 +380,13 @@ def add_unique_codes(path_to_tokenizer_config: str, path_to_extract: str, datase
     metadata['is_already_run']['add_unique_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-def add_categorical_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_type: str, pids: List[int], **kwargs):
+def add_categorical_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_cls: str, pids: List[int], path_to_cache_dir: str, **kwargs):
     """For each unique (code, categorical value) in dataset, add a CategoricalTCE to tokenizer config."""
-    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, "add_categorical_codes")
+    path_to_cache_dir: str = os.path.join(path_to_cache_dir, "add_categorical_codes")
     os.makedirs(path_to_cache_dir, exist_ok=True)
 
     # Run function in parallel    
-    results = run_helper(calc_categorical_codes, merge_categorical_codes, path_to_extract, dataset_type, pids, path_to_cache_dir, **kwargs)
+    results = run_helper(calc_categorical_codes, merge_categorical_codes, path_to_extract, dataset_cls, pids, path_to_cache_dir, **kwargs)
 
     # Add codes to tokenizer config
     tokenizer_config, metadata = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
@@ -412,16 +411,16 @@ def add_categorical_codes(path_to_tokenizer_config: str, path_to_extract: str, d
     metadata['is_already_run']['add_categorical_codes'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_tokenizer_config_to_path(path_to_tokenizer_config, tokenizer_config, metadata)
 
-def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_type: str, pids: List[int], dataset: str = "v8", split: str = "train", **kwargs):
+def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_cls: str, pids: List[int], path_to_cache_dir: str, dataset: str = "v8", split: str = "train", **kwargs):
     #Add occurrence count to each entry in tokenizer config.
     print("Starting add_occurrence_count_to_codes function\n")
-    path_to_cache_dir: str = os.path.join(PATH_TO_CACHE_DIR, split, "add_occurrence_count_to_codes")
+    path_to_cache_dir: str = os.path.join(path_to_cache_dir, split, "add_occurrence_count_to_codes")
     os.makedirs(path_to_cache_dir, exist_ok=True)
 
     # Run function in parallel   
     print("Running run_helper") 
     start_time = datetime.datetime.now()
-    results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_extract, dataset_type, pids, path_to_cache_dir, additional_args=(path_to_tokenizer_config,), **kwargs)
+    results = run_helper(calc_code_2_occurrence_count, merge_code_2_occurrence_count, path_to_extract, dataset_cls, pids, path_to_cache_dir, additional_args=(path_to_tokenizer_config,), **kwargs)
     print(f"Finished run_helper, time taken: {datetime.datetime.now() - start_time}")
 
     # Add stats to tokenizer config
@@ -457,11 +456,11 @@ def add_occurrence_count_to_codes(path_to_tokenizer_config: str, path_to_extract
     print("Completed add_occurrence_count_to_codes function")
 
     
-def add_description_to_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_type: str, **kwargs):
-    if dataset_type == 'femr':
+def add_description_to_codes(path_to_tokenizer_config: str, path_to_extract: str, dataset_cls: str, **kwargs):
+    if dataset_cls == 'FEMRDataset':
         import femr.datasets
         femr_db = femr.datasets.PatientDatabase(path_to_extract)
-    elif dataset_type == 'meds':
+    elif dataset_cls == 'MEDSDataset':
         import meds_reader
         femr_db = meds_reader.SubjectDatabase(path_to_extract)
     
@@ -501,9 +500,9 @@ def remove_codes_belonging_to_vocabs(path_to_tokenizer_config: str, excluded_voc
 #
 ################################################
 
-def calc_parallelize(path_to_extract: str, dataset_type: str, func: Callable, merger: Callable, pids: List[int], path_to_cache_dir: Optional[str], n_procs: int = 5, chunk_size: int = 10000, additional_args: Tuple = ()):
+def calc_parallelize(path_to_extract: str, dataset_cls: str, func: Callable, merger: Callable, pids: List[int], path_to_cache_dir: Optional[str], n_procs: int = 5, chunk_size: int = 10000, additional_args: Tuple = ()):
     # Set up parallel tasks
-    tasks = [(path_to_cache_dir, path_to_extract, dataset_type, pids[start:start+chunk_size]) + additional_args for start in range(0, len(pids), chunk_size)]
+    tasks = [(path_to_cache_dir, path_to_extract, dataset_cls, pids[start:start+chunk_size]) + additional_args for start in range(0, len(pids), chunk_size)]
 
     # Debugging info
     print(f"calc_parallelize: {len(tasks)} tasks created")
@@ -517,10 +516,10 @@ def calc_parallelize(path_to_extract: str, dataset_type: str, func: Callable, me
 
     return merger(results)
 
-def run_helper(calc_func: Callable, merge_func: Callable, path_to_extract: str, dataset_type: str, pids: List[int], path_to_cache_dir: Optional[str], additional_args: Tuple = (), **kwargs):
+def run_helper(calc_func: Callable, merge_func: Callable, path_to_extract: str, dataset_cls: str, pids: List[int], path_to_cache_dir: Optional[str], additional_args: Tuple = (), **kwargs):
     print(f"Running {calc_func.__name__} for {len(pids)} patients")
     results = calc_parallelize(path_to_extract, 
-                               dataset_type,
+                               dataset_cls,
                                calc_func, 
                                merge_func, 
                                pids=pids,

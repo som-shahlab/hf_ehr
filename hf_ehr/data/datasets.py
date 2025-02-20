@@ -11,7 +11,7 @@ class BaseDataset(Dataset):
     pass
 
 class MEDSDataset(BaseDataset):
-    """Dataset that returns patients in a MEDS dataset.
+    """Dataset that returns patients in a MEDS dataset (after it has been converted to a MEDSReader extract).
         dataset[idx] = a specific patient, so you can only retrieve ONE sample per patient.
     """
     def __init__(self, 
@@ -262,8 +262,23 @@ class AllTokensFEMRDataset(FEMRDataset):
 
 if __name__ == '__main__':
     from hf_ehr.data.tokenization import CLMBRTokenizer, DescTokenizer
-    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_MIMIC4, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
     import time
+    
+    PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
+    # Datasets
+    PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
+    PATH_TO_FEMR_EXTRACT_MIMIC4 = '/share/pi/nigam/data/femr_mimic_4_extract'
+    # Tokenizers
+    PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/')
+    PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/')
+    PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json')
+    PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/')
+    PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
+    PATH_TO_TOKENIZER_COOKBOOK_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_v8/')
+    PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_v8_DIR, 'tokenizer_config.json')
+    PATH_TO_TOKENIZER_CEHR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cehr_v8/')
+    PATH_TO_TOKENIZER_CEHR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CEHR_v8_DIR, 'tokenizer_config.json')
+    
     # Tokenizer
     # tokenizer = CLMBRTokenizer(PATH_TO_TOKENIZER_CLMBR_v8_CONFIG)
 

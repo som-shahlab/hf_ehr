@@ -120,16 +120,17 @@ def load_datasets(config: DictConfig, tokenizer: Optional[BaseTokenizer]) -> Dic
         - Takes ~8s for each dataset to load using /share/pi/.
     """
     dataset_name: str = config.data.dataset.name
-    path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
     is_debug: bool = getattr(config.data.dataset, 'is_debug', False)
     seed: int = config.main.seed
     
     # Load datasets
     if dataset_name == 'FEMRDataset':
+        path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
         train_dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=is_debug, seed=seed)
         val_dataset = FEMRDataset(path_to_femr_extract, split='val', is_debug=is_debug, seed=seed)
         test_dataset = FEMRDataset(path_to_femr_extract, split='test', is_debug=is_debug, seed=seed)
     elif dataset_name == 'AllTokensFEMRDataset':
+        path_to_femr_extract: str = config.data.dataset.path_to_femr_extract
         max_length: int = config.data.dataloader.max_length
         assert tokenizer is not None, "Tokenizer must be provided for AllTokensFEMRDataset"
         train_dataset = AllTokensFEMRDataset(tokenizer, max_length, path_to_femr_extract, split='train', is_debug=is_debug, seed=seed)
@@ -141,7 +142,7 @@ def load_datasets(config: DictConfig, tokenizer: Optional[BaseTokenizer]) -> Dic
         val_dataset = MEDSDataset(path_to_meds_extract, split='val', is_debug=is_debug, seed=seed)
         test_dataset = MEDSDataset(path_to_meds_extract, split='test', is_debug=is_debug, seed=seed)
     else:
-        raise ValueError(f"Unknown dataset_name: {dataset_name}")
+        raise ValueError(f"Unknown value for config.data.dataset.name: {dataset_name}")
     
     return { 
         'train' : train_dataset, 

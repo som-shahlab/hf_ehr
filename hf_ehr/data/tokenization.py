@@ -1091,14 +1091,26 @@ def collate_femr_timelines(batch: List[Tuple[int, List[Event]]],
 
 if __name__ == '__main__':
     from hf_ehr.data.datasets import FEMRDataset
-    from hf_ehr.config import PATH_TO_FEMR_EXTRACT_v8, PATH_TO_TOKENIZER_CLMBR_v8_CONFIG, PATH_TO_TOKENIZER_DESC_v8_CONFIG, PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, PATH_TO_TOKENIZER_CEHR_v8_CONFIG
     
+    PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
+    # Datasets
+    PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
+    # Tokenizers
+    PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/')
+    PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/')
+    PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json')
+    PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/')
+    PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
+    PATH_TO_TOKENIZER_COOKBOOK_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_v8/')
+    PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_v8_DIR, 'tokenizer_config.json')
+    PATH_TO_TOKENIZER_CEHR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cehr_v8/')
+    PATH_TO_TOKENIZER_CEHR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CEHR_v8_DIR, 'tokenizer_config.json')
+
     # Load v8 dataset
     print("Loading v8 dataset...")
     path_to_femr_extract: str = PATH_TO_FEMR_EXTRACT_v8
     dataset = FEMRDataset(path_to_femr_extract, split='train', is_debug=False)
     
-  
     # Cookbook Tokenizer
     if False:
         print("Loading tokenizer...")

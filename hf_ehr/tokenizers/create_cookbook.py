@@ -2,8 +2,8 @@
 Creates a tokenizer config for the cookbook tokenizer
 
 Usage:
-python create_cookbook.py --dataset v8 --n_procs 5 --chunk_size 10000 --is_force_refresh
-python create_cookbook.py --dataset meds_dev --n_procs 10 --chunk_size 10000
+    python create_cookbook.py --path_to_dataset_config ../configs/data/v8.yaml --path_to_tokenizer_config ../configs/tokenizer/clmbr.yaml --n_procs 5 --chunk_size 10000 --is_force_refresh
+    python create_cookbook.py --path_to_dataset_config ../configs/data/meds_dev.yaml --path_to_tokenizer_config ../configs/tokenizer/clmbr.yaml --n_procs 10 --chunk_size 10000 --n_buckets_for_numerical_range_codes 5
 """
 
 import os
@@ -15,25 +15,24 @@ from typing import Any, Callable, Dict, List
 from utils import add_numerical_range_codes, add_unique_codes, add_occurrence_count_to_codes, remove_codes_belonging_to_vocabs, add_categorical_codes
 from hf_ehr.data.datasets import FEMRDataset, MEDSDataset
 from hf_ehr.config import (
-    PATH_TO_FEMR_EXTRACT_v8, 
-    PATH_TO_FEMR_EXTRACT_v9, 
-    PATH_TO_FEMR_EXTRACT_MIMIC4, 
-    PATH_TO_MEDS_EXTRACT_DEV, 
-    PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG, 
-    PATH_TO_TOKENIZER_COOKBOOK_MEDS_DEV_CONFIG, 
-    PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG,
     load_tokenizer_config_and_metadata_from_path, 
     save_tokenizer_config_to_path,
     NumericalRangeTCE, 
     CountOccurrencesTCEStat
 )
 from hf_ehr.tokenizers.utils import call_func_with_logging
+from hf_ehr.utils import get_dataset_info_from_config_yaml, get_tokenizer_info_from_config_yaml
+
+DEFAULT_PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/create_cookbook/'
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser('Generate statistics about dataset')
-    parser.add_argument('--dataset', choices=['v8', 'v9', 'mimic4', 'meds_dev', 'meds_dev_debug' ], default='v8', help='FEMR dataset version to use: v8 or v9')
-    parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
+    parser = argparse.ArgumentParser('Create CookbookTokenizer for a dataset')
+    parser.add_argument('--path_to_dataset_config', required=True, type=str, help='Config .yaml file for dataset to use')
+    parser.add_argument('--path_to_tokenizer_config', required=True, type=str, help='Config .yaml file for tokenizer to use')
+    parser.add_argument('--path_to_cache_dir', type=str, default=DEFAULT_PATH_TO_CACHE_DIR, help='Path to cache directory where intermediate results are stored')
+    parser.add_argument('--n_buckets_for_numerical_range_codes', type=int, default=10, help='Number of buckets to use for numerical range codes')
     parser.add_argument('--chunk_size', type=int, default=None, help='Number of pids per process')
+    parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
     parser.add_argument('--is_force_refresh', action='store_true', default=False, help='If specified, will force refresh the tokenizer config')
     parser.add_argument('--is_debug', action='store_true', default=False, help='If specified, only do 1000 patients')
     return parser.parse_args()
@@ -112,50 +111,24 @@ def meds_dev_etl(path_to_tokenizer_config: str):
 def main():
     start_total = time.time()
     args = parse_args()
-        
-    # Load datasets
-    start = time.time()
-    dataset_type: str = None
-    if args.dataset == 'v8':
-        dataset_type = 'femr'
-        path_to_extract = PATH_TO_FEMR_EXTRACT_v8
+    n_buckets_for_numerical_range_codes: int = args.n_buckets_for_numerical_range_codes
+
+    # Load dataset config
+    path_to_extract, dataset_cls = get_dataset_info_from_config_yaml(args.path_to_dataset_config)
+    
+    # Load tokenizer config
+    path_to_tokenizer_config, __ = get_tokenizer_info_from_config_yaml(args.path_to_tokenizer_config)
+
+    # Load actual dataset
+    if dataset_cls == 'FEMRDataset':
         dataset = FEMRDataset(path_to_extract, split='train', is_debug=False)
-    elif args.dataset == 'v9':
-        dataset_type = 'femr'
-        path_to_extract = PATH_TO_FEMR_EXTRACT_v9
-        dataset = FEMRDataset(path_to_extract, split='train', is_debug=False)
-    elif args.dataset == 'mimic4':
-        dataset_type = 'femr'
-        path_to_extract = PATH_TO_FEMR_EXTRACT_MIMIC4
-        dataset = FEMRDataset(path_to_extract, split='train', is_debug=False)
-    elif args.dataset == 'meds_dev':
-        dataset_type = 'meds'
-        path_to_extract = PATH_TO_MEDS_EXTRACT_DEV
+    elif dataset_cls == 'MEDSDataset':
         dataset = MEDSDataset(path_to_extract, split='train', is_debug=False)
-    elif args.dataset == 'meds_dev_debug':
-        dataset_type = 'meds'
-        path_to_extract = PATH_TO_MEDS_EXTRACT_DEV
-        dataset = MEDSDataset(path_to_extract, split='train', is_debug=True)
     else:
-        raise ValueError(f'Invalid dataset: {args.dataset}')
-    print(f"Time to load database: {time.time() - start:.2f}s")
+        raise ValueError(f'Invalid dataset `name` in YAML config: {dataset_cls}')
     pids: List[int] = dataset.get_pids().tolist()
     print(f"Loaded n={len(pids)} patients using extract at: `{path_to_extract}`")
     
-    # Load tokenizer config
-    if args.dataset == 'v8':
-        path_to_tokenizer_config = PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG
-    elif args.dataset == 'v9':
-        path_to_tokenizer_config = PATH_TO_TOKENIZER_COOKBOOK_v9_CONFIG
-    elif args.dataset == 'mimic4':
-        path_to_tokenizer_config = PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_CONFIG
-    elif args.dataset == 'meds_dev':
-        path_to_tokenizer_config = PATH_TO_TOKENIZER_COOKBOOK_MEDS_DEV_CONFIG
-    elif args.dataset == 'meds_dev_debug':
-        path_to_tokenizer_config = PATH_TO_TOKENIZER_COOKBOOK_MEDS_DEV_CONFIG + '_debug'
-    else:
-        raise ValueError(f'Invalid dataset: {args.dataset}')
-        
     # Create folder to store tokenizer config if it doesn't exist
     os.makedirs(os.path.dirname(path_to_tokenizer_config), exist_ok=True)
     if os.path.exists(path_to_tokenizer_config):
@@ -185,17 +158,17 @@ def main():
     print(f"Running with n_procs={args.n_procs}, chunk_size={chunk_size}")
 
     # With `n_procs=5`, should take ~25 mins
-    call_func_with_logging(add_unique_codes, 'add_unique_codes', path_to_tokenizer_config, pids=pids, n_procs=args.n_procs, chunk_size=chunk_size, path_to_extract=path_to_extract, dataset_type=dataset_type)
+    call_func_with_logging(add_unique_codes, 'add_unique_codes', path_to_tokenizer_config, pids=pids, path_to_cache_dir=path_to_cache_dir, n_procs=args.n_procs, chunk_size=chunk_size, path_to_extract=path_to_extract, dataset_cls=dataset_cls)
     tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     check_add_unique_codes(tokenizer_config)
     
     # With `n_procs=5`, should take ~XXXX mins
-    call_func_with_logging(add_categorical_codes, 'add_categorical_codes', path_to_tokenizer_config, pids=pids, n_procs=args.n_procs, path_to_extract=path_to_extract, dataset_type=dataset_type)
+    call_func_with_logging(add_categorical_codes, 'add_categorical_codes', path_to_tokenizer_config, pids=pids, n_procs=args.n_procs, path_to_cache_dir=path_to_cache_dir, path_to_extract=path_to_extract, dataset_cls=dataset_cls)
     tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     check_add_categorical_codes(tokenizer_config)
     
     # With `n_procs=5`, should take ~XXXX mins
-    call_func_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', path_to_tokenizer_config, pids=pids, N=10, path_to_extract=path_to_extract, dataset_type=dataset_type, n_procs=args.n_procs)
+    call_func_with_logging(add_numerical_range_codes, 'add_numerical_range_codes', path_to_tokenizer_config, pids=pids, N=n_buckets_for_numerical_range_codes, path_to_cache_dir=path_to_cache_dir, path_to_extract=path_to_extract, dataset_cls=dataset_cls, n_procs=args.n_procs)
     tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     check_add_numerical_range_codes(tokenizer_config)
     
@@ -205,7 +178,7 @@ def main():
     check_remove_codes_belonging_to_vocabs(tokenizer_config, excluded_vocabs)
     
     # With `n_procs=5`, should take ~XXXX mins
-    call_func_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', path_to_tokenizer_config, pids=pids, dataset=args.dataset, split='train', n_procs=args.n_procs, chunk_size=chunk_size, path_to_extract=path_to_extract, dataset_type=dataset_type)
+    call_func_with_logging(add_occurrence_count_to_codes, 'add_occurrence_count_to_codes', path_to_tokenizer_config, pids=pids, path_to_cache_dir=path_to_cache_dir, dataset=args.dataset, split='train', n_procs=args.n_procs, chunk_size=chunk_size, path_to_extract=path_to_extract, dataset_cls=dataset_cls)
     tokenizer_config, _ = load_tokenizer_config_and_metadata_from_path(path_to_tokenizer_config)
     check_add_occurrence_count_to_codes(tokenizer_config)
     

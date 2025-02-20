@@ -16,7 +16,6 @@ from torch.utils.data import DataLoader
 import datetime
 import traceback
 import pandas as pd
-from hf_ehr.config import H100_BASE_DIR, A100_BASE_DIR, V100_BASE_DIR, GPU_BASE_DIR, PATH_TO_FEMR_EXTRACT_v8, PATH_TO_FEMR_EXTRACT_MIMIC4
 from hf_ehr.data.datasets import AllTokensFEMRDataset, FEMRDataset
 from hf_ehr.data.tokenization import BaseTokenizer, collate_femr_timelines
 from hf_ehr.utils import load_config_from_ckpt, load_tokenizer_from_config, load_model_from_path, load_ckpt
@@ -35,20 +34,6 @@ def parse_args() -> Namespace:
     parser.add_argument('--is_debug', action='store_true', default=False, help='Debug setting')
     parser.add_argument('--is_load_from_config', action='store_true', default=False,  help='If TRUE, load dataset based on config')
     return parser.parse_args()
-
-def patch_config(config: DictConfig) -> None:
-    """Rewrite paths for Carina partitions."""
-    base_dir = GPU_BASE_DIR
-    femr_dataset_dirname = os.path.basename(config.data.dataset.path_to_femr_extract)
-    if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
-        base_dir = V100_BASE_DIR
-    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-a100':
-        base_dir = A100_BASE_DIR
-    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-h100':
-        base_dir = H100_BASE_DIR
-    elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
-        base_dir = GPU_BASE_DIR
-    config.data.dataset.path_to_femr_extract = os.path.join(base_dir, femr_dataset_dirname)
 
 def load_config(ckpt: Dict[str, Any]) -> Dict[str, Any]:
     """Load configuration from a checkpoint."""
@@ -207,11 +192,11 @@ def eval(model: BaseModel,
 def map_datasource_to_femr_extract(datasource: str) -> str:
     """Maps data source name (e.g. 'mimic4') to the proper path to FEMR extract"""
     if datasource == 'starr':
-        return PATH_TO_FEMR_EXTRACT_v8
+        return '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
     elif datasource == 'ehrshot':
         return '/share/pi/nigam/mwornow/ehrshot-benchmark/EHRSHOT_ASSETS/femr/extract'
     elif datasource == 'mimic4':
-        return PATH_TO_FEMR_EXTRACT_MIMIC4
+        return '/share/pi/nigam/data/femr_mimic_4_extract'
     else:
         raise ValueError(f"Unknown datasource: {datasource}")
 

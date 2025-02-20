@@ -66,7 +66,7 @@ class StartTrainingCheckpoint(ModelCheckpoint):
 
     def on_train_start(self, trainer, pl_module):
         # ! WARNING: Do not add a dist.barrier or rank_zero_only check here, or it will break DDP
-        # sicne `trainer.save_checkpoint()`` handles this automatically
+        # ! since `trainer.save_checkpoint()`` handles this automatically
         filepath = os.path.join(self.dirpath, f"{self.filename}.ckpt")
         if not os.path.exists(filepath):
             # Save a checkpoint at the beginning of training
@@ -142,6 +142,7 @@ def main(config: DictConfig) -> None:
     if 'trainer' in config and 'accumulate_grad_batches' in config.trainer:
         if config.trainer.accumulate_grad_batches == "__PLACEHOLDER__":
             try:
+                # Force gradient accumulation to keep 65536 tokens per accumulation step
                 assert config.data.dataloader.approx_batch_sampler.max_tokens <= 65536, "config.data.dataloader.approx_batch_sampler.max_tokens must be <= 65536"
                 assert 65536 % config.data.dataloader.approx_batch_sampler.max_tokens == 0, "config.data.dataloader.approx_batch_sampler.max_tokens must be a factor of 65536"
                 config.trainer.accumulate_grad_batches = 65536 // config.data.dataloader.approx_batch_sampler.max_tokens
@@ -149,7 +150,6 @@ def main(config: DictConfig) -> None:
             except (KeyError, ZeroDivisionError) as e:
                 logger.error(f"Failed to calculate accumulate_grad_batches: {e}")
                 return
-
 
     # Load config
     print(config)

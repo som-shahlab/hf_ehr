@@ -226,13 +226,11 @@ def create_race_sex_plot(demographics: Dict) -> None:
     plt.savefig('race_sex_plot.png')
 
 @hydra.main(version_base=None, config_path='../configs/', config_name='config')
-def main(config: DictConfig) -> None:
-    # Number of patients: 3769353
-    
+def main(config: DictConfig) -> None:    
     # Uncomment to generate the demographics json
-    # config.data.dataset.path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
-    # datasets = load_datasets(config)
-    # compute_statistics(datasets['train'], 'train')
+    config.data.dataset.path_to_femr_extract = PATH_TO_FEMR_EXTRACT_v9
+    datasets = load_datasets(config)
+    compute_statistics(datasets['train'], 'train')
 
     # Uncomment to generate the demographics plots
     demographics = json.load(open(get_json_path('train')))

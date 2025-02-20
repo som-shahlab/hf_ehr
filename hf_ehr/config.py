@@ -9,42 +9,20 @@ from dataclasses import dataclass, asdict, field
 import logging
 from tqdm import tqdm
 
+# FEMR splits for Stanford STARR-OMOP
 SPLIT_SEED: int = 97
 SPLIT_TRAIN_CUTOFF: float = 70
 SPLIT_VAL_CUTOFF: float = 85
 
-H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
-A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
-V100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
-GPU_BASE_DIR: str = '/share/pi/nigam/data/'
-SHAHLAB_SECURE_BASE_DIR: str = '/home/migufuen/hf_ehr/data/'
-
-PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/'
-PATH_TO_RUNS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'runs/')
-
-# Datasets
-PATH_TO_DATASET_CACHE_DIR = os.path.join(PATH_TO_CACHE_DIR, 'dataset/')
-PATH_TO_FEMR_EXTRACT_v9 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9'
-PATH_TO_FEMR_EXTRACT_v8 = '/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes'
-PATH_TO_FEMR_EXTRACT_MIMIC4 = '/share/pi/nigam/data/femr_mimic_4_extract'
-PATH_TO_MEDS_EXTRACT_DEV = '/share/pi/nigam/mwornow/meds-dev/benchmark_v1/meds-extract-v0.0.7_test_reader'
-
-# Tokenizers
-PATH_TO_TOKENIZERS_DIR: str = os.path.join(PATH_TO_CACHE_DIR, 'tokenizers/')
-PATH_TO_TOKENIZER_COOKBOOK_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_v8/')
-PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_debug/')
-PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_mimic4/')
-PATH_TO_TOKENIZER_COOKBOOK_MEDS_DEV_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cookbook_meds_dev/')
-PATH_TO_TOKENIZER_CLMBR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'clmbr_v8/')
-PATH_TO_TOKENIZER_CEHR_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'cehr_v8/')
-PATH_TO_TOKENIZER_DESC_v8_DIR: str = os.path.join(PATH_TO_TOKENIZERS_DIR, 'desc_v8/')
-PATH_TO_TOKENIZER_COOKBOOK_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_v8_DIR, 'tokenizer_config.json')
-PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_DEBUG_v8_DIR, 'tokenizer_config.json')
-PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_MIMIC4_DIR, 'tokenizer_config.json')
-PATH_TO_TOKENIZER_COOKBOOK_MEDS_DEV_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_COOKBOOK_MEDS_DEV_DIR, 'tokenizer_config.json')
-PATH_TO_TOKENIZER_CLMBR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CLMBR_v8_DIR, 'tokenizer_config.json')
-PATH_TO_TOKENIZER_CEHR_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_CEHR_v8_DIR, 'tokenizer_config.json')
-PATH_TO_TOKENIZER_DESC_v8_CONFIG: str = os.path.join(PATH_TO_TOKENIZER_DESC_v8_DIR, 'tokenizer_config.json')
+def copy_file(src: str, dest: str, is_overwrite_if_exists: bool = False) -> None:
+    """Copy a file or directory if it does not exist."""
+    if is_overwrite_if_exists or not os.path.exists(os.path.join(dest, os.path.basename(src))):
+        if os.path.isdir(src):
+            logger.info(f"Copying directory from `{src}` to `{dest}`.")
+            os.system(f'cp -r {src} {dest}')
+        else:
+            logger.info(f"Copying file from `{src}` to `{dest}`.")
+            os.system(f'cp {src} {dest}')
 
 def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: Any) -> None:
     """
@@ -68,6 +46,11 @@ def wrapper_with_logging(func: Callable, func_name: str, *args: Any, **kwargs: A
         logging.error(f"Error in {func_name}: {str(e)}")
         raise
 
+#############################################
+#
+# hf_ehr's internal Event type -- generic object for representing a clinical event
+#
+#############################################
 @dataclass()
 class Event():
     code: str # LOINC/1234
@@ -87,6 +70,13 @@ class Event():
 #############################################
 @dataclass()
 class TCEStat():
+    """A statistic about a token. 
+    
+    Examples:
+        - count_occurrences: Number of times a token occurs in a dataset
+        - count_patients: Number of unique patients with the token in a dataset
+        - ppl: Average perplexity of the token in a dataset
+    """
     type: Literal['count_occurrences', 'count_patients', 'ppl'] # type of this stat
 
     def to_dict(self) -> dict:
@@ -94,7 +84,7 @@ class TCEStat():
     
 @dataclass()
 class CountOccurrencesTCEStat(TCEStat):
-    # Counts total # of occurrences of token in dataset split
+    """Count of the # of times a token occurs in a dataset split."""
     dataset: Optional[str] = None
     split: Optional[str] = None
     count: Optional[str] = None
@@ -102,7 +92,7 @@ class CountOccurrencesTCEStat(TCEStat):
 
 @dataclass()
 class CountPatientsTCEStat(TCEStat):
-    # Counts total # of unique patients with this token in dataset split
+    """Count of the # of unique patients with a token in a dataset split."""
     dataset: Optional[str] = None
     split: Optional[str] = None
     count: Optional[int] = None
@@ -110,7 +100,7 @@ class CountPatientsTCEStat(TCEStat):
 
 @dataclass()
 class PPLTCEStat(TCEStat):
-    # Record the average perplexity of the token in the dataset split
+    """Average perplexity of a token in a dataset split."""
     dataset: Optional[str] = None
     split: Optional[str] = None
     model: Optional[str] = None
@@ -124,6 +114,7 @@ class PPLTCEStat(TCEStat):
 #############################################
 @dataclass()
 class TokenizerConfigEntry():
+    """A token in the tokenizer config. One entry per unique token. Includes metadata and stats about the token."""
     code: str # LOINC/1234 -- raw code
     type: Literal['numerical_range', 'categorical', 'code'] # type of this token
     description: Optional[str] = None # 'Glucose' -- description of the code
@@ -149,6 +140,13 @@ class TokenizerConfigEntry():
 
 @dataclass()
 class CodeTCE(TokenizerConfigEntry):
+    """A vanilla code token. 
+    
+    Examples:
+        - LOINC/1234
+        - ICD10/1234
+        - SNOMED/1234
+    """
     type: str = 'code'
 
     def to_token(self) -> str:
@@ -157,6 +155,13 @@ class CodeTCE(TokenizerConfigEntry):
 
 @dataclass()
 class NumericalRangeTCE(TokenizerConfigEntry):
+    """A token that represents a numerical range.
+    
+    Examples:
+        - LOINC/1234 || mg/dL || 0.0 - 100.0
+        - ICD10/1234 || kg || 0.0 - 100.0
+        - SNOMED/1234 || kg || 0.0 - 100.0
+    """
     type: str = 'numerical_range'
     tokenization: Dict[str, Any] = field(default_factory=lambda: {
         'unit' : None, 'range_start': None, 'range_end' : None, 
@@ -168,6 +173,13 @@ class NumericalRangeTCE(TokenizerConfigEntry):
 
 @dataclass()
 class CategoricalTCE(TokenizerConfigEntry):
+    """A token that represents a specific (set of) categorical values.
+    
+    Examples:
+        - LOINC/1234 || category1,category2,category3
+        - ICD10/1234 || category1,category2,category3
+        - SNOMED/1234 || category1,category2,category3
+    """
     type: str = 'categorical'
     tokenization: Dict[str, Any] = field(default_factory=lambda: {
         'categories': [] 
@@ -297,19 +309,15 @@ EHRSHOT_TASK_GROUP_2_LABELING_FUNCTION = {
 
 #############################################
 #
-# Helper functions
+# Carina-specific functions
 #
 #############################################
 
-def copy_file(src: str, dest: str, is_overwrite_if_exists: bool = False) -> None:
-    """Copy a file or directory if it does not exist."""
-    if is_overwrite_if_exists or not os.path.exists(os.path.join(dest, os.path.basename(src))):
-        if os.path.isdir(src):
-            logger.info(f"Copying directory from `{src}` to `{dest}`.")
-            os.system(f'cp -r {src} {dest}')
-        else:
-            logger.info(f"Copying file from `{src}` to `{dest}`.")
-            os.system(f'cp {src} {dest}')
+H100_BASE_DIR: str = '/local-scratch/nigam/users/hf_ehr/'
+A100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
+V100_BASE_DIR: str = '/local-scratch/nigam/hf_ehr/'
+GPU_BASE_DIR: str = '/share/pi/nigam/data/'
+SHAHLAB_SECURE_BASE_DIR: str = '/home/migufuen/hf_ehr/data/'
 
 def copy_resources_to_local(base_dir: str, is_overwrite_if_exists: bool = False) -> None:
     """Copy resources to local-scratch directories."""
@@ -317,7 +325,6 @@ def copy_resources_to_local(base_dir: str, is_overwrite_if_exists: bool = False)
     if base_dir == GPU_BASE_DIR:
         # Don't do any copying if GPU partiton b/c just using the shared drive for now
         return
-    # copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_08_13_extract_v9', base_dir, is_overwrite_if_exists=False)
     copy_file('/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes', base_dir, is_overwrite_if_exists=False)
     copy_file('/share/pi/nigam/mwornow/meds_dev', base_dir, is_overwrite_if_exists=False)
     
@@ -362,3 +369,17 @@ def rewrite_paths_for_carina_from_config(config: DictConfig) -> DictConfig:
     else:
         logger.info("No local-scratch directory found. Using default `/share/pi/` paths.")
     return config
+
+def patch_config(config: DictConfig) -> None:
+    """Rewrite paths for Carina partitions."""
+    base_dir = GPU_BASE_DIR
+    femr_dataset_dirname = os.path.basename(config.data.dataset.path_to_femr_extract)
+    if os.environ.get('SLURM_JOB_PARTITION') == 'nigam-v100':
+        base_dir = V100_BASE_DIR
+    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-a100':
+        base_dir = A100_BASE_DIR
+    elif os.environ.get('SLURM_JOB_PARTITION') == 'nigam-h100':
+        base_dir = H100_BASE_DIR
+    elif os.environ.get('SLURM_JOB_PARTITION') == 'gpu':
+        base_dir = GPU_BASE_DIR
+    config.data.dataset.path_to_femr_extract = os.path.join(base_dir, femr_dataset_dirname)
