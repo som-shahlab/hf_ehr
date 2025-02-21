@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, Union
 from torch import nn
 from omegaconf import DictConfig
 from transformers.models.bert.modeling_bert import BertSelfAttention
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 
 # Custom Bert Self Attention Layer with RoPE
 class RoPEBertSelfAttention(BertSelfAttention):

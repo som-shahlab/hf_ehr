@@ -5,7 +5,7 @@ from omegaconf import DictConfig
 from jaxtyping import Float
 from typing import Dict, Any, Optional
 
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 
 class LlamaLanguageModel(BaseModel):
     """

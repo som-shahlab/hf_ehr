@@ -4,7 +4,7 @@ from hf_ehr.trainer.loaders import load_dataloaders, load_datasets
 import numpy as np
 import os
 import time
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 import torch
 from argparse import ArgumentParser, Namespace
 from omegaconf import DictConfig, OmegaConf

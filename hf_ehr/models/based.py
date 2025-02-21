@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, Union
 from omegaconf import DictConfig
 from typing import Dict, Any, Optional
 from jaxtyping import Float
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 from based.models.gpt import GPTLMHeadModel
 
 class BasedLanguageModel(BaseModel):

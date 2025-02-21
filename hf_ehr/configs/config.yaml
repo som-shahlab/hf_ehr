@@ -6,6 +6,8 @@ main:
   # If TRUE, then delete existing checkpoint and restart from scratch
   # If FALSE, then resume from the checkpoint in the file `last.ckpt` in `path_to_output_dir` (if exists)
   is_force_restart: False
+  # If TRUE, then rewrite paths to use Shah Lab Carina directories (useful for internal Shah Lab runs)
+  is_carina: False
 
 hydra:
   run:

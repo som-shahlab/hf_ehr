@@ -137,7 +137,8 @@ def train_token_metric_func(val: int, last_val: Optional[int], config) -> Tuple[
 @hydra.main(version_base=None, config_path='../configs/', config_name="config")
 def main(config: DictConfig) -> None:
     # Rewrite paths for /local-scratch on certain partitions
-    config = rewrite_paths_for_carina_from_config(config)
+    if config.main.is_carina:
+        config = rewrite_paths_for_carina_from_config(config)
 
     if 'trainer' in config and 'accumulate_grad_batches' in config.trainer:
         if config.trainer.accumulate_grad_batches == "__PLACEHOLDER__":

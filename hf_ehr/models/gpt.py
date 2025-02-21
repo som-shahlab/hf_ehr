@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 from typing import Dict, Any, Optional
 from jaxtyping import Float
 from lightning.pytorch.utilities import rank_zero_only
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 
 #######################################
 ## Rotary Positional Embedding (ROPE) ##

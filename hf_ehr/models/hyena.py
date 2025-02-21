@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 from typing import Dict, Any, Optional, Tuple, Union
 from jaxtyping import Float
 
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 
 def hyena_forward(
     self: AutoModelForCausalLM,

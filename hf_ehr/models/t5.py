@@ -4,7 +4,7 @@ from omegaconf import DictConfig
 from typing import Union, Dict, Any, Optional
 from jaxtyping import Float
 
-from hf_ehr.models.modules import BaseModel
+from hf_ehr.models.base import BaseModel
 
 class T5LanguageModel(BaseModel):
     """
