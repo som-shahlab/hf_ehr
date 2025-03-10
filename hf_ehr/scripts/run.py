@@ -316,7 +316,6 @@ def main(config: DictConfig) -> None:
         tokenizer = CLMBRTokenizer( config.data.tokenizer.path_to_config )
     elif config.data.tokenizer.name == 'CookbookTokenizer':
         # Custom cookbook
-        raise ValueError("CookbookTokenizer is not supported in this script yet.")
         logger.info(f"Loading CookbookTokenizer: `{config.data.tokenizer.path_to_config}`")
         tokenizer = CookbookTokenizer( config.data.tokenizer.path_to_config, metadata=tokenizer_metadata, )
     elif config.data.tokenizer.name == 'CEHRTokenizer':
