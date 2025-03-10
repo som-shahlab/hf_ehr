@@ -41,6 +41,8 @@ class WandbRelogger:
         if highest_step_ckpt['global_step'] != self.get_last_step(path_to_last_ckpt):
             logger.critical(f'Current `last.ckpt` @ `{path_to_last_ckpt}` is not the highest step checkpoint. It has steps={self.get_last_step(path_to_last_ckpt)}, but the highest step checkpoint has `steps={highest_step_ckpt["global_step"]}`. Overwriting `last.ckpt` with the highest step checkpoint found at `{highest_step_ckpt_path}` (wandb_run_id={highest_step_ckpt["wandb_run_id"]}).')
             shutil.copy(highest_step_ckpt_path, path_to_last_ckpt)
+        else:
+            logger.critical(f'Current `last.ckpt` @ `{path_to_last_ckpt}` is the highest step checkpoint. No need to overwrite. Resuming run from checkpoint @ `{path_to_last_ckpt}`.')
         return highest_step_ckpt['wandb_run_id']
 
     def update_run_id(self, run_log_dir: str, run_id: str, prev_run_id: str):
