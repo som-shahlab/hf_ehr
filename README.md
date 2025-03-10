@@ -462,6 +462,14 @@ git add . && git commit -m "New version"
 make release
 ```
 
+To remove an existing tag and create a new one:
+
+```bash
+git tag -d v0.1.4
+git push origin --delete v0.1.4
+make release
+```
+
 ### MEDS-DEV
 
 First, create a tokenizer from the MEDS extract. This takes 834 seconds.
