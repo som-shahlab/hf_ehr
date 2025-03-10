@@ -52,7 +52,7 @@ for model_name in tqdm(models):
     path_to_tokenizer: str = os.path.join(path_to_model, 'logs', 'artifacts', 'tokenizer_config.json')
 
     # Load checkpoint
-    ckpt = torch.load(path_to_ckpt, map_location='cpu')
+    ckpt = torch.load(path_to_ckpt, map_location='cpu', weights_only=False)
 
     # Load config
     with open(path_to_config) as f:

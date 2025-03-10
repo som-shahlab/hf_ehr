@@ -26,7 +26,7 @@ class SortishSampler(Sampler):
         self.n_replicas: int = n_replicas
         self.bucket_size: int = bucket_size
         n_buckets: int = int(np.ceil(len(sequence_lengths) / self.bucket_size))
-        self.bucketed_data = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
+        self.bucketed_data: List[np.ndarray] = [self.data[i * bucket_size: i * bucket_size + bucket_size] for i in range(n_buckets)]
         self.epoch: int = 0
 
         self.n_samples_per_batch: Optional[List[int]] = n_samples_per_batch # [idx] = batch idx, [value] = number of samples in that batch
@@ -53,7 +53,7 @@ class SortishSampler(Sampler):
     def __iter__(self):
         """This gets called once at the start of every epoch."""
         np.random.seed(0)
-        data = np.copy(self.bucketed_data) # copy to prevent modifying the original data; for deterministic shuffling between epochs
+        data: List[np.ndarray] = [ np.copy(x) for x in self.bucketed_data ] # copy to prevent modifying the original data; for deterministic shuffling between epochs
         if self.is_random_shuffle_within_buckets:
             for bucket in data:
                 np.random.shuffle(bucket)

@@ -110,7 +110,7 @@ Launch a GPT training run with the ability to configure common hyperparameters (
 
 ```bash
 cd hf_ehr/scripts/carina
-python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 1024 --dataloader approx --dataset v8 --is_run_local --is_force_refresh
+python3 main.py --model gpt2 --size base --tokenizer clmbr --context_length 512 --dataloader approx --dataset v8 --trainer single_gpu --is_run_local --is_skip_base --extra "callbacks.model_checkpointing.save_most_recent_every_n_train_steps=10"
 ```
 
 Launch a Llama run on a MEDS dataset with more customization over configs (using `run.py`):

@@ -368,13 +368,15 @@ def main():
         exit(0)
 
     # Path to sbatch.sh file
+    print(f"Writing sbatch script to: {path_to_sbatch_script}")
     run_short_name: str = f"{args.model}_{args.size}_{args.context_length}_{args.tokenizer}_{args.dataset}_{args.dataloader}"
     random_int: int = random.randint(0, 1_000_000_000)
     path_to_slurm_scripts: str = os.path.abspath(os.path.join(__file__, '../../../../slurm_scripts'))
     path_to_sbatch_script: str = os.path.join(path_to_slurm_scripts, f"{run_short_name}_{random_int}.sh")
+    print(f"Making directory: {path_to_slurm_scripts}")
     os.makedirs(path_to_slurm_scripts, exist_ok=True)
 
-    # Write sbatch.sh file
+    # Write sbatch.sh filed
     with open(path_to_sbatch_script, 'w') as f:
         f.write(f"""#!/bin/bash
 #SBATCH --job-name={run_short_name}

@@ -24,8 +24,8 @@ def rename_files(file_paths):
             # From 'train-tokens-total_nonPAD-ckpt_val=1000000000-persist.ckpt' to 1000000000
             ckpt_val: int = int(re.search(r'ckpt_val=(\d+)', file_path).group(1))
             # Keep whichever checkpoint is closer to ckpt_val
-            ckpt_old = torch.load(new_file_path, map_location='cpu')
-            ckpt_new = torch.load(file_path, map_location='cpu')
+            ckpt_old = torch.load(new_file_path, map_location='cpu', weights_only=False)
+            ckpt_new = torch.load(file_path, map_location='cpu', weights_only=False)
             if abs(ckpt_old['train_total_tokens_nonPAD'] - ckpt_val) < abs(ckpt_new['train_total_tokens_nonPAD'] - ckpt_val):
                 # Old checkpoint is closer to ckpt_val, so keep it
                 print(f"WARNING: File already exists, skipping rename @ {file_path}")

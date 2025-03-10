@@ -21,12 +21,17 @@ from hf_ehr.models.gpt import GPTLanguageModel
 from hf_ehr.models.hyena import HyenaLanguageModel
 from hf_ehr.models.mamba import MambaLanguageModel
 from hf_ehr.models.llama import LlamaLanguageModel
-from hf_ehr.models.based import BasedLanguageModel
 from hf_ehr.models.t5 import T5LanguageModel
 from hf_ehr.trainer.loaders import load_datasets, load_dataloaders
 from hf_ehr.config import rewrite_paths_for_carina_from_config
 from hf_ehr.logger.reloggers import WandbRelogger
 import torch.distributed as dist
+
+try:
+    from hf_ehr.models.based import BasedLanguageModel
+except ImportError:
+    print("BasedLanguageModel not found")
+    pass
 
 class GradNormCallback(Callback):
     """
@@ -258,10 +263,10 @@ def main(config: DictConfig) -> None:
                     )
                     wandb_run_id = run.id
                 else:
-                    logger.critical(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
                     wandb_relogger = WandbRelogger(config.logging.wandb.project, config.logging.wandb.entity)
                     run = wandb_relogger.relog_metrics(path_to_resume_ckpt, path_to_log_dir)
                     wandb_run_id = run.id
+                    logger.critical(f"Restarting wandb run from prior run with id=`{wandb_run_id}`")
             
             loggers += [ 
                 WandbLogger(project=config.logging.wandb.project,

@@ -2,7 +2,7 @@ import wandb
 import torch
 import pandas as pd
 import os
-
+import shutil
 from loguru import logger
 
 class WandbRelogger:
@@ -15,11 +15,33 @@ class WandbRelogger:
         self.api = wandb.Api()
 
     def get_run_id(self, run_log_dir: str) -> str:
-        """Gets the wandb run ID from the run_log_dir."""
-        wandb_run_id: str = ''
-        with open(os.path.join(run_log_dir, 'wandb_run_id.txt'), 'r') as f:
-                wandb_run_id = f.read()
-        return wandb_run_id.strip()
+        """Go through all the prev_wandb_run_id_*.txt files (including wandb_run_id.txt) in the run_log_dir and return the one that
+        has the highest step."""
+        wandb_run_ids: List[str] = []
+        
+        # Get the previous checkpoint with the highest step
+        highest_step_ckpt_path: str | None = None
+        highest_step_ckpt: str | None = None
+        for file in os.listdir(os.path.join(run_log_dir, '../ckpts')):
+            if file.endswith('.ckpt'):
+                ckpt = torch.load(os.path.join(run_log_dir, '../ckpts', file), map_location='cpu', weights_only=False)
+                if (
+                    highest_step_ckpt is None or 
+                    ckpt['global_step'] > highest_step_ckpt['global_step']
+                ):
+                    highest_step_ckpt = ckpt
+                    highest_step_ckpt_path = os.path.abspath(os.path.join(run_log_dir, '../ckpts', file))
+
+        # Make sure that a checkpoint was found
+        if highest_step_ckpt is None:
+            raise ValueError(f'No checkpoint found in the run_log_dir @ `{run_log_dir}`')
+
+        # Make sure that 'last.ckpt' is the highest step checkpoint
+        path_to_last_ckpt = os.path.abspath(os.path.join(run_log_dir, '../ckpts', 'last.ckpt'))
+        if highest_step_ckpt['global_step'] != self.get_last_step(path_to_last_ckpt):
+            logger.critical(f'Current `last.ckpt` @ `{path_to_last_ckpt}` is not the highest step checkpoint. It has steps={self.get_last_step(path_to_last_ckpt)}, but the highest step checkpoint has `steps={highest_step_ckpt["global_step"]}`. Overwriting `last.ckpt` with the highest step checkpoint found at `{highest_step_ckpt_path}` (wandb_run_id={highest_step_ckpt["wandb_run_id"]}).')
+            shutil.copy(highest_step_ckpt_path, path_to_last_ckpt)
+        return highest_step_ckpt['wandb_run_id']
 
     def update_run_id(self, run_log_dir: str, run_id: str, prev_run_id: str):
         """Updates the wandb run ID in the run_log_dir."""
@@ -43,7 +65,7 @@ class WandbRelogger:
     
     def get_last_step(self, ckpt_path: str) -> int:
         """Gets the last step from the model checkpoint."""
-        checkpoint = torch.load(ckpt_path, map_location='cpu')
+        checkpoint = torch.load(ckpt_path, map_location='cpu', weights_only=False)
         return checkpoint["global_step"]
     
     def relog_metrics(self, ckpt_path: str, run_log_dir: str):
@@ -88,7 +110,7 @@ if __name__ == '__main__':
     new_run.finish()
     
     # This code loads the model checkpoint and "global_step" contains the int for the current step
-    # checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu')
+    # checkpoint = torch.load(PATH_TO_MODEL, map_location='cpu', weights_only=False)
     # print(checkpoint.keys())
     # print(checkpoint["global_step"])
     # exit()
