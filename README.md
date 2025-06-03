@@ -96,10 +96,9 @@ pip install -r requirements.txt --no-cache-dir
 pip install -e .
 
 # [Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
-cd hf_ehr/scripts/tokenizers
-sbatch clmbr.sh # Takes ~5 seconds
-sbatch desc.sh # Takes ~30 min
-sbatch cookbook.sh # Takes many hours
+python3 hf_ehr/tokenizers/create_clmbr.py # Takes ~5 seconds
+python3 hf_ehr/tokenizers/create_desc.py # Takes ~30 min
+python3 hf_ehr/tokenizers/create_cookbook.py # Takes many hours
 ```
 
 <a name="quick_start"/>

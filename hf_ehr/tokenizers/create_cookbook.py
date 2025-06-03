@@ -21,15 +21,13 @@ from hf_ehr.config import (
     CountOccurrencesTCEStat
 )
 from hf_ehr.tokenizers.utils import call_func_with_logging
-from hf_ehr.utils import get_dataset_info_from_config_yaml, get_tokenizer_info_from_config_yaml
-
-DEFAULT_PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/create_cookbook/'
+from hf_ehr.utils import get_dataset_info_from_config_yaml, get_tokenizer_info_from_config_yaml, get_rel_path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Create CookbookTokenizer for a dataset')
     parser.add_argument('--path_to_dataset_config', required=True, type=str, help='Config .yaml file for dataset to use')
     parser.add_argument('--path_to_tokenizer_config', required=True, type=str, help='Config .yaml file for tokenizer to use')
-    parser.add_argument('--path_to_cache_dir', type=str, default=DEFAULT_PATH_TO_CACHE_DIR, help='Path to cache directory where intermediate results are stored')
+    parser.add_argument('--path_to_cache_dir', type=str, default=get_rel_path('cache/create_cookbook/'), help='Path to cache directory where intermediate results are stored')
     parser.add_argument('--n_buckets_for_numerical_range_codes', type=int, default=10, help='Number of buckets to use for numerical range codes')
     parser.add_argument('--chunk_size', type=int, default=None, help='Number of pids per process')
     parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
@@ -112,6 +110,9 @@ def main():
     start_total = time.time()
     args = parse_args()
     n_buckets_for_numerical_range_codes: int = args.n_buckets_for_numerical_range_codes
+    
+    # Create cache directory if it doesn't exist
+    os.makedirs(args.path_to_cache_dir, exist_ok=True)
 
     # Load dataset config
     path_to_extract, dataset_cls = get_dataset_info_from_config_yaml(args.path_to_dataset_config)

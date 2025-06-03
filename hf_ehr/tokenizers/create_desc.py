@@ -2,7 +2,7 @@
 Creates a tokenizer config for the DescEmb tokenizer
 
 Usage:
-    python create_cookbook.py --path_to_dataset_config ../configs/data/v8.yaml --path_to_tokenizer_config ../configs/tokenizer/clmbr.yaml --n_procs 5 --chunk_size 10000 --is_force_refresh
+    python create_desc.py --path_to_dataset_config ../configs/data/v8.yaml --path_to_tokenizer_config ../configs/tokenizer/clmbr.yaml --n_procs 5 --chunk_size 10000 --is_force_refresh
 """
 
 import os
@@ -21,7 +21,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--path_to_dataset_config', required=True, type=str, help='Config .yaml file for dataset to use')
     parser.add_argument('--path_to_tokenizer_config', required=True, type=str, help='Config .yaml file for tokenizer to use')
     parser.add_argument('--path_to_cache_dir', type=str, default=DEFAULT_PATH_TO_CACHE_DIR, help='Path to cache directory where intermediate results are stored')
-    # parser.add_argument('--n_buckets_for_numerical_range_codes', type=int, default=10, help='Number of buckets to use for numerical range codes')
     parser.add_argument('--chunk_size', type=int, default=None, help='Number of pids per process')
     parser.add_argument('--n_procs', type=int, default=5, help='Number of processes to use')
     parser.add_argument('--is_force_refresh', action='store_true', default=False, help='If specified, will force refresh the tokenizer config')

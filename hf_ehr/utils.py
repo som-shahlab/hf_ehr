@@ -231,7 +231,7 @@ def get_tokenizer_info_from_config_yaml(path_to_config_yaml: str) -> Tuple[str, 
     Returns:
         Tuple[str, str]: A tuple containing the path to the tokenizer_config.json and the type of tokenizer.
     """
-    config_tokenizer: str = yaml.safe_load(open(args.path_to_tokenizer_config, 'r'))
+    config_tokenizer: str = yaml.safe_load(open(path_to_config_yaml, 'r'))
     assert 'data' in config_tokenizer, f"Expected 'data' in config_tokenizer, got {config_tokenizer.keys()}"
     assert 'tokenizer' in config_tokenizer['data'], f"Expected 'tokenizer' in config_tokenizer['data'], got {config_tokenizer['data'].keys()}"
     assert 'path_to_config' in config_tokenizer['data']['tokenizer'], f"Expected 'path_to_config' in config_tokenizer['data']['tokenizer'], got {config_tokenizer['data']['tokenizer'].keys()}"

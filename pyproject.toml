@@ -40,6 +40,8 @@ dependencies = [
     "meds_etl==0.3.8",
     "femr==0.1.16",
     "pyyaml==6.0.1",
+    "build",
+    "twine",
     "torch"
 ]
 
