@@ -22,6 +22,16 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 
 Please see our [HuggingFace Collection](https://huggingface.co/collections/StanfordShahLab/context-clues-models-6757f893f6a2918c7ab809f1) to download the following models pretrained from scratch on 2 billion tokens of deidentified structured EHR data:
 
+```python
+from transformers import AutoModelForCausalLM
+from hf_ehr.data.tokenization import CLMBRTokenizer
+
+model = AutoModelForCausalLM.from_pretrained("StanfordShahLab/gpt-base-512-clmbr")
+tokenizer = CLMBRTokenizer.from_pretrained("StanfordShahLab/gpt-base-512-clmbr")
+```
+
+All models:
+
 | Model | Context Lengths |
 | ----- | ------------- |
 | gpt | [512](https://huggingface.co/StanfordShahLab/gpt-base-512-clmbr), [1024](https://huggingface.co/StanfordShahLab/gpt-base-1024-clmbr), [2048](https://huggingface.co/StanfordShahLab/gpt-base-2048-clmbr), [4096](https://huggingface.co/StanfordShahLab/gpt-base-4096-clmbr) |
@@ -92,8 +102,7 @@ Development install:
 ```bash
 conda create -n hf_env python=3.10 -y
 conda activate hf_env
-pip install -r requirements.txt --no-cache-dir
-pip install -e .
+pip install -e . --no-cache-dir
 
 # [Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
 python3 hf_ehr/tokenizers/create_clmbr.py # Takes ~5 seconds
