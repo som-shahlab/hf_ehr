@@ -92,8 +92,7 @@ Development install:
 ```bash
 conda create -n hf_env python=3.10 -y
 conda activate hf_env
-pip install -r requirements.txt --no-cache-dir
-pip install -e .
+pip install -e . --no-cache-dir
 
 # [Optional] If you haven't already created your **Tokenizers**, run the following. If you're on Carina, then skip this step.
 cd hf_ehr/scripts/tokenizers
