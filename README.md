@@ -431,7 +431,7 @@ For a fixed sequence length of `500`...
 | StanfordShahLab/mamba-tiny-1024-clmbr   |       9225.39 |          500 |     0.929321   |
 | StanfordShahLab/mamba-tiny-4096-clmbr   |       9225.39 |          500 |     0.918106   |
 | StanfordShahLab/mamba-tiny-8192-clmbr   |       9225.39 |          500 |     0.913788   |
-| StanfordShahLab/mamba-tiny-16384-clmbr  |      75097.6  |          500 |     1.13286    |
+| StanfordShahLab/mamba-tiny-16384-clmbr  |      75097.60  |          500 |     1.13286    |
 | StanfordShahLab/hyena-large-1024-clmbr  |       1873.65 |          500 |     0.157894   |
 | StanfordShahLab/hyena-large-4096-clmbr  |       1898.93 |          500 |     0.0143214  |
 | StanfordShahLab/hyena-large-8192-clmbr  |       1900.43 |          500 |     0.0147968  |
