@@ -462,8 +462,6 @@ When using the `pip install mamba-ssm causal-conv1d` packages for accelerated Ma
 
 | Model                              |   GPU Mem (MB) |   Sequence Length |   Time per forward pass (s) |
 |:----------------------------------------|--------------:|-------------:|---------------:|
-| model_name                             |   peak_memory |   seq_length |   time_per_seq |
-|:---------------------------------------|--------------:|-------------:|---------------:|
 | StanfordShahLab/mamba-tiny-1024-clmbr  |       1952.03 |          500 |      0.0595783 |
 | StanfordShahLab/mamba-tiny-4096-clmbr  |       1952.03 |          500 |      0.0205079 |
 | StanfordShahLab/mamba-tiny-8192-clmbr  |       1952.03 |          500 |      0.0202962 |
