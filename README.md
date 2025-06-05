@@ -444,19 +444,19 @@ For varying sequence lengths to the `maximum` supported by each model...
 | StanfordShahLab/gpt-base-512-clmbr      |       1672.24 |          492 |     0.00668569 |
 | StanfordShahLab/gpt-base-1024-clmbr     |       2918.64 |         1004 |     0.010623   |
 | StanfordShahLab/gpt-base-2048-clmbr     |       5415.06 |         2028 |     0.0173378  |
-| StanfordShahLab/gpt-base-4096-clmbr     |      10467.4  |         4076 |     0.0358181  |
+| StanfordShahLab/gpt-base-4096-clmbr     |      10467.40  |         4076 |     0.0358181  |
 | StanfordShahLab/llama-base-512-clmbr    |       1248.85 |          492 |     0.00650101 |
-| StanfordShahLab/llama-base-1024-clmbr   |       2003.7  |         1004 |     0.00906057 |
+| StanfordShahLab/llama-base-1024-clmbr   |       2003.70  |         1004 |     0.00906057 |
 | StanfordShahLab/llama-base-2048-clmbr   |       3477.72 |         2028 |     0.0141757  |
-| StanfordShahLab/llama-base-4096-clmbr   |       6495    |         4076 |     0.026729   |
-| StanfordShahLab/mamba-tiny-1024-clmbr   |      17701.5  |         1004 |     1.87138    |
-| StanfordShahLab/mamba-tiny-4096-clmbr   |      70163.3  |         4076 |     7.94088    |
+| StanfordShahLab/llama-base-4096-clmbr   |       6495.00    |         4076 |     0.026729   |
+| StanfordShahLab/mamba-tiny-1024-clmbr   |      17701.50  |         1004 |     1.87138    |
+| StanfordShahLab/mamba-tiny-4096-clmbr   |      70163.30  |         4076 |     7.94088    |
 | StanfordShahLab/mamba-tiny-8192-clmbr   |        OOM    |         8172 |   --          |
 | StanfordShahLab/mamba-tiny-16384-clmbr  |        OOM    |        16364 |   --          |
 | StanfordShahLab/hyena-large-1024-clmbr  |       3242.75 |         1004 |     0.0167934  |
-| StanfordShahLab/hyena-large-4096-clmbr  |      11557.6  |         4076 |     0.0334628  |
-| StanfordShahLab/hyena-large-8192-clmbr  |      22618.4  |         8172 |     0.183798   |
-| StanfordShahLab/hyena-large-16384-clmbr |      44731.1  |        16364 |     0.11162    |
+| StanfordShahLab/hyena-large-4096-clmbr  |      11557.60  |         4076 |     0.0334628  |
+| StanfordShahLab/hyena-large-8192-clmbr  |      22618.40  |         8172 |     0.183798   |
+| StanfordShahLab/hyena-large-16384-clmbr |      44731.10  |        16364 |     0.11162    |
 
 When using the `pip install mamba-ssm causal-conv1d` packages for accelerated Mamba:
 
@@ -467,9 +467,9 @@ When using the `pip install mamba-ssm causal-conv1d` packages for accelerated Ma
 | StanfordShahLab/mamba-tiny-8192-clmbr  |       1952.03 |          500 |      0.0202962 |
 | StanfordShahLab/mamba-tiny-16384-clmbr |       1952.03 |          500 |      0.0200981 |
 | StanfordShahLab/mamba-tiny-1024-clmbr  |       3271.28 |         1004 |      0.0236377 |
-| StanfordShahLab/mamba-tiny-4096-clmbr  |      11728.2  |         4076 |      0.0447765 |
-| StanfordShahLab/mamba-tiny-8192-clmbr  |      22923.1  |         8172 |      0.0768456 |
-| StanfordShahLab/mamba-tiny-16384-clmbr |      45357.6  |        16364 |      0.137661  |
+| StanfordShahLab/mamba-tiny-4096-clmbr  |      11728.20  |         4076 |      0.0447765 |
+| StanfordShahLab/mamba-tiny-8192-clmbr  |      22923.10  |         8172 |      0.0768456 |
+| StanfordShahLab/mamba-tiny-16384-clmbr |      45357.60  |        16364 |      0.137661  |
 
 <a name="other" />
 
