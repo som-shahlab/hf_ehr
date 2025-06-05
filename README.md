@@ -387,16 +387,14 @@ meds_reader_verify $PATH_TO_MEDS $PATH_TO_MEDS_READER
 
 4. **Create train/val/test splits** (80/10/10) by running the below Python script. *Note: This takes ~1 min to run.*
 ```bash
-cd hf_ehr/scripts/datasets
-python split_meds_dataset.py --path_to_meds_reader $PATH_TO_MEDS_READER --train_split_size 0.8 --val_split_size 0.1
+python3 hf_ehr/scripts/datasets/split_meds_dataset.py --path_to_meds_reader $PATH_TO_MEDS_READER --train_split_size 0.8 --val_split_size 0.1
 ```
 
 5. **Train** a tokenizer on the dataset. Limit our vocabulary to the top-$k$ most frequently occurring codes. **TODO**
 
 ```bash
-cd hf_ehr/tokenizers
-python create_cookbook.py --dataset truven --n_procs 5 --chunk_size 10000 --is_force_refresh
-python create_cookbook_k.py --dataset truven --k 32 --stat count_occurrences
+python3 hf_ehr/tokenizers/create_cookbook.py --path_to_dataset_config hf_ehr/configs/data/truven.yaml --path_to_tokenizer_config hf_ehr/configs/tokenizer/truven.yaml --n_procs 32 --chunk_size 10000 --is_force_refresh
+python3 hf_ehr/tokenizers/create_cookbook_k.py --path_to_tokenizer_config hf_ehr/configs/tokenizer/truven.yaml --k 32 --stat count_occurrences
 ```
 
 6. **Train** a **Llama model** on the dataset using 2 GPUs. *Note: This takes ~5 hrs per epoch with 2 H100's.*
