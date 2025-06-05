@@ -13,6 +13,7 @@ It currently supports EHR data defined using the [**MEDS data standard**](https:
 1. 📊 [Evaluation](#evaluation)
 1. 💊 [MEDS Demo](#meds_demo)
 1. Ⓜ️ [Merative/Truven/MarketScan Demo](#truven_demo)
+1. 🔍 [Profiling](#profiling)
 1. ℹ️ [Other](#other)
 1. 🎓 [Citation](#citation)
 
@@ -407,6 +408,73 @@ cd hf_ehr/scripts/carina
 python3 main.py --model llama --size base --tokenizer clmbr --context_length 512 --dataloader batch --dataset truven --trainer multi_gpu_2 --is_run_local --is_force_refresh
 ``` 
 
+
+<a name="profiling" />
+
+## 🔍 Profiling
+
+Run `python3 hf_ehr/scripts/huggingface/profile.py` to calculate the GPU memory requirements and speed of a forward pass for each model (inference).
+
+### H100 (80GB)
+
+Results when testing on one H100 (80GB) GPU.
+
+For a fixed sequence length of `500`...
+
+| Model                              |   GPU Mem (MB) |   Sequence Length |   Time per forward pass (s) |
+|:----------------------------------------|--------------:|-------------:|---------------:|
+| StanfordShahLab/gpt-base-512-clmbr      |       1733.18 |          500 |     0.0477076  |
+| StanfordShahLab/gpt-base-1024-clmbr     |       1742.49 |          500 |     0.00666604 |
+| StanfordShahLab/gpt-base-2048-clmbr     |       1784.28 |          500 |     0.0067502  |
+| StanfordShahLab/gpt-base-4096-clmbr     |       1932.71 |          500 |     0.00669129 |
+| StanfordShahLab/llama-base-512-clmbr    |       1257.64 |          500 |     0.0132446  |
+| StanfordShahLab/llama-base-1024-clmbr   |       1257.64 |          500 |     0.00650663 |
+| StanfordShahLab/llama-base-2048-clmbr   |       1257.64 |          500 |     0.00649655 |
+| StanfordShahLab/llama-base-4096-clmbr   |       1257.64 |          500 |     0.00647738 |
+| StanfordShahLab/mamba-tiny-1024-clmbr   |       9225.39 |          500 |     0.929321   |
+| StanfordShahLab/mamba-tiny-4096-clmbr   |       9225.39 |          500 |     0.918106   |
+| StanfordShahLab/mamba-tiny-8192-clmbr   |       9225.39 |          500 |     0.913788   |
+| StanfordShahLab/mamba-tiny-16384-clmbr  |      75097.6  |          500 |     1.13286    |
+| StanfordShahLab/hyena-large-1024-clmbr  |       1873.65 |          500 |     0.157894   |
+| StanfordShahLab/hyena-large-4096-clmbr  |       1898.93 |          500 |     0.0143214  |
+| StanfordShahLab/hyena-large-8192-clmbr  |       1900.43 |          500 |     0.0147968  |
+| StanfordShahLab/hyena-large-16384-clmbr |       1903.43 |          500 |     0.0146549  |
+
+For varying sequence lengths to the `maximum` supported by each model...
+
+| Model                              |   GPU Mem (MB) |   Sequence Length |   Time per forward pass (s) |
+|:----------------------------------------|--------------:|-------------:|---------------:|
+| StanfordShahLab/gpt-base-512-clmbr      |       1672.24 |          492 |     0.00668569 |
+| StanfordShahLab/gpt-base-1024-clmbr     |       2918.64 |         1004 |     0.010623   |
+| StanfordShahLab/gpt-base-2048-clmbr     |       5415.06 |         2028 |     0.0173378  |
+| StanfordShahLab/gpt-base-4096-clmbr     |      10467.4  |         4076 |     0.0358181  |
+| StanfordShahLab/llama-base-512-clmbr    |       1248.85 |          492 |     0.00650101 |
+| StanfordShahLab/llama-base-1024-clmbr   |       2003.7  |         1004 |     0.00906057 |
+| StanfordShahLab/llama-base-2048-clmbr   |       3477.72 |         2028 |     0.0141757  |
+| StanfordShahLab/llama-base-4096-clmbr   |       6495    |         4076 |     0.026729   |
+| StanfordShahLab/mamba-tiny-1024-clmbr   |      17701.5  |         1004 |     1.87138    |
+| StanfordShahLab/mamba-tiny-4096-clmbr   |      70163.3  |         4076 |     7.94088    |
+| StanfordShahLab/mamba-tiny-8192-clmbr   |        OOM    |         8172 |   --          |
+| StanfordShahLab/mamba-tiny-16384-clmbr  |        OOM    |        16364 |   --          |
+| StanfordShahLab/hyena-large-1024-clmbr  |       3242.75 |         1004 |     0.0167934  |
+| StanfordShahLab/hyena-large-4096-clmbr  |      11557.6  |         4076 |     0.0334628  |
+| StanfordShahLab/hyena-large-8192-clmbr  |      22618.4  |         8172 |     0.183798   |
+| StanfordShahLab/hyena-large-16384-clmbr |      44731.1  |        16364 |     0.11162    |
+
+When using the `pip install mamba-ssm causal-conv1d` packages for accelerated Mamba:
+
+| Model                              |   GPU Mem (MB) |   Sequence Length |   Time per forward pass (s) |
+|:----------------------------------------|--------------:|-------------:|---------------:|
+| model_name                             |   peak_memory |   seq_length |   time_per_seq |
+|:---------------------------------------|--------------:|-------------:|---------------:|
+| StanfordShahLab/mamba-tiny-1024-clmbr  |       1952.03 |          500 |      0.0595783 |
+| StanfordShahLab/mamba-tiny-4096-clmbr  |       1952.03 |          500 |      0.0205079 |
+| StanfordShahLab/mamba-tiny-8192-clmbr  |       1952.03 |          500 |      0.0202962 |
+| StanfordShahLab/mamba-tiny-16384-clmbr |       1952.03 |          500 |      0.0200981 |
+| StanfordShahLab/mamba-tiny-1024-clmbr  |       3271.28 |         1004 |      0.0236377 |
+| StanfordShahLab/mamba-tiny-4096-clmbr  |      11728.2  |         4076 |      0.0447765 |
+| StanfordShahLab/mamba-tiny-8192-clmbr  |      22923.1  |         8172 |      0.0768456 |
+| StanfordShahLab/mamba-tiny-16384-clmbr |      45357.6  |        16364 |      0.137661  |
 
 <a name="other" />
 
