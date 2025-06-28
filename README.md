@@ -78,12 +78,21 @@ textual_tokens: List[str] = tokenizer.convert_events_to_tokens(patient)
 
 ####################################
 # 4. Run model
-logits = model(**batch).logits
-# > logits.shape = torch.Size([1, 9, 39818])
+outputs = model(**batch, output_hidden_states=True)
 
 ####################################
-# 5. Get patient representation for finetuning (usually we choose the last token's logits)
-representation = logits[:, -1, :]
+# 5. Get logits + probabilities for next token
+logits = outputs.logits
+# > logits.shape = torch.Size([1, 9, 39818])
+next_token_preds = torch.nn.functional.softmax(logits[:, -1, :], dim=-1) # should sum to 1
+# > next_token_pred.shape = torch.Size([1, 39818])
+
+####################################
+# 5. Get patient representation for finetuning (usually the hidden state of the LAST layer for the LAST token
+last_layer_hidden_state = outputs.hidden_states[-1]
+# > last_layer_hidden_state.shape = torch.Size([1, 9, 768])
+patient_rep = last_layer_hidden_state[:, -1, :]
+# > patient_rep.shape = torch.Size([1, 768])
 ```
 <a name="installation" />
 
