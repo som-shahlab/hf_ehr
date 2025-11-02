@@ -13,7 +13,8 @@ from hf_ehr.data.datasets import FEMRDataset, MEDSDataset
 from hf_ehr.tokenizers.utils import call_func_with_logging, load_tokenizer_config_and_metadata_from_path, add_unique_codes, add_description_to_codes
 from hf_ehr.utils import get_dataset_info_from_config_yaml, get_tokenizer_info_from_config_yaml
 
-DEFAULT_PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/create_desc/'
+#DEFAULT_PATH_TO_CACHE_DIR: str = '/share/pi/nigam/mwornow/hf_ehr/cache/create_desc/'
+DEFAULT_PATH_TO_CACHE_DIR: str = '/share/pi/nigam/projects/jfries/hf_ehr/cache/create_desc/'
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser('Create DescEmb tokenizer config')
@@ -39,6 +40,7 @@ def check_remove_codes_belonging_to_vocabs(tokenizer_config, excluded_vocabs):
 
 def main():
     start_total = time.time()
+    args = parse_args()
 
     # Load dataset config
     path_to_extract, dataset_cls = get_dataset_info_from_config_yaml(args.path_to_dataset_config)
@@ -82,6 +84,7 @@ def main():
     # Hparams
     chunk_size: int = args.chunk_size if args.chunk_size else len(pids) // args.n_procs
     excluded_vocabs = ['STANFORD_OBS']
+    path_to_cache_dir = args.path_to_cache_dir
     print(f"Running with n_procs={args.n_procs}, chunk_size={chunk_size}")
 
     # With `n_procs=5`, should take ~25 mins

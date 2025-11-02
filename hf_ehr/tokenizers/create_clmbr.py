@@ -5,7 +5,7 @@ Limits to top k tokens
 import argparse
 import json
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 import os
 from tqdm import tqdm
 from hf_ehr.config import (

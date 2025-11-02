@@ -249,7 +249,8 @@ def get_dataset_info_from_config_yaml(path_to_config_yaml: str) -> Tuple[str, st
     Returns:
         Tuple[str, str]: A tuple containing the path to the extract and the type of dataset.
     """
-    config_dataset: str = yaml.safe_load(open(args.path_to_dataset_config, 'r'))
+    #config_dataset: str = yaml.safe_load(open(args.path_to_dataset_config, 'r'))
+    config_dataset: str = yaml.safe_load(open(path_to_config_yaml, 'r'))
     assert 'data' in config_dataset, f"Expected 'data' in config_dataset, got {config_dataset.keys()}"
     assert 'dataset' in config_dataset['data'], f"Expected 'dataset' in config_dataset['data'], got {config_dataset['data'].keys()}"
     assert 'name' in config_dataset['data']['dataset'], f"Expected 'name' in config_dataset['data']['dataset'], got {config_dataset['data']['dataset'].keys()}"
