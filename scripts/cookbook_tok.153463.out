@@ -1,9 +1,0 @@
-Loaded n=2567450 patients using extract at: `/share/pi/nigam/data/som-rit-phi-starr-prod.starr_omop_cdm5_deid_2023_02_08_extract_v8_no_notes`
-Overwriting tokenizer config at: /share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/clmbr_v8/tokenizer_config.json
-==> Saving tokenizer config to: `/share/pi/nigam/mwornow/hf_ehr/cache/tokenizers/clmbr_v8/tokenizer_config.json`
-Running with n_procs=5, chunk_size=10000
-
-----
-Start | add_unique_codes()...
-Running calc_unique_codes for 2567450 patients
-calc_parallelize: 257 tasks created
